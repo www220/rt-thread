@@ -70,6 +70,13 @@ struct at91_uart {
  */
 void rt_at91_usart_handler(int vector, void *param)
 {
+    register rt_uint32_t ir = REG_RD(REGS_UARTDBG_BASE, HW_UARTDBGRIS);
+    if (ir & BM_UARTDBGRIS_RXRIS)
+    {
+        rt_device_t dev = (rt_device_t)param;
+        rt_hw_serial_isr((struct rt_serial_device *)dev, RT_SERIAL_EVENT_RX_IND);
+        REG_WR(REGS_UARTDBG_BASE, HW_UARTDBGICR, BM_UARTDBGICR_RXIC);
+    }
 }
 
 /**
@@ -100,8 +107,11 @@ static int at91_usart_putc(struct rt_serial_device *serial, char c)
 
 static int at91_usart_getc(struct rt_serial_device *serial)
 {
-    int result;
-	result = -1;
+    int result = -1;
+
+	/* Read data byte */
+	if ((REG_RD(REGS_UARTDBG_BASE, HW_UARTDBGFR) & BM_UARTDBGFR_RXFE) == 0)
+        result = REG_RD(REGS_UARTDBG_BASE, HW_UARTDBGDR) & 0xff;
 
     return result;
 }
@@ -123,18 +133,11 @@ struct at91_uart dbgu = {
 
 #endif
 
-void at91_usart_gpio_init(void)
-{
-	rt_uint32_t val;
-}
-
 /**
  * This function will handle init uart
  */
 void rt_hw_usart_init(void)
 {
-	at91_usart_gpio_init();
-
 #if defined(RT_USING_DBGU)
 	serial_dbgu.ops = &at91_usart_ops;
 	serial_dbgu.config.baud_rate = BAUD_RATE_115200;
@@ -147,12 +150,13 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_dbgu, "dbgu", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &dbgu);
+    
+    REG_WR(REGS_UARTDBG_BASE, HW_UARTDBGCR, BM_UARTDBGCR_TXE | BM_UARTDBGCR_RXE | BM_UARTDBGCR_UARTEN);
+	REG_WR(REGS_UARTDBG_BASE, HW_UARTDBGLCR_H, BM_UARTDBGLCR_H_WLEN);
+    REG_WR(REGS_UARTDBG_BASE, HW_UARTDBGIMSC, BM_UARTDBGIMSC_RXIM);
+    
+    /* install interrupt handler */
+    rt_hw_interrupt_install(IRQ_DUART, rt_at91_usart_handler, &serial_dbgu, "DbgU");
+    rt_hw_interrupt_umask(IRQ_DUART);
 #endif
 }
-
-#ifdef RT_USING_DBGU
-void rt_dbgu_isr(void)
-{
-	rt_at91_usart_handler(dbgu.irq, &(serial_dbgu.parent));
-}
-#endif

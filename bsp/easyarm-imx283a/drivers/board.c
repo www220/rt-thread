@@ -28,34 +28,12 @@
 #include "board.h"
 #include <mmu.h>
 
-extern void rt_hw_interrupt_init(void);
-extern void rt_hw_timer0_init(void);
-
 static struct mem_desc hw_mem_desc[] =
 {
     { 0x00000000, 0xFFFFFFFF, 0x00000000, RW_NCNB },/* None cached for 4G memory */
 //  visual start, visual end, phy start , props
-    { 0x00000000, 0x000FFFFF, 0x41008000, RW_CB },  /* ISR Vector table */
+    { 0x00000000, 0x000000FF, 0x41008000, RW_CB },  /* ISR Vector table */
 };
-
-/**
- * This function will handle rtos timer
- */
-static void rt_systick_handler(int vector, void *param)
-{
-    rt_kprintf("tick\n");
-}
-
-/**
- * This function will init pit for system ticks
- */
-static void rt_hw_timer_init()
-{
-    rt_hw_timer0_init();
-    /* install interrupt handler */
-    rt_hw_interrupt_install(IRQ_TIMER0, rt_systick_handler, RT_NULL, "SysTick");
-    rt_hw_interrupt_umask(IRQ_TIMER0);
-}
 
 void rt_hw_board_init()
 {
@@ -78,8 +56,10 @@ void inittmppath(void)
 {
 }
 
+extern volatile int wtdog_count;
 void cpu_usage_idle_hook(void)
 {
+    wtdog_count = 0;
 }
 
 /*@}*/

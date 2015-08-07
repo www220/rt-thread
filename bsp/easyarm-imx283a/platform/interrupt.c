@@ -53,23 +53,13 @@ rt_isr_handler_t rt_hw_interrupt_handle(rt_uint32_t vector, void *param)
  */
 void rt_hw_interrupt_init(void)
 {
-    register rt_uint32_t idx,start,cur;
+    register rt_uint32_t idx;
 
 	/* Reset icoll */
 	REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_CTRL_CLR, BM_ICOLL_CTRL_SFTRST);
+	while (REG_RD_ADDR(REGS_ICOL_BASE + HW_ICOLL_CTRL) & BM_ICOLL_CTRL_SFTRST)
+		;
 
-	for (idx=0; idx<200; idx++) {
-		if (!(REG_RD_ADDR(REGS_ICOL_BASE + HW_ICOLL_CTRL) & BM_ICOLL_CTRL_SFTRST))
-			break;
-        
-        start = cur = REG_RD_ADDR(REGS_DIGCTL_BASE + HW_DIGCTL_MICROSECONDS);
-        while (cur == start)
-            cur = REG_RD_ADDR(REGS_DIGCTL_BASE + HW_DIGCTL_MICROSECONDS);
-	}
-	if (idx >= 200) {
-		rt_kprintf("%s:%d timeout when enableing\n", __func__, __LINE__);
-		;//return;
-	}
 	REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_CTRL_CLR, BM_ICOLL_CTRL_CLKGATE);
 
     /* init exceptions table */
@@ -99,9 +89,7 @@ void rt_hw_interrupt_init(void)
     REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_LEVELACK,
                  BF_ICOLL_LEVELACK_IRQLEVELACK(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL3));
 
-    REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_VBASE, 0);      
     REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_VECTOR, 0);
-    REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_CTRL, BM_ICOLL_CTRL_IRQ_FINAL_ENABLE);
     /* Barrier */
     (void)REG_RD_ADDR(REGS_ICOL_BASE + HW_ICOLL_STAT);    
 }
@@ -122,7 +110,6 @@ void rt_hw_interrupt_mask(int irq)
 void rt_hw_interrupt_umask(int irq)
 {
     REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_INTERRUPTn_SET(irq), BM_ICOLL_INTERRUPTn_ENABLE);
-    REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_INTERRUPTn_CLR(irq), BM_ICOLL_INTERRUPTn_ENFIQ);
 }
 
 /**
@@ -162,7 +149,6 @@ rt_uint32_t rt_hw_interrupt_get_active(rt_uint32_t fiq_irq)
     REG_RD_ADDR(REGS_ICOL_BASE + HW_ICOLL_VECTOR);
     /* get irq number */
     id = REG_RD_ADDR(REGS_ICOL_BASE + HW_ICOLL_STAT);
-    rt_kprintf("irq %d\n",id);
     return id;
 }
 
@@ -170,7 +156,8 @@ void rt_hw_interrupt_ack(rt_uint32_t fiq_irq, rt_uint32_t id)
 {
     REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_VECTOR, 0);
     /* ACK current interrupt */
-    REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_LEVELACK, BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0);
+    REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_LEVELACK,
+                 BF_ICOLL_LEVELACK_IRQLEVELACK(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0));
     /* Barrier */
     (void)REG_RD_ADDR(REGS_ICOL_BASE + HW_ICOLL_STAT);
 }

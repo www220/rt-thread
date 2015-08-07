@@ -31,11 +31,18 @@
  */
 #define N		0
 
-/* Ticks per second */
-#define CONFIG_SYS_HZ	1000
-
 /* Maximum fixed count */
-#define TIMER_LOAD_VAL	1000
+#define TIMER_LOAD_VAL	32000/RT_TICK_PER_SECOND
+
+void rt_hw_systick_handler(int vector, void *param)
+{
+    register rt_uint32_t ir = REG_RD(REGS_TIMROT_BASE, HW_TIMROT_TIMCTRLn(N));
+    if (ir & BM_TIMROT_TIMCTRLn_IRQ)
+    {
+        rt_tick_increase();
+        REG_WR(REGS_TIMROT_BASE, HW_TIMROT_TIMCTRLn_CLR(N), BM_TIMROT_TIMCTRLn_IRQ);
+    }
+}
 
 void rt_hw_timer0_init(void)
 {
@@ -64,13 +71,13 @@ void rt_hw_timer0_init(void)
 	* Now initialize timer
 	*/
 
-	/* Set fixed_count to 0 */
-	REG_WR(REGS_TIMROT_BASE, HW_TIMROT_FIXED_COUNTn(N), 0);
+	/* Set fixed_count to 0xffffffff */
+	REG_WR(REGS_TIMROT_BASE, HW_TIMROT_FIXED_COUNTn(N), 0xffffffff);
 
 	/* set UPDATE bit and 1Khz frequency */
 	REG_WR(REGS_TIMROT_BASE, HW_TIMROT_TIMCTRLn(N),
 		BM_TIMROT_TIMCTRLn_RELOAD | BM_TIMROT_TIMCTRLn_UPDATE |
-		BV_TIMROT_TIMCTRLn_SELECT__1KHZ_XTAL);
+		BV_TIMROT_TIMCTRLn_SELECT__32KHZ_XTAL | BM_TIMROT_TIMCTRLn_IRQ_EN);
 
 	/* Set fixed_count to maximal value */
 	REG_WR(REGS_TIMROT_BASE, HW_TIMROT_FIXED_COUNTn(N), TIMER_LOAD_VAL);
@@ -79,13 +86,12 @@ void rt_hw_timer0_init(void)
         for (i=0; i<16; i++)
             pp1[i] = pp2[i];
     }
-	REG_WR(REGS_TIMROT_BASE, HW_TIMROT_TIMCTRLn(N), REG_RD(REGS_TIMROT_BASE, HW_TIMROT_TIMCTRLn(N)) | BM_TIMROT_TIMCTRLn_IRQ_EN);
-    {
-        while (0)
-        {
-            unsigned int aa = REG_RD(REGS_TIMROT_BASE, HW_TIMROT_RUNNING_COUNTn(N));
-            if (aa <= 1)
-                rt_kprintf("elsep ok %d\n",aa);
-        }
-    }
+}
+
+void rt_hw_timer_init()
+{
+    rt_hw_timer0_init();
+    /* install interrupt handler */
+    rt_hw_interrupt_install(IRQ_TIMER0, rt_hw_systick_handler, RT_NULL, "SysTick");
+    rt_hw_interrupt_umask(IRQ_TIMER0);
 }

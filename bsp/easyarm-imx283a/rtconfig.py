@@ -33,7 +33,7 @@ if PLATFORM == 'gcc':
     OBJDUMP = PREFIX + 'objdump'
     OBJCPY = PREFIX + 'objcopy'
 
-    DEVICE = ' -mcpu=arm926ej-s'
+    DEVICE = ' -mcpu=arm926ej-s -Wall'
     CFLAGS = DEVICE
     AFLAGS = '-c'+ DEVICE + ' -x assembler-with-cpp'
     AFLAGS += ' -Iplatform'

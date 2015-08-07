@@ -29,6 +29,7 @@
 #include "regs-uartdbg.h"
 #include "regs-digctl.h"
 #include "regs-timrot.h"
+#include "regs-uartdbg.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64
@@ -42,8 +43,12 @@
 #define FINSH_DEVICE_NAME "dbgu"
 
 void rt_hw_board_init(void);
+void rt_hw_interrupt_init(void);
 void rt_hw_usart_init(void);
+void rt_hw_timer_init(void);
 void rt_hw_spi_init(void);
 void rt_hw_rtc_init(void);
+
+void inittmppath(void);
 
 #endif
