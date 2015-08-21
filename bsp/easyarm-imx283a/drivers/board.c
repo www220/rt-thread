@@ -52,13 +52,4 @@ void rt_hw_board_init()
     rt_hw_timer_init();
 }
 
-void inittmppath(void)
-{
-}
-
-void cpu_usage_idle_hook(void)
-{
-    wtdog_count = 0;
-}
-
 /*@}*/

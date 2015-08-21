@@ -112,8 +112,8 @@
 #define RT_DFS_ELM_MAX_LFN			255
 #define RT_DFS_ELM_MAX_SECTOR_SIZE  4096
 
-//#define RT_USING_DFS_ROMFS
-//#define DFS_ROMFS_ROOT
+#define RT_USING_DFS_ROMFS
+#define DFS_ROMFS_ROOT
 #define RT_USING_DFS_DEVFS
 
 /* the max number of mounted filesystem */

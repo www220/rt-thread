@@ -2,27 +2,81 @@ Import('RTT_ROOT')
 Import('rtconfig')
 from building import *
 
-cwd     = os.path.join(str(Dir('#')), 'drivers')
+cwd = GetCurrentDir()
 
-# add the general drvers.
 src = Split("""
+romfs.c
+platform.c
+""")
+
+basedev_src = Split("""
 board.c
 usart.c
 """)
 
-# add Ethernet drvers.
-if GetDepend('RT_USING_LED'):
-	src += ['led.c']
+basesim_src = Split("""
+simbase.c
+simusart.c
+""")
 
-if GetDepend('RT_USING_SDIO'):
-	src += ['at91_mci.c']
+ethdev_src = Split("""
+deveth.c
+""")
 
-if GetDepend('RT_USING_LWIP'):
-	src += ['macb.c']
+ethsim_src = Split("""
+simeth.c
+""")
 
-if GetDepend('RT_USING_I2C') and GetDepend('RT_USING_I2C_BITOPS'):
-	src += ['at91_i2c_gpio.c']
+rtcdev_src = Split("""
+devrtc.c
+""")
 
+rtcsim_src = Split("""
+simrtc.c
+win32/pktdrv.c
+""")
+
+spidev_src = Split("""
+devspi.c
+w25qxx.c
+""")
+
+spisim_src = Split("""
+simw25qxx.c
+""")
+
+elmdev_src = Split("""
+w25ftl.c
+""")
+
+if rtconfig.PLATFORM != 'cl':
+    src += basedev_src
+else:
+    src += basesim_src
+
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_LWIP']):
+        src += ethdev_src
+else:
+    if GetDepend(['RT_USING_LWIP']):
+        src += ethsim_src
+    
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_RTC']):
+        src += rtcdev_src
+else:
+    if GetDepend(['RT_USING_RTC']):
+        src += rtcsim_src
+
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_SPI']):
+        src += spidev_src
+else:
+    if GetDepend(['RT_USING_RTC']):
+        src += spisim_src
+
+if GetDepend(['RT_USING_DFS_ELMFAT']):
+    src += elmdev_src
     
 CPPPATH = [cwd]
 
