@@ -30,11 +30,12 @@
 #include "regs-digctl.h"
 #include "regs-timrot.h"
 #include "regs-uartdbg.h"
+#include "regs-clkctrl.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64
-#define HEAP_SIZE         64
-#define HEAP_END          (0x40000000 + 64 * 1024 * 1024)
+#define HEAP_SIZE         32
+#define HEAP_END          (0x40000000 + HEAP_SIZE * 1024 * 1024)
 
 #define RT_USING_DBGU
 //#deiine RT_USING_UART1
@@ -49,6 +50,7 @@ void rt_hw_timer_init(void);
 void rt_hw_spi_init(void);
 void rt_hw_rtc_init(void);
 
+extern volatile int wtdog_count;
 void inittmppath(void);
 
 #endif

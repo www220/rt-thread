@@ -56,7 +56,6 @@ void inittmppath(void)
 {
 }
 
-extern volatile int wtdog_count;
 void cpu_usage_idle_hook(void)
 {
     wtdog_count = 0;

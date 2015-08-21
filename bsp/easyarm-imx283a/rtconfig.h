@@ -71,7 +71,9 @@
 #define RT_USING_MEMHEAP
 
 /* Using Small MM */
-#define RT_USING_SMALL_MEM
+//#define RT_USING_SMALL_MEM
+/* Using SLAB Allocator */
+#define RT_USING_SLAB
 
 /* Using Libc */
 #define RT_USING_LIBC

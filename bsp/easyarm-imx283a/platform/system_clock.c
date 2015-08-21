@@ -90,3 +90,123 @@ void rt_hw_timer_init()
     rt_hw_interrupt_install(IRQ_TIMER0, rt_hw_systick_handler, RT_NULL, "SysTick");
     rt_hw_interrupt_umask(IRQ_TIMER0);
 }
+
+static u32 mx28_get_pclk(void)
+{
+	const u32 xtal = 24, ref = 480;
+	u32 clkfrac, clkseq, clkctrl;
+	u32 frac, div;
+	u32 pclk;
+
+	clkfrac = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_FRAC0);
+	clkseq = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_CLKSEQ);
+	clkctrl = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_CPU);
+
+	if (clkctrl & (BM_CLKCTRL_CPU_DIV_XTAL_FRAC_EN |
+		BM_CLKCTRL_CPU_DIV_CPU_FRAC_EN)) {
+		/* No support of fractional divider calculation */
+		pclk = 0;
+	} else {
+		if (clkseq & BM_CLKCTRL_CLKSEQ_BYPASS_CPU) {
+			/* xtal path */
+			div = (clkctrl & BM_CLKCTRL_CPU_DIV_XTAL) >>
+				BP_CLKCTRL_CPU_DIV_XTAL;
+			pclk = xtal / div;
+		} else {
+			/* ref path */
+			frac = (clkfrac & BM_CLKCTRL_FRAC0_CPUFRAC) >>
+				BP_CLKCTRL_FRAC0_CPUFRAC;
+			div = (clkctrl & BM_CLKCTRL_CPU_DIV_CPU) >>
+				BP_CLKCTRL_CPU_DIV_CPU;
+			pclk =  (ref * 18 / frac) / div;
+		}
+	}
+
+	return pclk;
+}
+static u32 mx28_get_hclk(void)
+{
+	u32 clkctrl, div, hclk;
+
+	clkctrl = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_HBUS);
+
+	if (clkctrl & BM_CLKCTRL_HBUS_DIV_FRAC_EN) {
+		/* No support of fractional divider calculation */
+		hclk = 0;
+	} else {
+		div = (clkctrl & BM_CLKCTRL_HBUS_DIV) >>
+			BP_CLKCTRL_HBUS_DIV;
+		hclk = mx28_get_pclk() / div;
+	}
+
+	return hclk;
+}
+static u32 mx28_get_emiclk(void)
+{
+	const u32 xtal = 24, ref = 480;
+	u32 clkfrac, clkseq, clkctrl;
+	u32 frac, div;
+	u32 emiclk;
+
+	clkfrac = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_FRAC0);
+	clkseq = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_CLKSEQ);
+	clkctrl = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_EMI);
+
+	if (clkseq & BM_CLKCTRL_CLKSEQ_BYPASS_EMI) {
+		/* xtal path */
+		div = (clkctrl & BM_CLKCTRL_EMI_DIV_XTAL) >>
+			BP_CLKCTRL_EMI_DIV_XTAL;
+		emiclk = xtal / div;
+	} else {
+		/* ref path */
+		frac = (clkfrac & BM_CLKCTRL_FRAC0_EMIFRAC) >>
+			BP_CLKCTRL_FRAC0_EMIFRAC;
+		div = (clkctrl & BM_CLKCTRL_EMI_DIV_EMI) >>
+			BP_CLKCTRL_EMI_DIV_EMI;
+		emiclk =  (ref * 18 / frac) / div;
+	}
+
+	return emiclk;
+}
+static u32 mx28_get_gpmiclk(void)
+{
+	const u32 xtal = 24, ref = 480;
+	u32 clkfrac, clkseq, clkctrl;
+	u32 frac, div;
+	u32 gpmiclk;
+
+	clkfrac = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_FRAC1);
+	clkseq = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_CLKSEQ);
+	clkctrl = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_GPMI);
+
+	if (clkseq & BM_CLKCTRL_CLKSEQ_BYPASS_GPMI) {
+		/* xtal path */
+		div = (clkctrl & BM_CLKCTRL_GPMI_DIV) >>
+			BP_CLKCTRL_GPMI_DIV;
+		gpmiclk = xtal / div;
+	} else {
+		/* ref path */
+		frac = (clkfrac & BM_CLKCTRL_FRAC1_GPMIFRAC) >>
+			BP_CLKCTRL_FRAC1_GPMIFRAC;
+		div = (clkctrl & BM_CLKCTRL_GPMI_DIV) >>
+			BP_CLKCTRL_GPMI_DIV;
+		gpmiclk =  (ref * 18 / frac) / div;
+	}
+
+	return gpmiclk;
+}
+
+#ifdef RT_USING_FINSH
+void list_cpuinfo(void)
+{
+	rt_kprintf("Freescale i.MX28 family\n");
+	rt_kprintf("CPU:   %d MHz\n", mx28_get_pclk());
+	rt_kprintf("BUS:   %d MHz\n", mx28_get_hclk());
+	rt_kprintf("EMI:   %d MHz\n", mx28_get_emiclk());
+	rt_kprintf("GPMI:   %d MHz\n", mx28_get_gpmiclk());
+}
+
+#include <finsh.h>
+FINSH_FUNCTION_EXPORT(list_cpuinfo, list cpu info);
+MSH_CMD_EXPORT(list_cpuinfo, list cpu info);
+#endif
