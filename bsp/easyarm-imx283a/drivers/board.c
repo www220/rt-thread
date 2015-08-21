@@ -30,9 +30,9 @@
 
 static struct mem_desc hw_mem_desc[] =
 {
-    { 0x00000000, 0xFFFFFFFF, 0x00000000, RW_NCNB },/* None cached for 4G memory */
-//  visual start, visual end, phy start , props
-    { 0x00000000, 0x000000FF, 0x41008000, RW_CB },  /* ISR Vector table */
+	{ 0x00000000, 0xFFFFFFFF, 0x00000000, RW_NCNB },     /* None cached for 4G memory */
+	{ 0x40000000, 0x44000000, 0x40000000, RW_CB },       /* 64M cached SDRAM memory */
+	{ 0x00000000, 0x00001000, 0x40000000, RW_CB },       /* isr vector table */
 };
 
 void rt_hw_board_init()

@@ -81,11 +81,6 @@ void rt_hw_timer0_init(void)
 
 	/* Set fixed_count to maximal value */
 	REG_WR(REGS_TIMROT_BASE, HW_TIMROT_FIXED_COUNTn(N), TIMER_LOAD_VAL);
-    {
-        unsigned int *pp1 = (unsigned int *)0,*pp2 = (unsigned int *)0x41008000,i;
-        for (i=0; i<16; i++)
-            pp1[i] = pp2[i];
-    }
 }
 
 void rt_hw_timer_init()

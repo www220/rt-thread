@@ -24,6 +24,7 @@
  */
 
 #include <rthw.h>
+#include <rtthread.h>
 #include "board.h"
 #include "regs-icoll.h"
 
@@ -69,7 +70,7 @@ void rt_hw_interrupt_init(void)
         irq_desc[idx].handler = (rt_isr_handler_t)rt_hw_interrupt_handle;
         irq_desc[idx].param = RT_NULL;
 #ifdef RT_USING_INTERRUPT_INFO
-        rt_snprintf(irq_desc[idx].name, RT_NAME_MAX - 1, "default");
+        rt_snprintf(irq_desc[idx].name, RT_NAME_MAX - 1, "null");
         irq_desc[idx].counter = 0;
 #endif
     }
@@ -169,7 +170,7 @@ void list_irq(void)
     rt_kprintf("number\tcount\tname\n");
     for (irq = 0; irq < MAX_HANDLERS; irq++)
     {
-        if (rt_strncmp(irq_desc[irq].name, "default", sizeof("default")))
+        if (rt_strncmp(irq_desc[irq].name, "null", sizeof("null")))
         {
             rt_kprintf("%02ld: %10ld  %s\n",
                        irq, irq_desc[irq].counter, irq_desc[irq].name);
@@ -179,5 +180,5 @@ void list_irq(void)
 
 #include <finsh.h>
 FINSH_FUNCTION_EXPORT(list_irq, list system irq);
-
+MSH_CMD_EXPORT(list_irq, list system irq);
 #endif
