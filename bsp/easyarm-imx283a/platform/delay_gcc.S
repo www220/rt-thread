@@ -8,7 +8,7 @@
  * published by the Free Software Foundation.
  */
  
-#define HZ 100
+#define HZ 1000
 #define ENTRY(name) \
   .globl name; \
   .align 0; \

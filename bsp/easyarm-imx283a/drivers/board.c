@@ -28,8 +28,8 @@
 #include "board.h"
 #include <mmu.h>
 
-unsigned long loops_per_jiffy = 0x115000;
-#define jiffies ((REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS))/1000/(1000/HZ))
+unsigned long loops_per_jiffy = 0x1bb00;
+#define jiffies ((REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS))/1000)
 
 void calibrate_delay(void)
 {

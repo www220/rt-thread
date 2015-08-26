@@ -58,7 +58,7 @@ extern void __bad_udelay(void);
 extern void __udelay(unsigned long usecs);
 extern void __const_udelay(unsigned long);
 
-#define HZ 100
+#define HZ 1000
 #define MAX_UDELAY_MS 2
 
 #define udelay(n)							\
