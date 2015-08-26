@@ -3,5 +3,6 @@
 
 #include "mx28.h"
 typedef unsigned int u32;
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #endif	/* __COMMON_H_ */
