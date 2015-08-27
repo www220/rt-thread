@@ -13,6 +13,7 @@ basedev_src = Split("""
 board.c
 usart.c
 nand.c
+apbh_dma.c
 """)
 
 basesim_src = Split("""
