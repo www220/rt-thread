@@ -12,6 +12,7 @@ platform.c
 basedev_src = Split("""
 board.c
 usart.c
+nand.c
 """)
 
 basesim_src = Split("""
@@ -25,6 +26,7 @@ deveth.c
 
 ethsim_src = Split("""
 simeth.c
+win32/pktdrv.c
 """)
 
 rtcdev_src = Split("""
@@ -33,7 +35,6 @@ devrtc.c
 
 rtcsim_src = Split("""
 simrtc.c
-win32/pktdrv.c
 """)
 
 spidev_src = Split("""
@@ -72,7 +73,7 @@ if rtconfig.PLATFORM != 'cl':
     if GetDepend(['RT_USING_SPI']):
         src += spidev_src
 else:
-    if GetDepend(['RT_USING_RTC']):
+    if GetDepend(['RT_USING_SPI']):
         src += spisim_src
 
 if GetDepend(['RT_USING_DFS_ELMFAT']):

@@ -75,7 +75,6 @@ static struct mem_desc hw_mem_desc[] =
 	{ 0x00000000, 0x00001000, 0x40000000, RW_CB },       /* isr vector table */
 };
 
-/* Gpmi pins */
 static struct pin_desc gpmi_pins_desc[] = {
 	{ PINID_GPMI_D00, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
 	{ PINID_GPMI_D01, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
@@ -95,32 +94,64 @@ static struct pin_desc gpmi_pins_desc[] = {
 	{ PINID_GPMI_CE1N, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
 	{ PINID_GPMI_RESETN, PIN_FUN1, PAD_4MA, PAD_3V3, 0 }
 };
+static struct pin_desc led_pins_desc[] = {
+	{ PINID_GPMI_RDY1, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_LCD_D21, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_LCD_D22, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_LCD_D23, PIN_GPIO, PAD_8MA, PAD_3V3, 1 }
+};
 
 static struct pin_group gpmi_pins = {
 	.pins		= gpmi_pins_desc,
 	.nr_pins	= ARRAY_SIZE(gpmi_pins_desc)
 };
+static struct pin_group led_pins = {
+	.pins		= led_pins_desc,
+	.nr_pins	= ARRAY_SIZE(led_pins_desc)
+};
 
 void rt_hw_board_init()
 {
+    u32 init[10];
+    init[0] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
+
+    /* Set up LED pins */
+	pin_set_group(&led_pins);
+    
+	pin_gpio_direction(PINID_GPMI_RDY1, 1);
+	pin_gpio_direction(PINID_LCD_D21, 1);
+	pin_gpio_direction(PINID_LCD_D22, 1);
+	pin_gpio_direction(PINID_LCD_D23, 1);
+    pin_gpio_set(PINID_GPMI_RDY1, 0);
+
     /* initialize mmu */
     rt_hw_mmu_init(hw_mem_desc, sizeof(hw_mem_desc)/sizeof(hw_mem_desc[0]));
+    init[1] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
     /* init udelay */
     calibrate_delay();
+    init[2] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
+    pin_gpio_set(PINID_GPMI_RDY1, 1);
     /* initialize hardware interrupt */
     rt_hw_interrupt_init();
-    
+    init[3] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
+
     /* initialize uart */
     rt_hw_usart_init();
 #ifdef RT_USING_CONSOLE
     rt_console_set_device(CONSOLE_DEVICE);
 #endif
+    init[4] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
 
     /* initialize timer0 */
     rt_hw_timer_init();
-    
+    init[5] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
+
     /* Set up GPMI pins */
 	pin_set_group(&gpmi_pins);
+    rt_hw_mtd_nand_init();
+
+    pin_gpio_set(PINID_GPMI_RDY1, 0);
+    rt_kprintf("init %d all %d\n",init[2]-init[1],init[5]-init[0]);
 }
 
 /*@}*/

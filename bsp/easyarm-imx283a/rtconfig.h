@@ -85,6 +85,8 @@
 #define RT_USING_SERIAL
 //#define RT_USING_SPI
 //#define RT_USING_RTC
+#define RT_MTD_NAND_DEBUG
+#define RT_USING_MTD_NAND
 
 /* SECTION: Console options */
 #define RT_USING_CONSOLE
@@ -93,8 +95,9 @@
 
 /* SECTION: finsh, a C-Express shell */
 #define RT_USING_FINSH
-#define FINSH_USING_MSH
-#define FINSH_USING_MSH_ONLY
+//#define FINSH_USING_MSH
+//#define FINSH_USING_MSH_ONLY
+
 /* Using symbol table */
 #define FINSH_USING_SYMTAB
 #define FINSH_USING_DESCRIPTION
@@ -123,7 +126,7 @@
 
 /* SECTION: sqlite, sql */
 //#define RT_USING_SQLITE
-#define rttTempFileDir "/spi/tmp"
+#define rttTempFileDir "/tmp"
 extern int rttGetTempname(int nBuf, char *zBuf);
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */

@@ -30,13 +30,13 @@
 #include <board.h>
 #include <rtthread.h>
 
-#define LED_ERR_PORT	GPIOF
-#define LED_ERR_PIN		GPIO_Pin_8
-#define LED_RUN_PORT	GPIOF
-#define LED_RUN_PIN		GPIO_Pin_7
+#define LED_ERR_PORT	PINID_LCD_D23
+#define LED_ERR_PIN		
+#define LED_RUN_PORT	PINID_LCD_D22
+#define LED_RUN_PIN		
 
-#define WDT_PORT		GPIOF
-#define WDT_PIN			GPIO_Pin_9
+#define WDT_PORT		PINID_GPMI_RDY1
+#define WDT_PIN			
 
 #ifdef RT_USING_DFS
 #include <dfs_init.h>
@@ -108,7 +108,7 @@ int loadset(void)
     rt_kprintf(csSql);
 
     //打开文件
-    sprintf(csSql,"%s/sysset.db","/spi");
+    sprintf(csSql,"%s/sysset.db","/mnt");
     if ((result = sqlite3_open(csSql,&sqldb)) != SQLITE_OK)
     {
         return 1;
@@ -143,8 +143,8 @@ int loadset(void)
     return 0;
 }
 
-#define GPIO_ResetBits(x,y)
-#define GPIO_SetBits(x,y)
+#define GPIO_ResetBits(x,y) pin_gpio_set(x,0)
+#define GPIO_SetBits(x,y) pin_gpio_set(x,1)
 
 ALIGN(RT_ALIGN_SIZE)
 static char thread_wtdog_stack[2048];
@@ -281,10 +281,10 @@ static void rt_thread_entry_main(void* parameter)
     rt_kprintf("Mount /dev ok!\n");
 #endif
 #if defined(RT_USING_SPI) && defined(RT_USING_DFS_ELMFAT)
-    if (dfs_mount("ftl0", "/spi", "elm", 0, 0) == 0)
-        rt_kprintf("Mount /spi ok!\n");
+    if (dfs_mount("ftl0", "/mnt", "elm", 0, 0) == 0)
+        rt_kprintf("Mount /mnt ok!\n");
     else
-        rt_kprintf("Mount /spi failed!\n");
+        rt_kprintf("Mount /mnt failed!\n");
 #endif
 
 #endif
