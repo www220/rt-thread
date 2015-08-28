@@ -23,7 +23,9 @@ typedef unsigned int u32;
 typedef signed long long s64;
 typedef unsigned long long u64;
 
-typedef u32 uint32_t;
+#define uint32_t u32
+#define uint16_t u16
+#define uint8_t u8
 
 #define BITS_PER_LONG 32
 #define memalign(x,y) rt_malloc_align(y,x)

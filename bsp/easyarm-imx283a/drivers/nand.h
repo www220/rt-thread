@@ -722,14 +722,6 @@
 #define GPMI_NFC_AUX_SIZE(page_size)	((GPMI_NFC_AUX_STATUS_OFF) + \
 	((GPMI_NFC_ECC_CHUNK_CNT(page_size) + 0x3) & ~0x3))
 
-static inline int abs(int n)
-{
-	if (n >= 0)
-		return n;
-	else
-		return n * -1;
-}
-
 static inline u32 gpmi_nfc_get_blk_mark_bit_ofs(u32 page_data_size,
 						u32 ecc_strength)
 {
@@ -872,45 +864,5 @@ static inline s32 gpmi_nfc_reset_block(void *hwreg, int is_enable)
 
 	return 0;
 }
-
-/**
- * struct gpmi_nfc_timing - GPMI NFC timing parameters
- *
- * This structure contains the fundamental timing attributes for the NAND Flash
- * bus and the GPMI NFC hardware.
- *
- * @data_setup_in_ns:         The data setup time, in nanoseconds. Usually the
- *                            maximum of tDS and tWP. A negative value
- *                            indicates this characteristic isn't known.
- * @data_hold_in_ns:          The data hold time, in nanoseconds. Usually the
- *                            maximum of tDH, tWH and tREH. A negative value
- *                            indicates this characteristic isn't known.
- * @address_setup_in_ns:      The address setup time, in nanoseconds. Usually
- *                            the maximum of tCLS, tCS and tALS. A negative
- *                            value indicates this characteristic isn't known.
- * @gpmi_sample_delay_in_ns:  A GPMI-specific timing parameter. A negative value
- *                            indicates this characteristic isn't known.
- * @tREA_in_ns:               tREA, in nanoseconds, from the data sheet. A
- *                            negative value indicates this characteristic isn't
- *                            known.
- * @tRLOH_in_ns:              tRLOH, in nanoseconds, from the data sheet. A
- *                            negative value indicates this characteristic isn't
- *                            known.
- * @tRHOH_in_ns:              tRHOH, in nanoseconds, from the data sheet. A
- *                            negative value indicates this characteristic isn't
- *                            known.
- */
-
-struct gpmi_nfc_timing {
-	u8 m_u8DataSetup;
-	u8 m_u8DataHold;
-	u8 m_u8AddressSetup;
-	u8 m_u8HalfPeriods;
-	u8 m_u8SampleDelay;
-	u8 m_u8NandTimingState;
-	u8 m_u8tREA;
-	u8 m_u8tRLOH;
-	u8 m_u8tRHOH;
-};
 
 #endif /* __ARCH_ARM___GPMI_H */

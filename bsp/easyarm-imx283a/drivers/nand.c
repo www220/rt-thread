@@ -2,10 +2,29 @@
 #include <rthw.h>
 #include <rtdevice.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "board.h"
 #include "nand.h"
 #include "apbh_dma.h"
 #include "bch.h"
+
+/*
+ * Constants for hardware specific CLE/ALE/NCE function
+ *
+ * These are bits which can be or'ed to set/clear multiple
+ * bits in one go.
+ */
+/* Select the chip by setting nCE to low */
+#define NAND_NCE		0x01
+/* Select the command latch by setting CLE to high */
+#define NAND_CLE		0x02
+/* Select the address latch by setting ALE to high */
+#define NAND_ALE		0x04
+
+#define NAND_CTRL_CLE		(NAND_NCE | NAND_CLE)
+#define NAND_CTRL_ALE		(NAND_NCE | NAND_ALE)
+#define NAND_CTRL_CHANGE	0x80
 
 /*
  * Standard NAND flash commands
@@ -23,6 +42,26 @@
 #define NAND_CMD_READID		0x90
 #define NAND_CMD_ERASE2		0xd0
 #define NAND_CMD_RESET		0xff
+
+#define NAND_CMD_NONE		-1
+
+/* Status bits */
+#define NAND_STATUS_FAIL	0x01
+#define NAND_STATUS_FAIL_N1	0x02
+#define NAND_STATUS_TRUE_READY	0x20
+#define NAND_STATUS_READY	0x40
+#define NAND_STATUS_WP		0x80
+
+/*
+ * CONFIG_SYS_NAND_RESET_CNT is used as a timeout mechanism when resetting
+ * a flash.  NAND flash is initialized prior to interrupts so standard timers
+ * can't be used.  CONFIG_SYS_NAND_RESET_CNT should be set to a value
+ * which is greater than (max NAND reset time / NAND status read time).
+ * A conservative default of 200000 (500 us / 25 ns) is used as a default.
+ */
+#ifndef CONFIG_SYS_NAND_RESET_CNT
+#define CONFIG_SYS_NAND_RESET_CNT 200000
+#endif
 
 #if 1
 #define OOB_SIZE        64
@@ -639,6 +678,246 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	return error;
 }
 
+/**
+ * cmd_ctrl - MTD Interface cmd_ctrl()
+ *
+ * This is the function that we install in the cmd_ctrl function pointer of the
+ * owning struct nand_chip. The only functions in the reference implementation
+ * that use these functions pointers are cmdfunc and select_chip.
+ *
+ * In this driver, we implement our own select_chip, so this function will only
+ * be called by the reference implementation's cmdfunc. For this reason, we can
+ * ignore the chip enable bit and concentrate only on sending bytes to the
+ * NAND Flash.
+ *
+ * @mtd:   The owning MTD.
+ * @data:  The value to push onto the data signals.
+ * @ctrl:  The values to push onto the control signals.
+ */
+static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl)
+{
+	int error;
+	static u8 *cmd_queue = 0;
+	static u32 cmd_Q_len = 0;
+#if defined(CONFIG_MTD_DEBUG)
+	unsigned int          i;
+	char                  display[GPMI_NFC_COMMAND_BUFFER_SIZE * 5];
+#endif
+
+	if (!cmd_queue) {
+#ifdef CONFIG_ARCH_MMU
+		cmd_queue =
+		(u8 *)ioremap_nocache((u32)iomem_to_phys((ulong)memalign(MXS_DMA_ALIGNMENT,
+		GPMI_NFC_COMMAND_BUFFER_SIZE)),
+		MXS_DMA_ALIGNMENT);
+#else
+		cmd_queue =
+		memalign(MXS_DMA_ALIGNMENT, GPMI_NFC_COMMAND_BUFFER_SIZE);
+#endif
+		if (!cmd_queue) {
+			printf("%s: failed to allocate command "
+				"queuebuffer\n",
+				__func__);
+			return;
+		}
+        
+        // mmu nocache
+        cmd_queue = (u8 *)(0x8000000|((u32)cmd_queue));
+        
+		memset(cmd_queue, 0, GPMI_NFC_COMMAND_BUFFER_SIZE);
+		cmd_Q_len = 0;
+	}
+
+	/*
+	 * Every operation begins with a command byte and a series of zero or
+	 * more address bytes. These are distinguished by either the Address
+	 * Latch Enable (ALE) or Command Latch Enable (CLE) signals being
+	 * asserted. When MTD is ready to execute the command, it will
+	 * deasert both latch enables.
+	 *
+	 * Rather than run a separate DMA operation for every single byte, we
+	 * queue them up and run a single DMA operation for the entire series
+	 * of command and data bytes.
+	 */
+
+	if ((ctrl & (NAND_ALE | NAND_CLE))) {
+		if (data != NAND_CMD_NONE)
+			cmd_queue[cmd_Q_len++] = data;
+		return;
+	}
+
+	/*
+	 * If control arrives here, MTD has deasserted both the ALE and CLE,
+	 * which means it's ready to run an operation. Check if we have any
+	 * bytes to send.
+	 */
+
+	if (!cmd_Q_len)
+		return;
+
+#if defined(CONFIG_MTD_DEBUG)
+	display[0] = 0;
+	for (i = 0; i < cmd_Q_len; i++)
+		sprintf(display + strlen(display),
+			" 0x%02x", cmd_queue[i] & 0xff);
+	MTDDEBUG(MTD_DEBUG_LEVEL1, "%s: command: %s\n", __func__, display);
+#endif
+
+#ifdef CONFIG_ARCH_MMU
+	error = send_command(mtd, 0,
+		(dma_addr_t)iomem_to_phys((u32)cmd_queue), cmd_Q_len);
+#else
+	error = send_command(mtd, 0,
+		(dma_addr_t)cmd_queue, cmd_Q_len);
+#endif
+
+	if (error)
+		printf("Command execute failed!\n");
+
+	/* Reset. */
+	cmd_Q_len = 0;
+}
+
+/*
+ * Wait for the ready pin, after a command
+ * The timeout is catched later.
+ */
+void nand_wait_ready(struct rt_mtd_nand_device *mtd)
+{
+	/* wait until command is processed or timeout occures */
+	u32 timeo = rt_tick_get();
+	while (rt_tick_get()-timeo < 1000) {
+		if (is_ready(mtd, 0))
+			break;
+	}
+}
+
+/**
+ * nand_read_buf() - MTD Interface read_buf().
+ *
+ * @mtd:  A pointer to the owning MTD.
+ * @buf:  The destination buffer.
+ * @len:  The number of bytes to read.
+ */
+static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
+{
+	static u8 *data_buf = 0;
+
+	if (!data_buf) {
+#ifdef CONFIG_ARCH_MMU
+		data_buf =
+		(u8 *)ioremap_nocache((u32)iomem_to_phys((ulong)memalign(MXS_DMA_ALIGNMENT,
+		PAGE_SIZE)),
+		MXS_DMA_ALIGNMENT);
+#else
+		data_buf =
+		memalign(MXS_DMA_ALIGNMENT, PAGE_SIZE);
+#endif
+		if (!data_buf) {
+			printf("%s: failed to allocate data_buf "
+				"queuebuffer\n",
+				__func__);
+			return;
+		}
+        
+        // mmu nocache
+        data_buf = (u8 *)(0x8000000|((u32)data_buf));
+	}
+    
+	if (len > PAGE_SIZE)
+		printf("[%s] Inadequate DMA buffer\n", __func__);
+
+	if (!buf)
+		printf("[%s] Buffer pointer is NULL\n", __func__);
+
+	/* Ask the NFC. */
+#ifdef CONFIG_ARCH_MMU
+	read_data(mtd, 0,
+			(dma_addr_t)iomem_to_phys((u32)data_buf),
+			len);
+#else
+	read_data(mtd, 0,
+			(dma_addr_t)data_buf, len);
+#endif
+
+	memcpy(buf, data_buf, len);
+}
+
+/**
+ * nand_command - [DEFAULT] Send command to NAND device
+ * @mtd:	MTD device structure
+ * @command:	the command to be sent
+ * @column:	the column address for this command, -1 if none
+ * @page_addr:	the page address for this command, -1 if none
+ *
+ * Send command to NAND device. This function is used for small page
+ * devices (256/512 Bytes per page)
+ */
+static void nand_command(struct rt_mtd_nand_device *mtd, unsigned int command,
+			 int column, int page_addr)
+{
+	int ctrl = NAND_CTRL_CLE | NAND_CTRL_CHANGE;
+
+	/*
+	 * Write out the command to the device.
+	 */
+	if (command == NAND_CMD_SEQIN) {
+		int readcmd;
+
+		if (column >= mtd->page_size) {
+			/* OOB area */
+			column -= mtd->page_size;
+			readcmd = NAND_CMD_READOOB;
+		} else if (column < 256) {
+			/* First 256 bytes --> READ0 */
+			readcmd = NAND_CMD_READ0;
+		} else {
+			column -= 256;
+			readcmd = NAND_CMD_READ1;
+		}
+		cmd_ctrl(mtd, readcmd, ctrl);
+		ctrl &= ~NAND_CTRL_CHANGE;
+	}
+	cmd_ctrl(mtd, command, ctrl);
+
+	/*
+	 * Address cycle, when necessary
+	 */
+	ctrl = NAND_CTRL_ALE | NAND_CTRL_CHANGE;
+	/* Serially input address */
+	if (column != -1) {
+		cmd_ctrl(mtd, column, ctrl);
+		ctrl &= ~NAND_CTRL_CHANGE;
+	}
+	if (page_addr != -1) {
+		cmd_ctrl(mtd, page_addr, ctrl);
+		ctrl &= ~NAND_CTRL_CHANGE;
+		cmd_ctrl(mtd, page_addr >> 8, ctrl);
+		cmd_ctrl(mtd, page_addr >> 16, ctrl);
+	}
+	cmd_ctrl(mtd, NAND_CMD_NONE, NAND_NCE | NAND_CTRL_CHANGE);
+
+	/*
+	 * program and erase have their own busy handlers
+	 * status and sequential in needs no delay
+	 */
+	switch (command) {
+
+	case NAND_CMD_PAGEPROG:
+	case NAND_CMD_ERASE1:
+	case NAND_CMD_ERASE2:
+	case NAND_CMD_SEQIN:
+	case NAND_CMD_STATUS:
+		return;
+
+	}
+	/* Apply this short delay always to ensure that we do wait tWB in
+	 * any case on any machine. */
+	udelay(1);
+
+	nand_wait_ready(mtd);
+}
+
 /* read chip id */
 static rt_err_t nanddrv_file_read_id(struct rt_mtd_nand_device *device)
 {
@@ -742,7 +1021,9 @@ void rt_hw_mtd_nand_init(void)
 
 void nand_init(void)
 {
-    int i;    
+    uint8_t id[4] = {0};
+    int i;
+    
 	for (i = 0; i < NFC_DMA_DESCRIPTOR_COUNT; ++i) {
 		dma_desc[i] = mxs_dma_alloc_desc();
 
@@ -756,6 +1037,18 @@ void nand_init(void)
 
 	mxs_dma_init();
 
+	/*
+	 * Reset the chip, required by some chips (e.g. Micron MT29FxGxxxxx)
+	 * after power-up
+	 */
+	nand_command(&_nanddrv_file_device, NAND_CMD_RESET, -1, -1);
+
+	/* Send the command for reading device ID */
+	nand_command(&_nanddrv_file_device, NAND_CMD_READID, 0x00, -1);
+
+	/* Read manufacturer and device IDs */
+	nand_read_buf(&_nanddrv_file_device, id, 4);
+    rt_kprintf("NAND ID:%x %x %x MXIC NAND 128Mi\n", id[0], id[1], id[2]);
 }
 
 #if defined(RT_USING_FINSH)
