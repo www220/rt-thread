@@ -43,6 +43,30 @@
 #define NAND_CMD_ERASE2		0xd0
 #define NAND_CMD_RESET		0xff
 
+/* Extended commands for large page devices */
+#define NAND_CMD_READSTART	0x30
+#define NAND_CMD_RNDOUTSTART	0xE0
+#define NAND_CMD_CACHEDPROG	0x15
+
+/* Extended commands for AG-AND device */
+/*
+ * Note: the command for NAND_CMD_DEPLETE1 is really 0x00 but
+ *       there is no way to distinguish that from NAND_CMD_READ0
+ *       until the remaining sequence of commands has been completed
+ *       so add a high order bit and mask it off in the command.
+ */
+#define NAND_CMD_DEPLETE1	0x100
+#define NAND_CMD_DEPLETE2	0x38
+#define NAND_CMD_STATUS_MULTI	0x71
+#define NAND_CMD_STATUS_ERROR	0x72
+/* multi-bank error status (banks 0-3) */
+#define NAND_CMD_STATUS_ERROR0	0x73
+#define NAND_CMD_STATUS_ERROR1	0x74
+#define NAND_CMD_STATUS_ERROR2	0x75
+#define NAND_CMD_STATUS_ERROR3	0x76
+#define NAND_CMD_STATUS_RESET	0x7f
+#define NAND_CMD_STATUS_CLEAR	0xff
+
 #define NAND_CMD_NONE		-1
 
 /* Status bits */
@@ -51,17 +75,6 @@
 #define NAND_STATUS_TRUE_READY	0x20
 #define NAND_STATUS_READY	0x40
 #define NAND_STATUS_WP		0x80
-
-/*
- * CONFIG_SYS_NAND_RESET_CNT is used as a timeout mechanism when resetting
- * a flash.  NAND flash is initialized prior to interrupts so standard timers
- * can't be used.  CONFIG_SYS_NAND_RESET_CNT should be set to a value
- * which is greater than (max NAND reset time / NAND status read time).
- * A conservative default of 200000 (500 us / 25 ns) is used as a default.
- */
-#ifndef CONFIG_SYS_NAND_RESET_CNT
-#define CONFIG_SYS_NAND_RESET_CNT 200000
-#endif
 
 #if 1
 #define OOB_SIZE        64
@@ -83,6 +96,12 @@
 #define NFC_DMA_DESCRIPTOR_COUNT	(4)
 static struct mxs_dma_desc *dma_desc[NFC_DMA_DESCRIPTOR_COUNT];
 static struct rt_mtd_nand_device _nanddrv_file_device;
+
+static u8 *data_buf = 0;
+static u8 *oob_buf = 0;
+
+extern void mmu_clean_dcache(rt_uint32_t buffer, rt_uint32_t size);
+extern void mmu_invalidate_dcache(rt_uint32_t buffer, rt_uint32_t size);
 
 /**
  * clear_bch() - Clears a BCH interrupt.
@@ -513,6 +532,7 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	u32			buffer_mask;
 	u32			page_size = mtd->page_size + mtd->oob_size;
 
+	/* Compute the DMA channel. */
 	dma_channel = MXS_DMA_CHANNEL_AHB_APBH_GPMI0 + chip;
 
 	/* Wait for the chip to report ready. */
@@ -720,10 +740,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
 				__func__);
 			return;
 		}
-        
-        // mmu nocache
-        cmd_queue = (u8 *)(0x8000000|((u32)cmd_queue));
-        
+
 		memset(cmd_queue, 0, GPMI_NFC_COMMAND_BUFFER_SIZE);
 		cmd_Q_len = 0;
 	}
@@ -801,8 +818,6 @@ void nand_wait_ready(struct rt_mtd_nand_device *mtd)
  */
 static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 {
-	static u8 *data_buf = 0;
-
 	if (!data_buf) {
 #ifdef CONFIG_ARCH_MMU
 		data_buf =
@@ -819,9 +834,8 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 				__func__);
 			return;
 		}
-        
-        // mmu nocache
-        data_buf = (u8 *)(0x8000000|((u32)data_buf));
+
+		oob_buf = data_buf + PAGE_DATA_SIZE;
 	}
     
 	if (len > PAGE_SIZE)
@@ -840,77 +854,93 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 			(dma_addr_t)data_buf, len);
 #endif
 
+    mmu_clean_dcache((u32)data_buf,len);
 	memcpy(buf, data_buf, len);
 }
 
 /**
- * nand_command - [DEFAULT] Send command to NAND device
+ * nand_command - [DEFAULT] Send command to NAND large page device
  * @mtd:	MTD device structure
  * @command:	the command to be sent
  * @column:	the column address for this command, -1 if none
  * @page_addr:	the page address for this command, -1 if none
  *
- * Send command to NAND device. This function is used for small page
- * devices (256/512 Bytes per page)
+ * Send command to NAND device. This is the version for the new large page
+ * devices We dont have the separate regions as we have in the small page
+ * devices.  We must emulate NAND_CMD_READOOB to keep the code compatible.
  */
 static void nand_command(struct rt_mtd_nand_device *mtd, unsigned int command,
-			 int column, int page_addr)
+			    int column, int page_addr)
 {
-	int ctrl = NAND_CTRL_CLE | NAND_CTRL_CHANGE;
+	/* Emulate NAND_CMD_READOOB */
+	if (command == NAND_CMD_READOOB) {
+		column += mtd->page_size;
+		command = NAND_CMD_READ0;
+	}
 
-	/*
-	 * Write out the command to the device.
-	 */
-	if (command == NAND_CMD_SEQIN) {
-		int readcmd;
+	/* Command latch cycle */
+	cmd_ctrl(mtd, command & 0xff,
+		       NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
 
-		if (column >= mtd->page_size) {
-			/* OOB area */
-			column -= mtd->page_size;
-			readcmd = NAND_CMD_READOOB;
-		} else if (column < 256) {
-			/* First 256 bytes --> READ0 */
-			readcmd = NAND_CMD_READ0;
-		} else {
-			column -= 256;
-			readcmd = NAND_CMD_READ1;
+	if (column != -1 || page_addr != -1) {
+		int ctrl = NAND_CTRL_CHANGE | NAND_NCE | NAND_ALE;
+
+		/* Serially input address */
+		if (column != -1) {
+			cmd_ctrl(mtd, column, ctrl);
+			ctrl &= ~NAND_CTRL_CHANGE;
+			cmd_ctrl(mtd, column >> 8, ctrl);
 		}
-		cmd_ctrl(mtd, readcmd, ctrl);
-		ctrl &= ~NAND_CTRL_CHANGE;
-	}
-	cmd_ctrl(mtd, command, ctrl);
-
-	/*
-	 * Address cycle, when necessary
-	 */
-	ctrl = NAND_CTRL_ALE | NAND_CTRL_CHANGE;
-	/* Serially input address */
-	if (column != -1) {
-		cmd_ctrl(mtd, column, ctrl);
-		ctrl &= ~NAND_CTRL_CHANGE;
-	}
-	if (page_addr != -1) {
-		cmd_ctrl(mtd, page_addr, ctrl);
-		ctrl &= ~NAND_CTRL_CHANGE;
-		cmd_ctrl(mtd, page_addr >> 8, ctrl);
-		cmd_ctrl(mtd, page_addr >> 16, ctrl);
+		if (page_addr != -1) {
+			cmd_ctrl(mtd, page_addr, ctrl);
+			cmd_ctrl(mtd, page_addr >> 8,
+				       NAND_NCE | NAND_ALE);
+		}
 	}
 	cmd_ctrl(mtd, NAND_CMD_NONE, NAND_NCE | NAND_CTRL_CHANGE);
 
 	/*
 	 * program and erase have their own busy handlers
-	 * status and sequential in needs no delay
+	 * status, sequential in, and deplete1 need no delay
 	 */
 	switch (command) {
 
+	case NAND_CMD_CACHEDPROG:
 	case NAND_CMD_PAGEPROG:
 	case NAND_CMD_ERASE1:
 	case NAND_CMD_ERASE2:
 	case NAND_CMD_SEQIN:
+	case NAND_CMD_RNDIN:
 	case NAND_CMD_STATUS:
+	case NAND_CMD_DEPLETE1:
 		return;
 
+		/*
+		 * read error status commands require only a short delay
+		 */
+	case NAND_CMD_STATUS_ERROR:
+	case NAND_CMD_STATUS_ERROR0:
+	case NAND_CMD_STATUS_ERROR1:
+	case NAND_CMD_STATUS_ERROR2:
+	case NAND_CMD_STATUS_ERROR3:
+		udelay(20);
+		return;
+
+	case NAND_CMD_RNDOUT:
+		/* No ready / busy check necessary */
+		cmd_ctrl(mtd, NAND_CMD_RNDOUTSTART,
+			       NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
+		cmd_ctrl(mtd, NAND_CMD_NONE,
+			       NAND_NCE | NAND_CTRL_CHANGE);
+		return;
+
+	case NAND_CMD_READ0:
+		cmd_ctrl(mtd, NAND_CMD_READSTART,
+			       NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
+		cmd_ctrl(mtd, NAND_CMD_NONE,
+			       NAND_NCE | NAND_CTRL_CHANGE);
 	}
+
 	/* Apply this short delay always to ensure that we do wait tWB in
 	 * any case on any machine. */
 	udelay(1);
@@ -921,7 +951,15 @@ static void nand_command(struct rt_mtd_nand_device *mtd, unsigned int command,
 /* read chip id */
 static rt_err_t nanddrv_file_read_id(struct rt_mtd_nand_device *device)
 {
-    return 0x00;
+    rt_err_t id = 0;
+    
+    /* Send the command for reading device ID */
+	nand_command(device, NAND_CMD_READID, 0x00, -1);
+
+	/* Read manufacturer and device IDs */
+	nand_read_buf(device, (uint8_t *)&id, 4);
+
+    return id;
 }
 
 /* read/write/move page */
@@ -930,7 +968,27 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
                                        rt_uint8_t *data, rt_uint32_t data_len,
                                        rt_uint8_t *spare, rt_uint32_t spare_len)
 {
-    return RT_EOK;
+	int                     error = 0;
+    
+    /* Send the command for reading device ID */
+	nand_command(device, NAND_CMD_READ0, 0x00, page);
+	/* Read manufacturer and device IDs */
+	//read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
+    if (data)
+    {
+    /* Read manufacturer and device IDs */
+	nand_read_buf(device, data_buf, data_len);
+
+        //mmu_clean_dcache((u32)data_buf,data_len);
+        //memcpy(data,data_buf,data_len);
+    }
+    if (spare)
+    {
+        mmu_clean_dcache((u32)oob_buf,spare_len);
+        memcpy(spare,oob_buf,spare_len);
+    }
+
+	return error;
 }
 
 static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
@@ -1021,9 +1079,9 @@ void rt_hw_mtd_nand_init(void)
 
 void nand_init(void)
 {
-    uint8_t id[4] = {0};
     int i;
-    
+    uint8_t id[4] = {0};
+   
 	for (i = 0; i < NFC_DMA_DESCRIPTOR_COUNT; ++i) {
 		dma_desc[i] = mxs_dma_alloc_desc();
 
@@ -1048,7 +1106,11 @@ void nand_init(void)
 
 	/* Read manufacturer and device IDs */
 	nand_read_buf(&_nanddrv_file_device, id, 4);
-    rt_kprintf("NAND ID:%x %x %x MXIC NAND 128Mi\n", id[0], id[1], id[2]);
+    rt_kprintf("NAND ID:%x %x ", id[0], id[1]);
+    if (id[0] == 0xc2 && id[1] == 0xf1)
+        rt_kprintf("MXIC NAND 128Mib\n");
+    else
+        rt_kprintf("Unknow NAND\n");
 }
 
 #if defined(RT_USING_FINSH)
@@ -1057,9 +1119,7 @@ void nand_eraseall()
 {
     int index;
     for (index = 0; index < _nanddrv_file_device.block_total; index ++)
-    {
         nanddrv_file_erase_block(&_nanddrv_file_device, index);
-    }
 }
 FINSH_FUNCTION_EXPORT(nand_eraseall, erase all of block in the nand flash);
 
