@@ -71,8 +71,9 @@ void calibrate_delay(void)
 static struct mem_desc hw_mem_desc[] =
 {
 	{ 0x00000000, 0xFFFFFFFF, 0x00000000, RW_NCNB },     /* None cached for 4G memory */
-	{ 0x40000000, 0x44000000, 0x40000000, RW_CB },       /* 64M cached SDRAM memory */
+	{ 0x40000000, 0x43FFFFFF, 0x40000000, RW_CB },       /* 64M cached SDRAM memory */
 	{ 0x00000000, 0x00001000, 0x40000000, RW_CB },       /* isr vector table */
+	{ 0xC0000000, 0xC3FFFFFF, 0x40000000, RW_NCNB },     /* 64M none-cached SDRAM */
 };
 
 static struct pin_desc gpmi_pins_desc[] = {
@@ -144,12 +145,14 @@ void rt_hw_board_init()
     rt_hw_timer_init();
     init[5] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
 
+#ifdef RT_USING_MTD_NAND
     /* Set up GPMI pins */
 	pin_set_group(&gpmi_pins);
     rt_hw_mtd_nand_init();
+#endif
 
     pin_gpio_set(PINID_GPMI_RDY1, 0);
-    rt_kprintf("init %d all %d\n",init[2]-init[1],init[5]-init[0]);
+    rt_kprintf("loops %d, init %d, all %d\n",loops_per_jiffy,init[2]-init[1],init[5]-init[0]);
 }
 
 /*@}*/

@@ -835,7 +835,7 @@ static inline s32 gpmi_nfc_reset_block(void *hwreg, int is_enable)
 	if (is_enable) {
 		/* now again set SFTRST */
 		REG_SET_ADDR(hwreg, BM_GPMI_CTRL0_SFTRST);
-		for (timeout = 100000000; timeout > 0; timeout--)
+		for (timeout = 1000000; timeout > 0; timeout--)
 			/* poll until CLKGATE set */
 			if (REG_RD_ADDR(hwreg) & BM_GPMI_CTRL0_CLKGATE)
 				break;

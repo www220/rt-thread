@@ -57,6 +57,31 @@ static void clear_bch(struct rt_mtd_nand_device *mtd)
 }
 
 /**
+ * is_ready() - Returns the ready/busy status of the given chip.
+ *
+ * @this:  Per-device data.
+ * @chip:  The chip of interest.
+ */
+static int is_ready(struct rt_mtd_nand_device *mtd, unsigned int target_chip)
+{
+	u32 mask;
+	u32 register_image;
+
+	/* Extract and return the status. */
+#if defined(CONFIG_GPMI_NFC_V0)
+	mask = BM_GPMI_DEBUG_READY0 << target_chip;
+
+	register_image = REG_RD(CONFIG_GPMI_REG_BASE, HW_GPMI_DEBUG);
+#else
+	mask = BF_GPMI_STAT_READY_BUSY(1 << 0);
+
+	register_image = REG_RD(CONFIG_GPMI_REG_BASE, HW_GPMI_STAT);
+#endif
+
+	return register_image & mask;
+}
+
+/**
  * send_command() - Sends a command and associated addresses.
  *
  * @this:    Per-device data.
@@ -664,9 +689,42 @@ const static struct rt_mtd_nand_driver_ops _ops =
     RT_NULL,
 };
 
+static inline void __enable_gpmi_clk(void)
+{
+	/* Clear bypass bit*/
+	REG_SET(REGS_CLKCTRL_BASE, HW_CLKCTRL_CLKSEQ,
+	       BM_CLKCTRL_CLKSEQ_BYPASS_GPMI);
+	/* Set gpmi clock to ref_gpmi/12 */
+	REG_WR(REGS_CLKCTRL_BASE, HW_CLKCTRL_GPMI,
+	      (REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_GPMI) &
+	      (~(BM_CLKCTRL_GPMI_DIV)) &
+	      (~(BM_CLKCTRL_GPMI_CLKGATE))) |
+	      1);
+}
+
 void rt_hw_mtd_nand_init(void)
 {
     rt_uint16_t ecc_size;
+
+	/* Reset the GPMI block. */
+    __enable_gpmi_clk();
+	gpmi_nfc_reset_block((void *)(CONFIG_GPMI_REG_BASE + HW_GPMI_CTRL0), 1);
+
+	/* Choose NAND mode. */
+	REG_CLR(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
+		BM_GPMI_CTRL1_GPMI_MODE);
+
+	/* Set the IRQ polarity. */
+	REG_SET(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
+		BM_GPMI_CTRL1_ATA_IRQRDY_POLARITY);
+
+	/* Disable write protection. */
+	REG_SET(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
+		BM_GPMI_CTRL1_DEV_RESET);
+
+	/* Select BCH ECC. */
+	REG_SET(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
+		BM_GPMI_CTRL1_BCH_MODE);
 
     ecc_size = (PAGE_DATA_SIZE) * 3 / 256;
     _nanddrv_file_device.plane_num = 2;
@@ -691,38 +749,13 @@ void nand_init(void)
 		if (NULL == dma_desc[i]) {
 			for (i -= 1; i >= 0; --i)
 				mxs_dma_free_desc(dma_desc[i]);
+            rt_kprintf("failed to malloc dma desc\n");
 			return;
 		}
 	}
 
 	mxs_dma_init();
-    
-	/* Reset the GPMI block. */
-	gpmi_nfc_reset_block((void *)(CONFIG_GPMI_REG_BASE + HW_GPMI_CTRL0), 1);
 
-	/* Choose NAND mode. */
-	REG_CLR(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
-		BM_GPMI_CTRL1_GPMI_MODE);
-
-	/* Set the IRQ polarity. */
-	REG_SET(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
-		BM_GPMI_CTRL1_ATA_IRQRDY_POLARITY);
-
-	/* Disable write protection. */
-	REG_SET(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
-		BM_GPMI_CTRL1_DEV_RESET);
-
-	/* Select BCH ECC. */
-	REG_SET(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
-		BM_GPMI_CTRL1_BCH_MODE);
-
-        {
-    char buf[4] = {0x90,00};
-    send_command(&_nanddrv_file_device,0,buf,2);
-    udelay(1000);
-    read_data(&_nanddrv_file_device,0,buf,2);
-    rt_kprintf("%x %x %x",buf[0],buf[1]);
-        }
 }
 
 #if defined(RT_USING_FINSH)
