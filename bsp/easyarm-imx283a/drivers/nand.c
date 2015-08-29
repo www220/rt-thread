@@ -101,6 +101,7 @@ static u8 *data_buf = 0;
 static u8 *oob_buf = 0;
 
 extern void mmu_clean_dcache(rt_uint32_t buffer, rt_uint32_t size);
+extern void mmu_clean_invalidated_dcache(rt_uint32_t buffer, rt_uint32_t size);
 extern void mmu_invalidate_dcache(rt_uint32_t buffer, rt_uint32_t size);
 
 /**
@@ -835,6 +836,7 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 			return;
 		}
 
+		memset(data_buf, 0, PAGE_SIZE);
 		oob_buf = data_buf + PAGE_DATA_SIZE;
 	}
     
@@ -854,7 +856,7 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 			(dma_addr_t)data_buf, len);
 #endif
 
-    mmu_clean_dcache((u32)data_buf,len);
+    mmu_invalidate_dcache((u32)data_buf,len);
 	memcpy(buf, data_buf, len);
 }
 
@@ -973,18 +975,15 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
     /* Send the command for reading device ID */
 	nand_command(device, NAND_CMD_READ0, 0x00, page);
 	/* Read manufacturer and device IDs */
-	//read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
+	read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
     if (data)
     {
-    /* Read manufacturer and device IDs */
-	nand_read_buf(device, data_buf, data_len);
-
-        //mmu_clean_dcache((u32)data_buf,data_len);
-        //memcpy(data,data_buf,data_len);
+        mmu_invalidate_dcache((u32)data_buf,data_len);
+        memcpy(data,data_buf,data_len);
     }
     if (spare)
     {
-        mmu_clean_dcache((u32)oob_buf,spare_len);
+        mmu_invalidate_dcache((u32)oob_buf,spare_len);
         memcpy(spare,oob_buf,spare_len);
     }
 
@@ -1042,6 +1041,11 @@ static inline void __enable_gpmi_clk(void)
 void rt_hw_mtd_nand_init(void)
 {
     rt_uint16_t ecc_size;
+	u32 block_count;
+	u32 block_size;
+	u32 metadata_size;
+	u32 ecc_strength;
+	u32 page_size;
 
 	/* Reset the GPMI block. */
     __enable_gpmi_clk();
@@ -1062,6 +1066,54 @@ void rt_hw_mtd_nand_init(void)
 	/* Select BCH ECC. */
 	REG_SET(CONFIG_GPMI_REG_BASE, HW_GPMI_CTRL1,
 		BM_GPMI_CTRL1_BCH_MODE);
+
+	/* Translate the abstract choices into register fields. */
+	block_count = GPMI_NFC_ECC_CHUNK_CNT(PAGE_DATA_SIZE) - 1;
+#if defined(CONFIG_GPMI_NFC_V2)
+	block_size = GPMI_NFC_CHUNK_DATA_CHUNK_SIZE >> 2;
+#else
+	block_size = GPMI_NFC_CHUNK_DATA_CHUNK_SIZE;
+#endif
+	metadata_size = GPMI_NFC_METADATA_SIZE;
+
+	ecc_strength =
+		gpmi_nfc_get_ecc_strength(PAGE_DATA_SIZE, OOB_SIZE) >> 1;
+
+	page_size    = PAGE_DATA_SIZE + OOB_SIZE;
+
+	/*
+	 * Reset the BCH block. Notice that we pass in true for the just_enable
+	 * flag. This is because the soft reset for the version 0 BCH block
+	 * doesn't work and the version 1 BCH block is similar enough that we
+	 * suspect the same (though this has not been officially tested). If you
+	 * try to soft reset a version 0 BCH block, it becomes unusable until
+	 * the next hard reset.
+	 */
+
+#if defined(CONFIG_GPMI_NFC_V2)
+	gpmi_nfc_reset_block((void *)CONFIG_BCH_REG_BASE + HW_BCH_CTRL, 0);
+#else
+	gpmi_nfc_reset_block((void *)CONFIG_BCH_REG_BASE + HW_BCH_CTRL, 1);
+#endif
+
+	/* Configure layout 0. */
+	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)     |
+		BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size) |
+		BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)       |
+		BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
+		CONFIG_BCH_REG_BASE + HW_BCH_FLASH0LAYOUT0);
+
+	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)   |
+		BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)     |
+		BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
+		CONFIG_BCH_REG_BASE + HW_BCH_FLASH0LAYOUT1);
+
+	/* Set *all* chip selects to use layout 0. */
+	writel(0, CONFIG_BCH_REG_BASE + HW_BCH_LAYOUTSELECT);
+
+	/* Enable interrupts. */
+	REG_SET(CONFIG_BCH_REG_BASE, HW_BCH_CTRL,
+		BM_BCH_CTRL_COMPLETE_IRQ_EN);
 
     ecc_size = (PAGE_DATA_SIZE) * 3 / 256;
     _nanddrv_file_device.plane_num = 2;
