@@ -28,8 +28,10 @@ typedef unsigned long long u64;
 #define uint8_t u8
 
 #define BITS_PER_LONG 32
-#define memalign(x,y) rt_malloc_align(y,x)
-#define freealign(x) rt_free_align(x)
+
+extern unsigned char *dma_align_mem;
+#define memalign(x,y) dma_align_mem; dma_align_mem += (u32)(((u32)(y)+15)&(u32)(~15))
+#define freealign(x)
 
 /* Dma addresses are 32-bits wide.  */
 typedef u32 dma_addr_t;

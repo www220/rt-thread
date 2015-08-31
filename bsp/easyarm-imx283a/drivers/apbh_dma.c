@@ -793,7 +793,7 @@ int mxs_dma_wait_complete(u32 uSecTimeout, unsigned int chan)
 
 int mxs_dma_go(int chan)
 {
-	u32 timeout = 10000;
+	u32 timeout = 1000000;
 	int  error;
 
 	LIST_HEAD(tmp_desc_list);

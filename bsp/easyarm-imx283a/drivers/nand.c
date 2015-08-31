@@ -76,19 +76,10 @@
 #define NAND_STATUS_READY	0x40
 #define NAND_STATUS_WP		0x80
 
-#if 1
 #define OOB_SIZE        64
 #define PAGE_DATA_SIZE  2048
 #define PAGE_PER_BLOCK  64
-#define ECC_SIZE       ((PAGE_DATA_SIZE) * 3 / 256)
 #define BLOCK_NUM       1024
-#else
-#define OOB_SIZE        16
-#define PAGE_DATA_SIZE  512
-#define PAGE_PER_BLOCK  32
-#define ECC_SIZE       ((PAGE_DATA_SIZE) * 3 / 256)
-#define BLOCK_NUM       512
-#endif
 
 #define BLOCK_SIZE      (PAGE_SIZE * PAGE_PER_BLOCK)
 #define PAGE_SIZE       (PAGE_DATA_SIZE + OOB_SIZE)
@@ -99,10 +90,6 @@ static struct rt_mtd_nand_device _nanddrv_file_device;
 
 static u8 *data_buf = 0;
 static u8 *oob_buf = 0;
-
-extern void mmu_clean_dcache(rt_uint32_t buffer, rt_uint32_t size);
-extern void mmu_clean_invalidated_dcache(rt_uint32_t buffer, rt_uint32_t size);
-extern void mmu_invalidate_dcache(rt_uint32_t buffer, rt_uint32_t size);
 
 /**
  * clear_bch() - Clears a BCH interrupt.
@@ -500,7 +487,7 @@ static int send_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	if (error)
 		printf("[%s] DMA error\n", __func__);
 
-	error = wait_for_bch_completion(10000);
+	error = wait_for_bch_completion(1000000);
 
 	error = (error) ? -ETIMEDOUT : 0;
 
@@ -686,7 +673,7 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	if (error)
 		printf("[%s] DMA error\n", __func__);
 
-	error = wait_for_bch_completion(10000);
+	error = wait_for_bch_completion(1000000);
 
 	error = (error) ? -ETIMEDOUT : 0;
 
@@ -856,7 +843,6 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 			(dma_addr_t)data_buf, len);
 #endif
 
-    mmu_invalidate_dcache((u32)data_buf,len);
 	memcpy(buf, data_buf, len);
 }
 
@@ -978,12 +964,10 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
 	read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
     if (data)
     {
-        mmu_invalidate_dcache((u32)data_buf,data_len);
         memcpy(data,data_buf,data_len);
     }
     if (spare)
     {
-        mmu_invalidate_dcache((u32)oob_buf,spare_len);
         memcpy(spare,oob_buf,spare_len);
     }
 
