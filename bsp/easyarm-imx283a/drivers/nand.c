@@ -787,7 +787,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
  * Wait for the ready pin, after a command
  * The timeout is catched later.
  */
-void nand_wait_ready(struct rt_mtd_nand_device *mtd)
+static void nand_wait_ready(struct rt_mtd_nand_device *mtd)
 {
 	/* wait until command is processed or timeout occures */
 	u32 timeo = rt_tick_get();
@@ -936,6 +936,32 @@ static void nand_command(struct rt_mtd_nand_device *mtd, unsigned int command,
 	nand_wait_ready(mtd);
 }
 
+/**
+ * nand_wait - [DEFAULT]  wait until the command is done
+ * @mtd:	MTD device structure
+ * @chip:	NAND chip structure
+ *
+ * Wait for command done. This applies to erase and program only
+ * Erase can take up to 400ms and program up to 20ms according to
+ * general NAND and SmartMedia specs
+ */
+static int nand_wait(struct rt_mtd_nand_device *mtd)
+{
+	u8 state = 0;
+	u32 timeo = rt_tick_get();
+
+	nand_command(mtd, NAND_CMD_STATUS, -1, -1);
+	while (1) {
+		if (rt_tick_get()-timeo > 2000)
+			return NAND_STATUS_FAIL;
+		if (is_ready(mtd, 0))
+			break;
+	}
+
+	nand_read_buf(mtd, &state, 1);
+	return state;
+}
+
 /* read chip id */
 static rt_err_t nanddrv_file_read_id(struct rt_mtd_nand_device *device)
 {
@@ -956,12 +982,12 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
                                        rt_uint8_t *data, rt_uint32_t data_len,
                                        rt_uint8_t *spare, rt_uint32_t spare_len)
 {
-	int                     error = 0;
+	int error = 0;
     
     /* Send the command for reading device ID */
 	nand_command(device, NAND_CMD_READ0, 0x00, page);
 	/* Read manufacturer and device IDs */
-	read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
+	error = read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
     if (data)
     {
         memcpy(data,data_buf,data_len);
@@ -979,7 +1005,22 @@ static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
                                         const rt_uint8_t *data, rt_uint32_t data_len,
                                         const rt_uint8_t *oob, rt_uint32_t spare_len)
 {
-    return RT_EOK;
+	int status = 0;
+    
+    /* Send the command for reading device ID */
+	nand_command(device, NAND_CMD_SEQIN, 0x00, page);
+
+    if (data)
+        memcpy(data_buf, data, data_len);
+    if (oob)
+        memcpy(oob_buf, oob, spare_len);
+    
+    send_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
+    
+	nand_command(device, NAND_CMD_PAGEPROG, -1, -1);
+	status = nand_wait(device);
+
+    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;;
 }
 
 static rt_err_t nanddrv_file_move_page(struct rt_mtd_nand_device *device, rt_off_t from, rt_off_t to)
@@ -990,12 +1031,19 @@ static rt_err_t nanddrv_file_move_page(struct rt_mtd_nand_device *device, rt_off
 /* erase block */
 static rt_err_t nanddrv_file_erase_block(struct rt_mtd_nand_device *device, rt_uint32_t block)
 {
+    int status = 0;
     if (block > BLOCK_NUM) return -RT_EIO;
 
     /* add the start blocks */
     block = block + device->block_start;
+    block *= device->pages_per_block;
 
-    return RT_EOK;
+	/* Send commands to erase a block */
+	nand_command(device, NAND_CMD_ERASE1, -1, block);
+	nand_command(device, NAND_CMD_ERASE2, -1, -1);
+
+    status = nand_wait(device);
+    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;
 }
 
 const static struct rt_mtd_nand_driver_ops _ops =
