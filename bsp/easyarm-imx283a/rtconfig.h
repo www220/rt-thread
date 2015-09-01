@@ -95,7 +95,7 @@
 
 /* SECTION: finsh, a C-Express shell */
 #define RT_USING_FINSH
-//#define FINSH_USING_MSH
+#define FINSH_USING_MSH
 //#define FINSH_USING_MSH_ONLY
 
 /* Using symbol table */

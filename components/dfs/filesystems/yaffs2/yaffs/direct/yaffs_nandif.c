@@ -238,6 +238,7 @@ struct yaffs_dev *
 		dev->param.inband_tags		  = geometry->inband_tags;
 		dev->param.chunks_per_block	  = geometry->pagesPerBlock;
 		dev->param.use_nand_ecc		  = geometry->hasECC;
+		dev->param.no_tags_ecc		  = geometry->hasECC;
 		dev->param.is_yaffs2		  = geometry->useYaffs2;
 		dev->param.n_reserved_blocks	  = 5;
 		dev->driver_context		  = (void *)geometry;

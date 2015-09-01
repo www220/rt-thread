@@ -53,13 +53,16 @@ static int nand_readpage(
 
 	res = rt_mtd_nand_read(RT_MTD_NAND_DEVICE(dev->os_context),
 	                   	   page, data, data_len, spare_buf, spare_len + 2);
-	rt_memcpy(spare, spare_buf + 2, spare_len);
-	if (res == 0)
+	if (res == -RT_EIO)
+        return YAFFS_FAIL;
+    
+	rt_memcpy(spare, spare_buf + 2, 16);
+	if (res == RT_EOK)
 		*ecc_status = 0;
-	else if (res == -1)
-		*ecc_status = 1;
-	else
+	else if (res == -RT_ERROR)
 		*ecc_status = -1;
+	else
+		*ecc_status = 1;
 
 	return YAFFS_OK;
 }
@@ -73,11 +76,11 @@ static int nand_writepage(
 	int res;
 	unsigned char spare_buf[64]; //not use malloc, this can be faster
 	rt_memset(spare_buf, 0xFF, sizeof(spare_buf));
-	rt_memcpy(spare_buf+2, spare, spare_len);
+	rt_memcpy(spare_buf+2, spare, 16);
 
 	res = rt_mtd_nand_write(RT_MTD_NAND_DEVICE(dev->os_context),
 						   page, data, data_len, spare_buf, spare_len + 2);
-	if (res != RT_EOK)
+	if (res == -RT_EIO)
 		return YAFFS_FAIL;
 
 	return YAFFS_OK;
@@ -87,7 +90,7 @@ static int nand_writepage(
 /*
  * yaffs2 configuration
  */
-#define CONFIG_YAFFS_ECC_MODE     0 //1 use ecc, 0 no ecc
+#define CONFIG_YAFFS_ECC_MODE     1 //1 use ecc, 0 no ecc
 #define CONFIG_YAFFS_INBAND_TAGS  0 //1 use in band tags, 0-no in band tags
 #define CONFIG_YAFFS_USE_YAFFS2   1 //1 yaffs2, 0-yaffs1
 
