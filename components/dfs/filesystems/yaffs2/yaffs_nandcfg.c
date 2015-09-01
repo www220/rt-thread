@@ -129,7 +129,7 @@ unsigned yaffs_trace_mask =
 	YAFFS_TRACE_TRACING |
 	YAFFS_TRACE_ALLOCATE |
 	YAFFS_TRACE_BAD_BLOCKS |
-    
+	YAFFS_TRACE_VERIFY |
 
 	0;
 
