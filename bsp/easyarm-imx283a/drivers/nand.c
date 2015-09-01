@@ -90,6 +90,8 @@ static struct rt_mtd_nand_device _nanddrv_file_device;
 
 static u8 *data_buf = 0;
 static u8 *oob_buf = 0;
+static u32 m_u32BlkMarkBitStart = 0;
+static u32 m_u32BlkMarkByteOfs = 0;
 
 /**
  * clear_bch() - Clears a BCH interrupt.
@@ -509,7 +511,7 @@ static int send_page(struct rt_mtd_nand_device *mtd, unsigned chip,
  * @auxiliary:  The physical address of the auxiliary buffer.
  */
 static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
-			dma_addr_t payload, dma_addr_t auxiliary)
+			dma_addr_t payload, dma_addr_t auxiliary, unsigned page_size)
 {
 	struct mxs_dma_desc	**d        = dma_desc;
 	s32			dma_channel;
@@ -518,7 +520,6 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	u32			address;
 	u32			ecc_command;
 	u32			buffer_mask;
-	u32			page_size = mtd->page_size + mtd->oob_size;
 
 	/* Compute the DMA channel. */
 	dma_channel = MXS_DMA_CHANNEL_AHB_APBH_GPMI0 + chip;
@@ -565,8 +566,9 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 #else
 	ecc_command  = BV_GPMI_ECCCTRL_ECC_CMD__DECODE;
 #endif
-	buffer_mask  = BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE |
-			BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY;
+	buffer_mask  = BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_AUXONLY;
+    if (page_size == mtd->page_size + mtd->oob_size)
+        buffer_mask |= BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE;
 
 	(*d)->cmd.cmd.data                   = 0;
 	(*d)->cmd.cmd.bits.command           = NO_DMA_XFER;
@@ -798,6 +800,56 @@ static void nand_wait_ready(struct rt_mtd_nand_device *mtd)
 }
 
 /**
+ * nand_write_buf() - MTD Interface write_buf().
+ *
+ * @mtd:  A pointer to the owning MTD.
+ * @buf:  The source buffer.
+ * @len:  The number of bytes to read.
+ */
+static void nand_write_buf(struct rt_mtd_nand_device *mtd,
+				const uint8_t *buf, int len)
+{
+	if (!data_buf) {
+#ifdef CONFIG_ARCH_MMU
+		data_buf =
+		(u8 *)ioremap_nocache((u32)iomem_to_phys((ulong)memalign(MXS_DMA_ALIGNMENT,
+		PAGE_SIZE)),
+		MXS_DMA_ALIGNMENT);
+#else
+		data_buf =
+		memalign(MXS_DMA_ALIGNMENT, PAGE_SIZE);
+#endif
+		if (!data_buf) {
+			printf("%s: failed to allocate data_buf "
+				"queuebuffer\n",
+				__func__);
+			return;
+		}
+
+		memset(data_buf, 0, PAGE_SIZE);
+		oob_buf = data_buf + PAGE_DATA_SIZE;
+	}
+    
+	if (len > PAGE_SIZE)
+		printf("[%s] Inadequate DMA buffer\n", __func__);
+
+	if (!buf)
+		printf("[%s] Buffer pointer is NULL\n", __func__);
+
+	memcpy(data_buf, buf, len);
+
+	/* Ask the NFC. */
+#ifdef CONFIG_ARCH_MMU
+	send_data(mtd, 0,
+			(dma_addr_t)iomem_to_phys((u32)data_buf),
+			len);
+#else
+	send_data(mtd, 0,
+			(dma_addr_t)data_buf, len);
+#endif
+}
+
+/**
  * nand_read_buf() - MTD Interface read_buf().
  *
  * @mtd:  A pointer to the owning MTD.
@@ -962,6 +1014,55 @@ static int nand_wait(struct rt_mtd_nand_device *mtd)
 	return state;
 }
 
+/**
+ * gpmi_nfc_block_mark_swapping() - Handles block mark swapping.
+ *
+ * Note that, when this function is called, it doesn't know whether it's
+ * swapping the block mark, or swapping it *back* -- but it doesn't matter
+ * because the the operation is the same.
+ *
+ * @this:       Per-device data.
+ * @payload:    A pointer to the payload buffer.
+ * @auxiliary:  A pointer to the auxiliary buffer.
+ */
+static void gpmi_nfc_block_mark_swapping(void *data_buf, void *oob_buf)
+{
+	u8  *p;
+	u8  *a;
+	u32 bit;
+	u8  mask;
+	u8  from_data;
+	u8  from_oob;
+
+	/*
+	 * If control arrives here, we're swapping. Make some convenience
+	 * variables.
+	 */
+	bit = m_u32BlkMarkBitStart;
+	p   = ((u8 *)data_buf) + m_u32BlkMarkByteOfs;
+	a   = oob_buf;
+
+	/*
+	 * Get the byte from the data area that overlays the block mark. Since
+	 * the ECC engine applies its own view to the bits in the page, the
+	 * physical block mark won't (in general) appear on a byte boundary in
+	 * the data.
+	 */
+	from_data = (p[0] >> bit) | (p[1] << (8 - bit));
+
+	/* Get the byte from the OOB. */
+	from_oob = a[0];
+
+	/* Swap them. */
+	a[0] = from_data;
+
+	mask = (0x1 << bit) - 1;
+	p[0] = (p[0] & mask) | (from_oob << bit);
+
+	mask = ~0 << bit;
+	p[1] = (p[1] & mask) | (from_oob >> (8 - bit));
+}
+
 /* read chip id */
 static rt_err_t nanddrv_file_read_id(struct rt_mtd_nand_device *device)
 {
@@ -982,22 +1083,52 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
                                        rt_uint8_t *data, rt_uint32_t data_len,
                                        rt_uint8_t *spare, rt_uint32_t spare_len)
 {
-	int error = 0;
+	int error = 0,fixnum = 0,i,block;
+    u8 *status = 0;
     
     /* Send the command for reading device ID */
 	nand_command(device, NAND_CMD_READ0, 0x00, page);
-	/* Read manufacturer and device IDs */
-	error = read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
-    if (data)
-    {
-        memcpy(data,data_buf,data_len);
+    
+    /* Read manufacturer and device IDs */
+    if (data && data_len) {
+        error = read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf, PAGE_SIZE);
+        block = GPMI_NFC_ECC_CHUNK_CNT(PAGE_DATA_SIZE)+1;
     }
-    if (spare)
-    {
-        memcpy(spare,oob_buf,spare_len);
+    else {//7 = 4*13/8+1
+        error = read_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf, GPMI_NFC_METADATA_SIZE+7);
+        block = 1;
     }
+    if (error != 0)
+        return -RT_EIO;
 
-	return error;
+	/* Handle block mark swapping. */
+    if (block > 1)
+        gpmi_nfc_block_mark_swapping(data_buf, oob_buf);
+
+    /* Check ECC buf */
+    status = oob_buf + GPMI_NFC_AUX_STATUS_OFF;
+    for(i=0; i<block; i++,status++)
+    {
+        if ((*status == 0x00) || (*status == 0xff))
+            continue;
+        if (*status == 0xfe) {
+            error++;
+            continue;
+        }
+        fixnum += *status;
+    }
+    
+    /* Copy Read Buf */
+    if (data && data_len)
+        memcpy(data,data_buf,data_len);
+    if (spare && spare_len)
+        memcpy(spare,oob_buf,spare_len);
+
+    if (error > 0)
+        return -RT_EIO;
+    if (error == 0 && fixnum > 0)
+        return -RT_ERROR;
+	return RT_EOK;
 }
 
 static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
@@ -1010,13 +1141,18 @@ static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
     /* Send the command for reading device ID */
 	nand_command(device, NAND_CMD_SEQIN, 0x00, page);
 
-    if (data)
+    if (data && data_len)
         memcpy(data_buf, data, data_len);
-    if (oob)
+    if (oob && spare_len)
         memcpy(oob_buf, oob, spare_len);
     
-    send_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
-    
+	/* Handle block mark swapping. */
+	gpmi_nfc_block_mark_swapping(data_buf, oob_buf);
+
+    status = send_page(device, 0, (dma_addr_t)data_buf, (dma_addr_t)oob_buf);
+    if (status != 0)
+        return -RT_EIO;
+
 	nand_command(device, NAND_CMD_PAGEPROG, -1, -1);
 	status = nand_wait(device);
 
@@ -1025,17 +1161,15 @@ static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
 
 static rt_err_t nanddrv_file_move_page(struct rt_mtd_nand_device *device, rt_off_t from, rt_off_t to)
 {
-    return RT_EOK;
+    return -RT_EIO;
 }
 
 /* erase block */
 static rt_err_t nanddrv_file_erase_block(struct rt_mtd_nand_device *device, rt_uint32_t block)
 {
     int status = 0;
-    if (block > BLOCK_NUM) return -RT_EIO;
 
     /* add the start blocks */
-    block = block + device->block_start;
     block *= device->pages_per_block;
 
 	/* Send commands to erase a block */
@@ -1046,6 +1180,42 @@ static rt_err_t nanddrv_file_erase_block(struct rt_mtd_nand_device *device, rt_u
     return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;
 }
 
+static rt_err_t nanddrv_file_check_block(struct rt_mtd_nand_device *device, rt_uint32_t block)
+{
+    u8 state = 0;
+
+    /* add the start blocks */
+    block *= device->pages_per_block;
+
+    /* Send the command for reading device ID */
+	nand_command(device, NAND_CMD_READ0, device->page_size, block);
+    
+    /* Read Bad Block Mark */
+	nand_read_buf(device, &state, 1);
+
+    return (state==0xff)?RT_EOK:-RT_EIO;
+}
+
+static rt_err_t nanddrv_file_mark_block(struct rt_mtd_nand_device *device, rt_uint32_t block)
+{
+    u8 state = 0;
+    int status = 0;
+
+    /* add the start blocks */
+    block *= device->pages_per_block;
+
+    /* Send the command for reading device ID */
+	nand_command(device, NAND_CMD_SEQIN, 0x00, block);
+    
+    /* Read Bad Block Mark */
+	nand_write_buf(device, &state, 1);
+    
+	nand_command(device, NAND_CMD_PAGEPROG, -1, -1);
+	status = nand_wait(device);
+
+    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;;
+}
+
 const static struct rt_mtd_nand_driver_ops _ops =
 {
     nanddrv_file_read_id,
@@ -1053,8 +1223,8 @@ const static struct rt_mtd_nand_driver_ops _ops =
     nanddrv_file_write_page,
     nanddrv_file_move_page,
     nanddrv_file_erase_block,
-    RT_NULL,
-    RT_NULL,
+    nanddrv_file_check_block,
+    nanddrv_file_mark_block,
 };
 
 static inline void __enable_gpmi_clk(void)
@@ -1072,12 +1242,11 @@ static inline void __enable_gpmi_clk(void)
 
 void rt_hw_mtd_nand_init(void)
 {
-    rt_uint16_t ecc_size;
 	u32 block_count;
 	u32 block_size;
 	u32 metadata_size;
-	u32 ecc_strength;
 	u32 page_size;
+    u32 blk_mark_bit_offs;
 
 	/* Reset the GPMI block. */
     __enable_gpmi_clk();
@@ -1100,16 +1269,13 @@ void rt_hw_mtd_nand_init(void)
 		BM_GPMI_CTRL1_BCH_MODE);
 
 	/* Translate the abstract choices into register fields. */
-	block_count = GPMI_NFC_ECC_CHUNK_CNT(PAGE_DATA_SIZE) - 1;
+	block_count = GPMI_NFC_ECC_CHUNK_CNT(PAGE_DATA_SIZE);
 #if defined(CONFIG_GPMI_NFC_V2)
 	block_size = GPMI_NFC_CHUNK_DATA_CHUNK_SIZE >> 2;
 #else
 	block_size = GPMI_NFC_CHUNK_DATA_CHUNK_SIZE;
 #endif
 	metadata_size = GPMI_NFC_METADATA_SIZE;
-
-	ecc_strength =
-		gpmi_nfc_get_ecc_strength(PAGE_DATA_SIZE, OOB_SIZE) >> 1;
 
 	page_size    = PAGE_DATA_SIZE + OOB_SIZE;
 
@@ -1130,13 +1296,13 @@ void rt_hw_mtd_nand_init(void)
 
 	/* Configure layout 0. */
 	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)     |
-		BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size) |
-		BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)       |
-		BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
+		BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size)    |
+		BF_BCH_FLASH0LAYOUT0_ECC0(2)                     |
+		BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(0),
 		CONFIG_BCH_REG_BASE + HW_BCH_FLASH0LAYOUT0);
 
 	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)   |
-		BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)     |
+		BF_BCH_FLASH0LAYOUT1_ECCN(2)                   |
 		BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
 		CONFIG_BCH_REG_BASE + HW_BCH_FLASH0LAYOUT1);
 
@@ -1147,10 +1313,14 @@ void rt_hw_mtd_nand_init(void)
 	REG_SET(CONFIG_BCH_REG_BASE, HW_BCH_CTRL,
 		BM_BCH_CTRL_COMPLETE_IRQ_EN);
 
-    ecc_size = (PAGE_DATA_SIZE) * 3 / 256;
+    blk_mark_bit_offs = gpmi_nfc_get_blk_mark_bit_ofs(PAGE_DATA_SIZE, 4);
+
+	m_u32BlkMarkByteOfs = blk_mark_bit_offs >> 3;
+	m_u32BlkMarkBitStart  = blk_mark_bit_offs & 0x7;
+
     _nanddrv_file_device.plane_num = 2;
     _nanddrv_file_device.oob_size = OOB_SIZE;
-    _nanddrv_file_device.oob_free = OOB_SIZE - ecc_size;
+    _nanddrv_file_device.oob_free = GPMI_NFC_METADATA_SIZE;
     _nanddrv_file_device.page_size = PAGE_DATA_SIZE;
     _nanddrv_file_device.pages_per_block = PAGE_PER_BLOCK;
     _nanddrv_file_device.block_start = 0;

@@ -747,7 +747,7 @@ static inline u32 gpmi_nfc_get_blk_mark_bit_ofs(u32 page_data_size,
 
 	/* Subtract the metadata bits. */
 	/* 32688 bits */
-	block_mark_bit_offset -= GPMI_NFC_METADATA_SIZE * 8;
+	block_mark_bit_offset -= GPMI_NFC_METADATA_SIZE * 8 + GPMI_NFC_CHUNK_ECC_SIZE_IN_BITS(ecc_strength);
 
 	/*
 	 * Compute the chunk number (starting at zero) in which the block mark
