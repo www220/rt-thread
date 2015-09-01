@@ -1,0 +1,37 @@
+# RT-Thread building script for component
+
+from building import *
+
+cwd = GetCurrentDir()
+
+src = Glob('*.c')
+
+yaffs = Split('''
+yaffs/direct/yaffsfs.c
+yaffs/direct/yaffs_nandif.c
+yaffs/direct/yaffs_error.c
+yaffs/direct/yaffs_attribs.c
+yaffs/direct/yaffs_qsort.c
+yaffs/direct/yaffs_hweight.c
+yaffs/yaffs_guts.c
+yaffs/yaffs_yaffs1.c
+yaffs/yaffs_yaffs2.c
+yaffs/yaffs_packedtags2.c
+yaffs/yaffs_verify.c
+yaffs/yaffs_allocator.c
+yaffs/yaffs_bitmap.c
+yaffs/yaffs_checkptrw.c
+yaffs/yaffs_ecc.c
+yaffs/yaffs_nand.c
+yaffs/yaffs_nameval.c
+yaffs/yaffs_summary.c
+yaffs/yaffs_tagscompat.c
+''')
+
+src = src + yaffs
+ 
+CPPPATH = [cwd, cwd + '/yaffs/direct', cwd + '/yaffs', cwd + '/yaffs/direct/basic-test']
+
+group = DefineGroup('Filesystem', src , depend = ['RT_USING_DFS', 'RT_USING_DFS_YAFFS'], CPPPATH = CPPPATH)
+
+Return('group')
