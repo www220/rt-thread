@@ -711,7 +711,7 @@
 #define GPMI_NFC_COMMAND_BUFFER_SIZE (10)
 
 /* ECC Macros */
-#define GPMI_NFC_METADATA_SIZE	(10)
+#define GPMI_NFC_METADATA_SIZE	(20)
 #define GPMI_NFC_CHUNK_DATA_CHUNK_SIZE	(512)
 #define GPMI_NFC_CHUNK_DATA_CHUNK_SIZE_IN_BITS	(512 * 6)
 #define GPMI_NFC_CHUNK_ECC_SIZE_IN_BITS(ecc_str)	(ecc_str * 13)
@@ -778,22 +778,6 @@ static inline u32 gpmi_nfc_get_blk_mark_bit_ofs(u32 page_data_size,
 		block_mark_chunk_number * chunk_ecc_size_in_bits;
 
 	return block_mark_bit_offset;
-}
-
-static inline u32 gpmi_nfc_get_ecc_strength(u32 page_data_size,
-						u32 page_oob_size)
-{
-	if (2048 == page_data_size)
-		return 8;
-	else if (4096 == page_data_size) {
-		if (128 == page_oob_size)
-			return 8;
-		else if (218 == page_oob_size)
-			return 16;
-		else
-			return 0;
-	} else
-		return 0;
 }
 
 static inline s32 gpmi_nfc_reset_block(void *hwreg, int is_enable)

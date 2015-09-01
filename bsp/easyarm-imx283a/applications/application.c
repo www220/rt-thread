@@ -44,13 +44,16 @@
 #ifdef RT_USING_DFS_ELMFAT
 #include <dfs_elm.h>
 #endif
+#ifdef RT_USING_DFS_YAFFS
+extern void dfs_yaffs_init(void);
+#endif
 #ifdef RT_USING_DFS_DEVFS
 #include <devfs.h>
 #endif
 #ifdef RT_USING_DFS_ROMFS
 #include <dfs_romfs.h>
 #endif
-#ifdef RT_USING_SPI
+#ifdef RT_USING_DFS_ELMFAT
 extern rt_err_t w25qxx_init(const char * flash_device_name, const char * spi_device_name);
 extern rt_err_t w25ftl_flash_init(const char * ftl_device_name, const char * flash_device_name);
 #endif
@@ -229,7 +232,7 @@ static void rt_thread_entry_wtdog(void* parameter)
 }
 
 ALIGN(RT_ALIGN_SIZE)
-static char thread_main_stack[2048];
+static char thread_main_stack[32768];
 struct rt_thread thread_main;
 static void rt_thread_entry_main(void* parameter)
 {
@@ -254,13 +257,6 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 #endif
 
-#ifdef RT_USING_SPI
-    w25qxx_init("flash0", "spi10");
-#endif
-#ifdef RT_USING_MTD_NAND
-    nand_init();
-#endif
-
     /* initialize the device file system */
 #ifdef RT_USING_DFS
     dfs_init();
@@ -274,12 +270,13 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
 #if defined(RT_USING_SPI) && defined(RT_USING_DFS_ELMFAT)
+    w25qxx_init("flash0", "spi10");
     elm_init();
     w25ftl_flash_init("ftl0", "flash0");
 #endif
-#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_ELMFAT)
-    elm_init();
-    w25ftl_flash_init("ftl0", "flash0");
+#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS)
+    nand_init();
+    dfs_yaffs_init();
 #endif
 
 #ifdef RT_USING_DFS_ROMFS
@@ -296,8 +293,8 @@ static void rt_thread_entry_main(void* parameter)
     else
         rt_kprintf("Mount /mnt failed!\n");
 #endif
-#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_ELMFAT)
-    if (dfs_mount("nand0", "/mnt", "elm", 0, 0) == 0)
+#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS)
+    if (dfs_mount("nand0", "/mnt", "yaffs2", 0, 0) == 0)
         rt_kprintf("Mount /mnt ok!\n");
     else
         rt_kprintf("Mount /mnt failed!\n");
