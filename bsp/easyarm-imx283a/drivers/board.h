@@ -32,6 +32,7 @@
 #include "regs-uartdbg.h"
 #include "regs-clkctrl.h"
 #include "regs-ocotp.h"
+#include "regs-enet.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64

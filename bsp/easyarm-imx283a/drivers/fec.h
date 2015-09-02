@@ -82,7 +82,7 @@ typedef struct cpm_buf_desc {
 #define BD_ENET_TX_TO1		BD_ENET_TX_PAD
 #define BD_ENET_TX_WRAP		((ushort)0x2000)
 #define BD_ENET_TX_INTR		((ushort)0x1000)
-#define BD_ENET_TX_TO2		BD_ENET_TX_INTR_
+#define BD_ENET_TX_TO2		BD_ENET_TX_INTR
 #define BD_ENET_TX_LAST		((ushort)0x0800)
 #define BD_ENET_TX_TC		((ushort)0x0400)
 #define BD_ENET_TX_DEF		((ushort)0x0200)
@@ -111,8 +111,6 @@ struct fec_info_s {
 	uint txIdx;
 	char *txbuf;
 	char *rxbuf[PKTBUFSRX];
-	int initialized;
-	struct fec_info_s *next;
 };
 
 /* Register read/write struct */

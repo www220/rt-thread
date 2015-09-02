@@ -3,7 +3,6 @@
 #include <rtdevice.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "board.h"
 #include "fec.h"
 
@@ -34,7 +33,6 @@ struct fec_info_s fec_info[] = {
 	 0,			/* tx Index */
 	 0,			/* tx buffer */
 	 { 0 },		/* rx buffer */
-	 0,			/* initialized flag */
 	 },
 };
 
@@ -192,7 +190,7 @@ static rt_err_t rt_stm32_eth_init(rt_device_t dev)
 	fecp->tcr = FEC_TCR_FDEN;
 
 	/* We use strictly polling mode only */
-	fecp->eimr = 0;
+	fecp->eimr = BM_ENET_MAC0_EIR_TXF|BM_ENET_MAC0_EIR_RXF;
 
 	/* Clear any pending interrupt */
 	fecp->eir = 0xffffffff;
@@ -304,7 +302,6 @@ static void swap_packet(void *packet, int length)
 {
 	int i;
 	unsigned int *buf = packet;
-
 	for (i = 0; i < (length + 3) / 4; i++, buf++)
 		*buf = ___swab32(*buf);
 }
@@ -318,22 +315,29 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 	volatile fec_t *fecp = (fec_t *) (info->iobase);
     
     struct pbuf* q;
-    rt_uint32_t offset,j;
+    rt_uint32_t offset;
 
-	j = 0;
-	while ((info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY) &&
-	       (j < FEC_MAX_TIMEOUT)) {
-		udelay(FEC_TIMEOUT_TICKET);
-		j++;
-	}
-	if (j >= FEC_MAX_TIMEOUT)
-		printf("TX not ready\n");
+    /* Check if the descriptor is owned by the ETHERNET DMA (when set) or CPU (when reset) */
+    while (fecp->tdar & 0x01000000)
+    {
+        rt_err_t result;
+        rt_uint32_t level;
 
+        level = rt_hw_interrupt_disable();
+        tx_is_waiting = RT_TRUE;
+        rt_hw_interrupt_enable(level);
+
+        /* it's own bit set, wait it */
+        result = rt_sem_take(&tx_wait, RT_WAITING_FOREVER);
+        if (result == RT_EOK) break;
+        if (result == -RT_ERROR) return -RT_ERROR;
+    }
+    
     offset = 0;
     for (q = p; q != NULL; q = q->next)
     {
         /* Copy the frame to be sent into memory pointed by the current ETHERNET DMA Tx descriptor */
-        memcpy((uint8_t*)info->txbd[info->txIdx].cbd_bufaddr+offset,q->payload,q->len);
+        rt_memcpy((uint8_t*)info->txbd[info->txIdx].cbd_bufaddr+offset,q->payload,q->len);
         offset += q->len;
     }
 #ifdef ETH_TX_DUMP
@@ -367,23 +371,6 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 
 	/* Activate transmit Buffer Descriptor polling */
 	fecp->tdar = 0x01000000;	/* Descriptor polling active    */
-
-	j = 0;
-	while ((info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY) &&
-	       (j < FEC_MAX_TIMEOUT)) {
-		udelay(FEC_TIMEOUT_TICKET);
-		j++;
-	}
-	if (j >= FEC_MAX_TIMEOUT)
-		printf("TX timeout packet at %p\n", p);
-
-#ifdef ETH_TX_DUMP
-	STM32_ETH_PRINTF("%s[%d] %s: cycles: %d    status: %x  retry cnt: %d\n",
-	       __FILE__, __LINE__, __func__, j,
-	       info->txbd[info->txIdx].cbd_sc,
-	       (info->txbd[info->txIdx].cbd_sc & 0x003C) >> 2);
-#endif
-
 	info->txIdx = (info->txIdx + 1) % TX_BUF_CNT;
 
 	return RT_EOK;
@@ -427,7 +414,7 @@ struct pbuf *rt_stm32_eth_rx(rt_device_t dev)
                 for (q = p; q != RT_NULL; q= q->next)
                 {
                     /* Copy the received frame into buffer from memory pointed by the current ETHERNET DMA Rx descriptor */
-                    memcpy(q->payload,(uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr+offset,q->len);
+                    rt_memcpy(q->payload,(uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr+offset,q->len);
                     offset += q->len;
                 }
 #ifdef ETH_RX_DUMP
@@ -793,10 +780,6 @@ static void phy_monitor_thread_entry(void *parameter)
         } /* linkchange */
 
         rt_thread_delay(RT_TICK_PER_SECOND);
-                    /* a frame has been received */
-            eth_device_ready(&(stm32_eth_device.parent));
-                        /* a frame has been received */
-            eth_device_ready(&(stm32_eth_device.parent));
     } /* while(1) */
 }
 #endif
@@ -817,6 +800,27 @@ static struct pin_group enet_pins = {
 	.pins		= enet_pins_desc,
 	.nr_pins	= ARRAY_SIZE(enet_pins_desc)
 };
+
+void rt_hw_enetmac_handler(int vector, void *param)
+{
+    register rt_uint32_t ir = REG_RD(0x800F0004, HW_ENET_MAC0_EIR);
+    if (ir & BM_ENET_MAC0_EIR_TXF)
+    {
+        STM32_ETH_PRINTF("ETH_DMA_IT_T\r\n");
+        if (tx_is_waiting == RT_TRUE)
+        {
+            tx_is_waiting = RT_FALSE;
+            rt_sem_release(&tx_wait);
+        }
+    }
+    if (ir & BM_ENET_MAC0_EIR_RXF)
+    {
+        STM32_ETH_PRINTF("ETH_DMA_IT_R\r\n");
+        /* a frame has been received */
+        eth_device_ready(&(stm32_eth_device.parent));
+    }
+    REG_WR(0x800F0004, HW_ENET_MAC0_EIR, ir);
+}
 
 void rt_hw_eth_init(void)
 {
@@ -911,4 +915,7 @@ void rt_hw_eth_init(void)
         if (tid != RT_NULL)
             rt_thread_startup(tid);
     }
+
+    rt_hw_interrupt_install(IRQ_ENET_MAC0, rt_hw_enetmac_handler, RT_NULL, "ENetMac");
+    rt_hw_interrupt_umask(IRQ_ENET_MAC0);
 }
