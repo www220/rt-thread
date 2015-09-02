@@ -74,15 +74,9 @@ extern void libc_system_init(const char* tty_name);
 #include <lwip/sys.h>
 #include <lwip/api.h>
 #include <netif/ethernetif.h>
-extern void rt_hw_stm32_eth_init(void);
+extern void rt_hw_eth_init(void);
 extern int eth_system_device_init(void);
 extern void lwip_sys_init(void);
-struct rt_memheap lwip_memheap;
-#endif
-
-#ifdef RT_USING_SQLITE
-#include "sqlite3.h"
-struct rt_memheap sqlite_memheap;
 #endif
 
 #ifdef RT_USING_FINSH
@@ -97,57 +91,6 @@ volatile int sys_stauts = -1;
 
 unsigned char NET_MAC[6] = {0};
 extern void cpu_usage_idle_hook(void);
-
-#include <string.h>
-#include <stdio.h>
-int loadset(void)
-{
-#ifdef RT_USING_SQLITE
-    char csSql[100] = {0};
-    char *emsg = 0;
-    int result = SQLITE_OK;
-    sqlite3_stmt *stmt = 0;
-    sqlite3 *sqldb = 0;
-
-    rttGetTempname(100,csSql);
-    strcat(csSql,"\n");
-    rt_kprintf(csSql);
-
-    //打开文件
-    sprintf(csSql,"%s/sysset.db","/mnt");
-    if ((result = sqlite3_open(csSql,&sqldb)) != SQLITE_OK)
-    {
-        return 1;
-    }
-    //建立默认表
-    strcpy(csSql,"CREATE TABLE IF NOT EXISTS [SYS_CFG] ([tID] INTEGER PRIMARY KEY,[tINFO] TEXT)");
-    result = sqlite3_exec(sqldb,csSql,0,0,&emsg);
-    strcpy(csSql,"INSERT INTO [SYS_CFG] VALUES (12,\"1111\")");
-    result = sqlite3_exec(sqldb,csSql,0,0,&emsg);
-    //查询表
-    strcpy(csSql,"SELECT * FROM [SYS_CFG]"); 
-    if ((result = sqlite3_prepare(sqldb,csSql,-1,&stmt,0)) != SQLITE_OK)
-    {
-        sqlite3_close(sqldb);
-        sqldb = 0;
-        return 2;
-    }
-    //循环获取所有记录
-    result = sqlite3_step(stmt);
-    while (result == SQLITE_ROW)
-    {
-        int idx = sqlite3_column_int(stmt,0);
-        const char *data = (const char*)sqlite3_column_text(stmt,1);
-        rt_kprintf("%d-%s",idx,data);
-        //
-        result = sqlite3_step(stmt);
-    } 
-    //
-    sqlite3_finalize(stmt);
-    sqlite3_close(sqldb);
-#endif
-    return 0;
-}
 
 #define GPIO_ResetBits(x,y) pin_gpio_set(x,0)
 #define GPIO_SetBits(x,y) pin_gpio_set(x,1)
@@ -241,22 +184,6 @@ static void rt_thread_entry_main(void* parameter)
     rt_hw_rtc_init();
 #endif
 
-#ifdef RT_USING_LWIP
-#ifdef _MSC_VER
-	rt_memheap_init(&lwip_memheap,"lwip",g_lwipmembuf,32 * 1024);
-#else
-	rt_memheap_init(&lwip_memheap,"lwip",(void *)0x10000000,32 * 1024);
-#endif
-#endif
-
-#ifdef RT_USING_SQLITE
-#ifdef _MSC_VER
-    rt_memheap_init(&sqlite_memheap,"sqlite",g_sqlmembuf,32 * 1024);
-#else
-    rt_memheap_init(&sqlite_memheap,"sqlite",(void *)0x10008000,32 * 1024);
-#endif
-#endif
-
     /* initialize the device file system */
 #ifdef RT_USING_DFS
     dfs_init();
@@ -309,7 +236,7 @@ static void rt_thread_entry_main(void* parameter)
     /* LwIP Initialization */
 #ifdef RT_USING_LWIP
     eth_system_device_init();
-    rt_hw_stm32_eth_init();
+    rt_hw_eth_init();
     lwip_sys_init();
     rt_kprintf("TCP/IP initialized!\n");
 #endif
@@ -320,7 +247,6 @@ static void rt_thread_entry_main(void* parameter)
     sqlite3_initialize();
     rt_kprintf("Sqlite3 initialized!\n");
 #endif
-    loadset();
 
     /* list date */
 #ifdef RT_USING_RTC

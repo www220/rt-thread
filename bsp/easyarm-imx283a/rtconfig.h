@@ -132,7 +132,7 @@
 extern int rttGetTempname(int nBuf, char *zBuf);
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
-//#define RT_USING_LWIP
+#define RT_USING_LWIP
 /* LwIP uses RT-Thread Memory Management */
 #define RT_LWIP_USING_RT_MEM
 /* Enable ICMP protocol*/
@@ -143,6 +143,10 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 #define RT_LWIP_TCP
 /* Enable DNS */
 #define RT_LWIP_DNS
+
+#define MEMP_NUM_NETCONN 32
+#define SO_REUSE 1
+#define LWIP_TCP_KEEPALIVE 1
 
 /* ip address of target*/
 #define RT_LWIP_IPADDR0	192

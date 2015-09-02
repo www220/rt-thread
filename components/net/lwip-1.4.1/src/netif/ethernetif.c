@@ -173,7 +173,7 @@ static err_t eth_netif_device_init(struct netif *netif)
             netif_set_up(ethif->netif);
         }
 
-#ifdef LWIP_NETIF_LINK_CALLBACK
+#if LWIP_NETIF_LINK_CALLBACK
         netif_set_link_up(ethif->netif);
 #endif
 

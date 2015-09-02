@@ -38,6 +38,8 @@
 #if defined (__IAR_SYSTEMS_ICC__) &&  (__VER__) >= 6020000
 #pragma module_name = "?time"
 time_t (__time32)(time_t *t) /* Only supports 32-bit timestamp */
+#elif defined (_MSC_VER)
+time_t _time32(time_t *t)
 #else
 time_t time(time_t *t)
 #endif
