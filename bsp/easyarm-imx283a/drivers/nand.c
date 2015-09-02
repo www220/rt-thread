@@ -1165,6 +1165,7 @@ static rt_err_t nanddrv_file_move_page(struct rt_mtd_nand_device *device, rt_off
 }
 
 /* erase block */
+static rt_err_t nanddrv_file_mark_block(struct rt_mtd_nand_device *device, rt_uint32_t block);
 static rt_err_t nanddrv_file_erase_block(struct rt_mtd_nand_device *device, rt_uint32_t block)
 {
     int status = 0;
@@ -1177,7 +1178,12 @@ static rt_err_t nanddrv_file_erase_block(struct rt_mtd_nand_device *device, rt_u
 	nand_command(device, NAND_CMD_ERASE2, -1, -1);
 
     status = nand_wait(device);
-    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;
+    if (status & NAND_STATUS_FAIL) {
+        nanddrv_file_mark_block(device,block/device->pages_per_block);
+        return -RT_EIO;
+    }
+
+    return RT_EOK;
 }
 
 static rt_err_t nanddrv_file_check_block(struct rt_mtd_nand_device *device, rt_uint32_t block)
@@ -1205,7 +1211,7 @@ static rt_err_t nanddrv_file_mark_block(struct rt_mtd_nand_device *device, rt_ui
     block *= device->pages_per_block;
 
     /* Send the command for reading device ID */
-	nand_command(device, NAND_CMD_SEQIN, 0x00, block);
+	nand_command(device, NAND_CMD_SEQIN, device->page_size, block);
     
     /* Read Bad Block Mark */
 	nand_write_buf(device, &state, 1);
@@ -1323,7 +1329,7 @@ void rt_hw_mtd_nand_init(void)
     _nanddrv_file_device.oob_free = GPMI_NFC_METADATA_SIZE;
     _nanddrv_file_device.page_size = PAGE_DATA_SIZE;
     _nanddrv_file_device.pages_per_block = PAGE_PER_BLOCK;
-    _nanddrv_file_device.block_start = 0;
+    _nanddrv_file_device.block_start = 160;
     _nanddrv_file_device.block_end = BLOCK_NUM / 2;
     _nanddrv_file_device.block_total = _nanddrv_file_device.block_end - _nanddrv_file_device.block_start;
     _nanddrv_file_device.ops = &_ops;
@@ -1372,8 +1378,11 @@ void nand_init(void)
 void nand_eraseall()
 {
     int index;
-    for (index = 0; index < _nanddrv_file_device.block_total; index ++)
-        nanddrv_file_erase_block(&_nanddrv_file_device, index);
+    for (index = _nanddrv_file_device.block_start; index < _nanddrv_file_device.block_total; index ++)
+    {
+        if (nanddrv_file_erase_block(&_nanddrv_file_device, index) != 0)
+            rt_kprintf("Nand Erase %d BadBlock\n", index);
+    }
 }
 FINSH_FUNCTION_EXPORT(nand_eraseall, erase all of block in the nand flash);
 

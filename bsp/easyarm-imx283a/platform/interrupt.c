@@ -89,7 +89,9 @@ void rt_hw_interrupt_init(void)
                  BF_ICOLL_LEVELACK_IRQLEVELACK(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL2));
     REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_LEVELACK,
                  BF_ICOLL_LEVELACK_IRQLEVELACK(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL3));
-
+    
+    /* isr memcpy */
+    rt_memcpy((void *)0, (void *)0x40000000, 256);
     REG_WR_ADDR(REGS_ICOL_BASE + HW_ICOLL_VECTOR, 0);
     /* Barrier */
     (void)REG_RD_ADDR(REGS_ICOL_BASE + HW_ICOLL_STAT);    
