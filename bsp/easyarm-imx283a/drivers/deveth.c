@@ -300,14 +300,13 @@ static rt_err_t rt_stm32_eth_control(rt_device_t dev, rt_uint8_t cmd, void *args
 		(((u32)(x) & (u32)0x0000ff00UL) <<  8) | \
 		(((u32)(x) & (u32)0x00ff0000UL) >>  8) | \
 		(((u32)(x) & (u32)0xff000000UL) >> 24) ))
-static void swap_packet(void *packet, int length, void *to)
+static void swap_packet(void *packet, int length)
 {
 	int i;
 	unsigned int *buf = packet;
-	unsigned int *save = to;
 
-	for (i = 0; i < (length + 3) / 4; i++, buf++, save++)
-		*save = ___swab32(*buf);
+	for (i = 0; i < (length + 3) / 4; i++, buf++)
+		*buf = ___swab32(*buf);
 }
 
 /* ethernet device interface */
@@ -333,11 +332,8 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
     offset = 0;
     for (q = p; q != NULL; q = q->next)
     {
-        uint8_t *to;
-
         /* Copy the frame to be sent into memory pointed by the current ETHERNET DMA Tx descriptor */
-        to = (uint8_t*)(info->txbd[info->txIdx].cbd_bufaddr + offset);
-        swap_packet(q->payload, q->len, to);
+        memcpy((uint8_t*)info->txbd[info->txIdx].cbd_bufaddr+offset,q->payload,q->len);
         offset += q->len;
     }
 #ifdef ETH_TX_DUMP
@@ -363,6 +359,7 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
         STM32_ETH_PRINTF("\r\ndump done!\r\n");
     }
 #endif
+    swap_packet((uint8_t*)info->txbd[info->txIdx].cbd_bufaddr, offset);
 	info->txbd[info->txIdx].cbd_datlen = offset;
 	info->txbd[info->txIdx].cbd_sc =
 	    (info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_WRAP) |
@@ -399,8 +396,8 @@ struct pbuf *rt_stm32_eth_rx(rt_device_t dev)
 	struct fec_info_s *info = stm32_eth->priv;
 	volatile fec_t *fecp = (fec_t *) (info->iobase);
 
-    struct pbuf* p;
-    rt_uint32_t offset = 0, framelength = 0;
+    struct pbuf *p,*q;
+    rt_uint32_t offset,framelength;
 
     /* init p pointer */
     p = RT_NULL;
@@ -418,18 +415,19 @@ struct pbuf *rt_stm32_eth_rx(rt_device_t dev)
 		} else {
             /* wtdog eth status */
             eth_wtdog = 0;
+            
+            framelength = info->rxbd[info->rxIdx].cbd_datlen - 4;
+            swap_packet((uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr, framelength);
 
             /* Get the Frame Length of the received packet: substruct 4 bytes of the CRC */
-			framelength = info->rxbd[info->rxIdx].cbd_datlen - 4;
             p = pbuf_alloc(PBUF_LINK, framelength, PBUF_RAM);
             if (p != RT_NULL)
             {
-                struct pbuf* q;
-
+                offset = 0;
                 for (q = p; q != RT_NULL; q= q->next)
                 {
                     /* Copy the received frame into buffer from memory pointed by the current ETHERNET DMA Rx descriptor */
-                    swap_packet((uint8_t *)(info->rxbd[info->rxIdx].cbd_bufaddr + offset), q->len, q->payload);
+                    memcpy(q->payload,(uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr+offset,q->len);
                     offset += q->len;
                 }
 #ifdef ETH_RX_DUMP

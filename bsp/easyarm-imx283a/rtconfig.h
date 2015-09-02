@@ -169,12 +169,12 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 /* tcp thread options */
 #define RT_LWIP_TCPTHREAD_PRIORITY		12
 #define RT_LWIP_TCPTHREAD_MBOX_SIZE		4
-#define RT_LWIP_TCPTHREAD_STACKSIZE		1024
+#define RT_LWIP_TCPTHREAD_STACKSIZE		4096
 
 /* ethernet if thread options */
 #define RT_LWIP_ETHTHREAD_PRIORITY		15
 #define RT_LWIP_ETHTHREAD_MBOX_SIZE		4
-#define RT_LWIP_ETHTHREAD_STACKSIZE		512
+#define RT_LWIP_ETHTHREAD_STACKSIZE		2048
 
 /* TCP sender buffer space */
 #define RT_LWIP_TCP_SND_BUF	8192
