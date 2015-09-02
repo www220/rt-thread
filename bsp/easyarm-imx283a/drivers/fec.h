@@ -266,7 +266,7 @@ typedef struct fec {
 #define	FEC_RESET_DELAY			100
 #define FEC_RX_TOUT			100
 
-#define FEC_MAX_TIMEOUT			5000000
+#define FEC_MAX_TIMEOUT			50000
 #define FEC_TIMEOUT_TICKET		2
 
 #endif				/* fec_h */

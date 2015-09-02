@@ -31,6 +31,7 @@
 #include "regs-timrot.h"
 #include "regs-uartdbg.h"
 #include "regs-clkctrl.h"
+#include "regs-ocotp.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64

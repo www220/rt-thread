@@ -151,14 +151,14 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 /* ip address of target*/
 #define RT_LWIP_IPADDR0	192
 #define RT_LWIP_IPADDR1	168
-#define RT_LWIP_IPADDR2	40
+#define RT_LWIP_IPADDR2	99
 #define RT_LWIP_IPADDR3	22
 
 /* gateway address of target*/
 #define RT_LWIP_GWADDR0	192
 #define RT_LWIP_GWADDR1	168
-#define RT_LWIP_GWADDR2	40
-#define RT_LWIP_GWADDR3	254
+#define RT_LWIP_GWADDR2	99
+#define RT_LWIP_GWADDR3	1
 
 /* mask address of target*/
 #define RT_LWIP_MSKADDR0	255
