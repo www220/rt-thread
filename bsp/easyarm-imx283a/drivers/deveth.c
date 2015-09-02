@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "board.h"
+#include "fec.h"
 
 #include <netif/ethernetif.h>
 #include <netif/ethernetif.h>
@@ -13,9 +14,29 @@
 #include "lwipopts.h"
 
 /* debug option */
-//#define ETH_DEBUG
+#define ETH_DEBUG
 //#define ETH_RX_DUMP
 //#define ETH_TX_DUMP
+
+#ifdef ETH_DEBUG
+#define STM32_ETH_PRINTF          rt_kprintf
+#else
+#define STM32_ETH_PRINTF(...)
+#endif
+
+struct fec_info_s fec_info[] = {
+	{
+	 0,			/* index */
+	 CONFIG_FEC0_IOBASE,	/* io base */
+	 0,			/* RX BD */
+	 0,			/* TX BD */
+	 0,			/* rx Index */
+	 0,			/* tx Index */
+	 0,			/* tx buffer */
+	 { 0 },		/* rx buffer */
+	 0,			/* initialized flag */
+	 },
+};
 
 #define MAX_ADDR_LEN 6
 struct rt_stm32_eth
@@ -25,92 +46,204 @@ struct rt_stm32_eth
 
 	/* interface address info. */
 	rt_uint8_t  dev_addr[MAX_ADDR_LEN];			/* hw address	*/
+    struct fec_info_s *priv;
 
 	uint32_t    ETH_Speed; /*!< @ref ETH_Speed */
 	uint32_t    ETH_Mode;  /*!< @ref ETH_Duplex_Mode */
 };
+
 static struct rt_stm32_eth stm32_eth_device;
 static struct rt_semaphore tx_wait;
 static rt_bool_t tx_is_waiting = RT_FALSE;
 
+/* Ethernet Transmit and Receive Buffers */
+#define DBUF_LENGTH		1520
+#define TX_BUF_CNT		2
+#define PKT_MAXBUF_SIZE		1518
+#define PKT_MINBUF_SIZE		64
+#define PKT_MAXBLR_SIZE		1520
+#define LAST_PKTBUFSRX		(PKTBUFSRX - 1)
+#define BD_ENET_RX_W_E		(BD_ENET_RX_WRAP | BD_ENET_RX_EMPTY)
+#define BD_ENET_TX_RDY_LST	(BD_ENET_TX_READY | BD_ENET_TX_LAST)
+
+/* the defins of MII operation */
+#define FEC_MII_ST      0x40000000
+#define FEC_MII_OP_OFF  28
+#define FEC_MII_OP_MASK 0x03
+#define FEC_MII_OP_RD   0x02
+#define FEC_MII_OP_WR   0x01
+#define FEC_MII_PA_OFF  23
+#define FEC_MII_PA_MASK 0xFF
+#define FEC_MII_RA_OFF  18
+#define FEC_MII_RA_MASK 0xFF
+#define FEC_MII_TA      0x00020000
+#define FEC_MII_DATA_OFF 0
+#define FEC_MII_DATA_MASK 0x0000FFFF
+
+#define FEC_MII_FRAME   (FEC_MII_ST | FEC_MII_TA)
+#define FEC_MII_OP(x)   (((x) & FEC_MII_OP_MASK) << FEC_MII_OP_OFF)
+#define FEC_MII_PA(pa)  (((pa) & FEC_MII_PA_MASK) << FEC_MII_PA_OFF)
+#define FEC_MII_RA(ra)  (((ra) & FEC_MII_RA_MASK) << FEC_MII_RA_OFF)
+#define FEC_MII_SET_DATA(v) (((v) & FEC_MII_DATA_MASK) << FEC_MII_DATA_OFF)
+#define FEC_MII_GET_DATA(v) (((v) >> FEC_MII_DATA_OFF) & FEC_MII_DATA_MASK)
+#define FEC_MII_READ(pa, ra) ((FEC_MII_FRAME | FEC_MII_OP(FEC_MII_OP_RD)) |\
+					FEC_MII_PA(pa) | FEC_MII_RA(ra))
+#define FEC_MII_WRITE(pa, ra, v) (FEC_MII_FRAME | FEC_MII_OP(FEC_MII_OP_WR)|\
+			FEC_MII_PA(pa) | FEC_MII_RA(ra) | FEC_MII_SET_DATA(v))
+
+#define FEC_MII_TIMEOUT		5000000
+#define FEC_MII_TICK         	2
+
+static inline int __fec_mii_read(volatile fec_t *fecp, unsigned char addr,
+				 unsigned char reg, unsigned short *value)
+{
+	int waiting = FEC_MII_TIMEOUT;
+	if (fecp->eir & FEC_EIR_MII)
+		fecp->eir = FEC_EIR_MII;
+
+	fecp->mmfr = FEC_MII_READ(addr, reg);
+	while (1) {
+		if (fecp->eir & FEC_EIR_MII) {
+			fecp->eir = FEC_EIR_MII;
+			break;
+		}
+		if ((waiting--) <= 0)
+			return -1;
+		udelay(FEC_MII_TICK);
+	}
+	*value = FEC_MII_GET_DATA(fecp->mmfr);
+	return 0;
+}
+
+static inline int __fec_mii_write(volatile fec_t *fecp, unsigned char addr,
+				  unsigned char reg, unsigned short value)
+{
+	int waiting = FEC_MII_TIMEOUT;
+	if (fecp->eir & FEC_EIR_MII)
+		fecp->eir = FEC_EIR_MII;
+
+	fecp->mmfr = FEC_MII_WRITE(addr, reg, value);
+	while (1) {
+		if (fecp->eir & FEC_EIR_MII) {
+			fecp->eir = FEC_EIR_MII;
+			break;
+		}
+		if ((waiting--) <= 0)
+			return -1;
+		udelay(FEC_MII_TICK);
+	}
+	return 0;
+}
+
+extern u32 mx28_get_hclk(void);
+static void mxc_fec_mii_init(volatile fec_t *fecp)
+{
+	u32 clk = mx28_get_hclk() * 1000000;
+	fecp->mscr = (fecp->mscr & (~0x7E)) | (((clk + 499999) / 5000000) << 1);
+}
+
+static void fec_reset(struct rt_stm32_eth *dev)
+{
+	struct fec_info_s *info = dev->priv;
+	volatile fec_t *fecp = (fec_t *)(info->iobase);
+	int i;
+
+	fecp->ecr = FEC_ECR_RESET;
+	for (i = 0; (fecp->ecr & FEC_ECR_RESET) && (i < FEC_RESET_DELAY); ++i)
+		udelay(1);
+
+	if (i == FEC_RESET_DELAY)
+		printf("FEC_RESET_DELAY timeout\n");
+}
+
 /* initialize the interface */
-static rt_err_t rt_eth_init(rt_device_t dev)
+static rt_err_t rt_stm32_eth_init(rt_device_t dev)
 {
     struct rt_stm32_eth * stm32_eth = (struct rt_stm32_eth *)dev;
-    ETH_InitTypeDef ETH_InitStructure;
+	struct fec_info_s *info = stm32_eth->priv;
+	volatile fec_t *fecp = (fec_t *) (info->iobase);
+	int i;
+	u8 *ea = NULL;
 
-    /* Enable ETHERNET clock  */
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_ETH_MAC | RCC_AHB1Periph_ETH_MAC_Tx |
-                           RCC_AHB1Periph_ETH_MAC_Rx, ENABLE);
+	fec_reset(stm32_eth);
 
-    SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_RMII);
+	/* We use strictly polling mode only */
+	fecp->eimr = 0;
 
-    /* Reset ETHERNET on AHB Bus */
-    ETH_DeInit();
+	/* Clear any pending interrupt */
+	fecp->eir = 0xffffffff;
 
-    /* Software reset */
-    ETH_SoftwareReset();
+	/* Set station address   */
+	ea = stm32_eth->dev_addr;
+	fecp->palr = (ea[0] << 24) | (ea[1] << 16) | (ea[2] << 8) | (ea[3]);
+	fecp->paur = (ea[4] << 24) | (ea[5] << 16);
 
-    /* Wait for software reset */
-    while (ETH_GetSoftwareResetStatus() == SET);
+	/* Clear unicast address hash table */
+	fecp->iaur = 0;
+	fecp->ialr = 0;
 
-    /* ETHERNET Configuration --------------------------------------------------*/
-    /* Call ETH_StructInit if you don't like to configure all ETH_InitStructure parameter */
-    ETH_StructInit(&ETH_InitStructure);
+	/* Clear multicast address hash table */
+	fecp->gaur = 0;
+	fecp->galr = 0;
 
-    /* Fill ETH_InitStructure parametrs */
-    /*------------------------   MAC   -----------------------------------*/
-    ETH_InitStructure.ETH_AutoNegotiation = ETH_AutoNegotiation_Enable;
-    ETH_InitStructure.ETH_Speed = stm32_eth->ETH_Speed;
-    ETH_InitStructure.ETH_Mode  = stm32_eth->ETH_Mode;
+	/* Set maximum receive buffer size. */
+	fecp->emrbr = PKT_MAXBLR_SIZE;
 
-    ETH_InitStructure.ETH_LoopbackMode = ETH_LoopbackMode_Disable;
-    ETH_InitStructure.ETH_RetryTransmission = ETH_RetryTransmission_Disable;
-    ETH_InitStructure.ETH_AutomaticPadCRCStrip = ETH_AutomaticPadCRCStrip_Disable;
-    ETH_InitStructure.ETH_ReceiveAll = ETH_ReceiveAll_Disable;
-    ETH_InitStructure.ETH_BroadcastFramesReception = ETH_BroadcastFramesReception_Enable;
-    ETH_InitStructure.ETH_PromiscuousMode = ETH_PromiscuousMode_Disable;
-    ETH_InitStructure.ETH_MulticastFramesFilter = ETH_MulticastFramesFilter_Perfect;
-    ETH_InitStructure.ETH_UnicastFramesFilter = ETH_UnicastFramesFilter_Perfect;
-#ifdef CHECKSUM_BY_HARDWARE
-    ETH_InitStructure.ETH_ChecksumOffload = ETH_ChecksumOffload_Enable;
+	/*
+	 * Setup Buffers and Buffer Desriptors
+	 */
+	info->rxIdx = 0;
+	info->txIdx = 0;
+
+	/*
+	 * Setup Receiver Buffer Descriptors (13.14.24.18)
+	 * Settings:
+	 *     Empty, Wrap
+	 */
+	for (i = 0; i < PKTBUFSRX; i++) {
+		info->rxbd[i].cbd_sc = BD_ENET_RX_EMPTY;
+		info->rxbd[i].cbd_datlen = 0;	/* Reset */
+#ifdef CONFIG_ARCH_MMU
+		info->rxbd[i].cbd_bufaddr =
+			(uint)iomem_to_phys((ulong)info->rxbuf[i]);
+#else
+		info->rxbd[i].cbd_bufaddr = 
+			(uint)info->rxbuf[i];
+#endif
+	}
+	info->rxbd[PKTBUFSRX - 1].cbd_sc |= BD_ENET_RX_WRAP;
+
+	/*
+	 * Setup Ethernet Transmitter Buffer Descriptors (13.14.24.19)
+	 * Settings:
+	 *    Last, Tx CRC
+	 */
+	for (i = 0; i < TX_BUF_CNT; i++) {
+		info->txbd[i].cbd_sc = BD_ENET_TX_LAST | BD_ENET_TX_TC;
+		info->txbd[i].cbd_datlen = 0;	/* Reset */
+#ifdef CONFIG_ARCH_MMU
+		info->txbd[i].cbd_bufaddr =
+			(uint)iomem_to_phys((ulong)&info->txbuf[0]);
+#else
+		info->txbd[i].cbd_bufaddr = (uint)&info->txbuf[0];
+#endif
+	}
+	info->txbd[TX_BUF_CNT - 1].cbd_sc |= BD_ENET_TX_WRAP;
+
+	/* Set receive and transmit descriptor base */
+#ifdef CONFIG_ARCH_MMU
+	fecp->erdsr = (uint)iomem_to_phys((ulong)&info->rxbd[0]);
+	fecp->etdsr = (uint)iomem_to_phys((ulong)&info->txbd[0]);
+#else
+	fecp->erdsr = (uint)(&info->rxbd[0]);
+	fecp->etdsr = (uint)(&info->txbd[0]);
 #endif
 
-    /*------------------------   DMA   -----------------------------------*/
+	/* Now enable the transmit and receive processing */
+	fecp->ecr |= FEC_ECR_ETHER_EN;
 
-    /* When we use the Checksum offload feature, we need to enable the Store and Forward mode:
-    the store and forward guarantee that a whole frame is stored in the FIFO, so the MAC can insert/verify the checksum,
-    if the checksum is OK the DMA can handle the frame otherwise the frame is dropped */
-    ETH_InitStructure.ETH_DropTCPIPChecksumErrorFrame = ETH_DropTCPIPChecksumErrorFrame_Enable;
-    ETH_InitStructure.ETH_ReceiveStoreForward = ETH_ReceiveStoreForward_Enable;
-    ETH_InitStructure.ETH_TransmitStoreForward = ETH_TransmitStoreForward_Enable;
-
-    ETH_InitStructure.ETH_ForwardErrorFrames = ETH_ForwardErrorFrames_Disable;
-    ETH_InitStructure.ETH_ForwardUndersizedGoodFrames = ETH_ForwardUndersizedGoodFrames_Disable;
-    ETH_InitStructure.ETH_SecondFrameOperate = ETH_SecondFrameOperate_Enable;
-    ETH_InitStructure.ETH_AddressAlignedBeats = ETH_AddressAlignedBeats_Enable;
-    ETH_InitStructure.ETH_FixedBurst = ETH_FixedBurst_Enable;
-    ETH_InitStructure.ETH_RxDMABurstLength = ETH_RxDMABurstLength_32Beat;
-    ETH_InitStructure.ETH_TxDMABurstLength = ETH_TxDMABurstLength_32Beat;
-    ETH_InitStructure.ETH_DMAArbitration = ETH_DMAArbitration_RoundRobin_RxTx_2_1;
-
-    /* configure Ethernet */
-    ETH_Init(&ETH_InitStructure);
-
-    /* Enable DMA Receive interrupt (need to enable in this case Normal interrupt) */
-    ETH_DMAITConfig(ETH_DMA_IT_NIS | ETH_DMA_IT_R | ETH_DMA_IT_T, ENABLE);
-
-    /* Initialize Tx Descriptors list: Chain Mode */
-    ETH_DMATxDescChainInit(DMATxDscrTab, &Tx_Buff[0][0], ETH_TXBUFNB);
-    /* Initialize Rx Descriptors list: Chain Mode  */
-    ETH_DMARxDescChainInit(DMARxDscrTab, &Rx_Buff[0][0], ETH_RXBUFNB);
-
-    /* MAC address configuration */
-    ETH_MACAddressConfig(ETH_MAC_Address0, (u8*)&stm32_eth_device.dev_addr[0]);
-
-    /* Enable MAC and DMA transmission and reception */
-    ETH_Start();
-
+	/* And last, try to fill Rx Buffer Descriptors */
+	fecp->rdar = 0x01000000;	/* Descriptor polling active    */
     return RT_EOK;
 }
 
@@ -157,198 +290,140 @@ static rt_err_t rt_stm32_eth_control(rt_device_t dev, rt_uint8_t cmd, void *args
 /* transmit packet. */
 rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 {
-    struct pbuf* q;
-    rt_uint32_t offset;
+    struct rt_stm32_eth * stm32_eth = (struct rt_stm32_eth *)dev;
+	struct fec_info_s *info = stm32_eth->priv;
+	volatile fec_t *fecp = (fec_t *) (info->iobase);
+	int j, rc;
+    void *packet;
+    int length;
+    
+    packet = p->payload;
+    length = p->len;
+    
+	j = 0;
+	while ((info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY) &&
+	       (j < FEC_MAX_TIMEOUT)) {
+		udelay(FEC_TIMEOUT_TICKET);
+		j++;
+	}
+	if (j >= FEC_MAX_TIMEOUT)
+		printf("TX not ready\n");
 
-    /* Check if the descriptor is owned by the ETHERNET DMA (when set) or CPU (when reset) */
-    while ((DMATxDescToSet->Status & ETH_DMATxDesc_OWN) != (uint32_t)RESET)
-    {
-        rt_err_t result;
-        rt_uint32_t level;
-
-        level = rt_hw_interrupt_disable();
-        tx_is_waiting = RT_TRUE;
-        rt_hw_interrupt_enable(level);
-
-        /* it's own bit set, wait it */
-        result = rt_sem_take(&tx_wait, RT_WAITING_FOREVER);
-        if (result == RT_EOK) break;
-        if (result == -RT_ERROR) return -RT_ERROR;
-    }
-
-    offset = 0;
-    for (q = p; q != NULL; q = q->next)
-    {
-        uint8_t *to;
-
-        /* Copy the frame to be sent into memory pointed by the current ETHERNET DMA Tx descriptor */
-        to = (uint8_t*)((DMATxDescToSet->Buffer1Addr) + offset);
-        memcpy(to, q->payload, q->len);
-        offset += q->len;
-    }
-#ifdef ETH_TX_DUMP
-    {
-        rt_uint32_t i;
-        rt_uint8_t *ptr = (rt_uint8_t*)(DMATxDescToSet->Buffer1Addr);
-
-        STM32_ETH_PRINTF("tx_dump, len:%d\r\n", p->tot_len);
-        for(i=0; i<p->tot_len; i++)
-        {
-            STM32_ETH_PRINTF("%02x ",*ptr);
-            ptr++;
-
-            if(((i+1)%8) == 0)
-            {
-                STM32_ETH_PRINTF("  ");
-            }
-            if(((i+1)%16) == 0)
-            {
-                STM32_ETH_PRINTF("\r\n");
-            }
-        }
-        STM32_ETH_PRINTF("\r\ndump done!\r\n");
-    }
+#ifdef CONFIG_MX28
+	swap_packet((void *)packet, length);
 #endif
 
-    /* Setting the Frame Length: bits[12:0] */
-    DMATxDescToSet->ControlBufferSize = (p->tot_len & ETH_DMATxDesc_TBS1);
-    /* Setting the last segment and first segment bits (in this case a frame is transmitted in one descriptor) */
-    DMATxDescToSet->Status |= ETH_DMATxDesc_LS | ETH_DMATxDesc_FS;
-    /* Enable TX Completion Interrupt */
-    DMATxDescToSet->Status |= ETH_DMATxDesc_IC;
-#ifdef CHECKSUM_BY_HARDWARE
-    DMATxDescToSet->Status |= ETH_DMATxDesc_ChecksumTCPUDPICMPFull;
-    /* clean ICMP checksum STM32F need */
-    {
-        struct eth_hdr *ethhdr = (struct eth_hdr *)(DMATxDescToSet->Buffer1Addr);
-        /* is IP ? */
-        if( ethhdr->type == htons(ETHTYPE_IP) )
-        {
-            struct ip_hdr *iphdr = (struct ip_hdr *)(DMATxDescToSet->Buffer1Addr + SIZEOF_ETH_HDR);
-            /* is ICMP ? */
-            if( IPH_PROTO(iphdr) == IP_PROTO_ICMP )
-            {
-                struct icmp_echo_hdr *iecho = (struct icmp_echo_hdr *)(DMATxDescToSet->Buffer1Addr + SIZEOF_ETH_HDR + sizeof(struct ip_hdr) );
-                iecho->chksum = 0;
-            }
-        }
-    }
+#ifdef CONFIG_ARCH_MMU
+	memcpy(ioremap_nocache((ulong)info->txbd[info->txIdx].cbd_bufaddr,
+			length),
+			(void *)packet, length);
+#else
+	info->txbd[info->txIdx].cbd_bufaddr = (uint)packet;
 #endif
-    /* Set Own bit of the Tx descriptor Status: gives the buffer back to ETHERNET DMA */
-    DMATxDescToSet->Status |= ETH_DMATxDesc_OWN;
-    /* When Tx Buffer unavailable flag is set: clear it and resume transmission */
-    if ((ETH->DMASR & ETH_DMASR_TBUS) != (uint32_t)RESET)
-    {
-        /* Clear TBUS ETHERNET DMA flag */
-        ETH->DMASR = ETH_DMASR_TBUS;
-        /* Transmit Poll Demand to resume DMA transmission*/
-        ETH->DMATPDR = 0;
-    }
+	info->txbd[info->txIdx].cbd_datlen = length;
+	info->txbd[info->txIdx].cbd_sc =
+	    (info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_WRAP) |
+	    BD_ENET_TX_TC | BD_ENET_TX_RDY_LST;
 
-    /* Update the ETHERNET DMA global Tx descriptor with next Tx decriptor */
-    /* Chained Mode */
-    /* Selects the next DMA Tx descriptor list for next buffer to send */
-    DMATxDescToSet = (ETH_DMADESCTypeDef*) (DMATxDescToSet->Buffer2NextDescAddr);
+	/* Activate transmit Buffer Descriptor polling */
+	fecp->tdar = 0x01000000;	/* Descriptor polling active    */
 
-    /* Return SUCCESS */
-    return RT_EOK;
+	/* FEC fix for MCF5275, FEC unable to initial transmit data packet.
+	 * A nop will ensure the descriptor polling active completed.
+	 */
+	__asm__("nop");
+
+#ifdef CONFIG_SYS_UNIFY_CACHE
+	icache_invalid();
+#endif
+	j = 0;
+
+	while ((info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY) &&
+	       (j < FEC_MAX_TIMEOUT)) {
+		udelay(FEC_TIMEOUT_TICKET);
+		j++;
+	}
+	if (j >= FEC_MAX_TIMEOUT)
+		printf("TX timeout packet at %p\n", packet);
+
+#ifdef ET_DEBUG
+	printf("%s[%d] %s: cycles: %d    status: %x  retry cnt: %d\n",
+	       __FILE__, __LINE__, __func__, j,
+	       info->txbd[info->txIdx].cbd_sc,
+	       (info->txbd[info->txIdx].cbd_sc & 0x003C) >> 2);
+#endif
+	/* return only status bits */
+	rc = (info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_STATS);
+	info->txIdx = (info->txIdx + 1) % TX_BUF_CNT;
+
+	return rc;
 }
 
 /* reception packet. */
 struct pbuf *rt_stm32_eth_rx(rt_device_t dev)
 {
     struct pbuf* p;
-    rt_uint32_t offset = 0, framelength = 0;
 
     /* init p pointer */
     p = RT_NULL;
 
-    /* Check if the descriptor is owned by the ETHERNET DMA (when set) or CPU (when reset) */
-    if(((DMARxDescToGet->Status & ETH_DMARxDesc_OWN) != (uint32_t)RESET))
-        return p;
-
-    if (((DMARxDescToGet->Status & ETH_DMARxDesc_ES) == (uint32_t)RESET) &&
-            ((DMARxDescToGet->Status & ETH_DMARxDesc_LS) != (uint32_t)RESET) &&
-            ((DMARxDescToGet->Status & ETH_DMARxDesc_FS) != (uint32_t)RESET))
-    {
-		/* wtdog eth status */
-		eth_wtdog = 0;
-		
-        /* Get the Frame Length of the received packet: substruct 4 bytes of the CRC */
-        framelength = ((DMARxDescToGet->Status & ETH_DMARxDesc_FL) >> ETH_DMARXDESC_FRAME_LENGTHSHIFT) - 4;
-
-        /* allocate buffer */
-        p = pbuf_alloc(PBUF_LINK, framelength, PBUF_RAM);
-        if (p != RT_NULL)
-        {
-            struct pbuf* q;
-
-            for (q = p; q != RT_NULL; q= q->next)
-            {
-                /* Copy the received frame into buffer from memory pointed by the current ETHERNET DMA Rx descriptor */
-                memcpy(q->payload, (uint8_t *)((DMARxDescToGet->Buffer1Addr) + offset), q->len);
-                offset += q->len;
-            }
-#ifdef ETH_RX_DUMP
-            {
-                rt_uint32_t i;
-                rt_uint8_t *ptr = (rt_uint8_t*)(DMARxDescToGet->Buffer1Addr);
-
-                STM32_ETH_PRINTF("rx_dump, len:%d\r\n", p->tot_len);
-                for(i=0; i<p->tot_len; i++)
-                {
-                    STM32_ETH_PRINTF("%02x ", *ptr);
-                    ptr++;
-
-                    if(((i+1)%8) == 0)
-                    {
-                        STM32_ETH_PRINTF("  ");
-                    }
-                    if(((i+1)%16) == 0)
-                    {
-                        STM32_ETH_PRINTF("\r\n");
-                    }
-                }
-                STM32_ETH_PRINTF("\r\ndump done!\r\n");
-            }
-#endif
-        }
-    }
-
-    /* Set Own bit of the Rx descriptor Status: gives the buffer back to ETHERNET DMA */
-    DMARxDescToGet->Status = ETH_DMARxDesc_OWN;
-
-    /* When Rx Buffer unavailable flag is set: clear it and resume reception */
-    if ((ETH->DMASR & ETH_DMASR_RBUS) != (uint32_t)RESET)
-    {
-        /* Clear RBUS ETHERNET DMA flag */
-        ETH->DMASR = ETH_DMASR_RBUS;
-        /* Resume DMA reception */
-        ETH->DMARPDR = 0;
-    }
-
-    /* Update the ETHERNET DMA global Rx descriptor with next Rx decriptor */
-    /* Chained Mode */
-    if((DMARxDescToGet->ControlBufferSize & ETH_DMARxDesc_RCH) != (uint32_t)RESET)
-    {
-        /* Selects the next DMA Rx descriptor list for next buffer to read */
-        DMARxDescToGet = (ETH_DMADESCTypeDef*) (DMARxDescToGet->Buffer2NextDescAddr);
-    }
-    else /* Ring Mode */
-    {
-        if((DMARxDescToGet->ControlBufferSize & ETH_DMARxDesc_RER) != (uint32_t)RESET)
-        {
-            /* Selects the first DMA Rx descriptor for next buffer to read: last Rx descriptor was used */
-            DMARxDescToGet = (ETH_DMADESCTypeDef*) (ETH->DMARDLAR);
-        }
-        else
-        {
-            /* Selects the next DMA Rx descriptor list for next buffer to read */
-            DMARxDescToGet = (ETH_DMADESCTypeDef*) ((uint32_t)DMARxDescToGet + 0x10 + ((ETH->DMABMR & ETH_DMABMR_DSL) >> 2));
-        }
-    }
-
     return p;
+}
+
+
+/** @defgroup PHY_Register_address
+  * @{
+  */
+#define PHY_BCR                          0          /*!< Tranceiver Basic Control Register */
+#define PHY_BSR                          1          /*!< Tranceiver Basic Status Register */
+
+/** @defgroup PHY_basic_Control_register
+  * @{
+  */
+#define PHY_Reset                       ((uint16_t)0x8000)      /*!< PHY Reset */
+#define PHY_Loopback                    ((uint16_t)0x4000)      /*!< Select loop-back mode */
+#define PHY_FULLDUPLEX_100M             ((uint16_t)0x2100)      /*!< Set the full-duplex mode at 100 Mb/s */
+#define PHY_HALFDUPLEX_100M             ((uint16_t)0x2000)      /*!< Set the half-duplex mode at 100 Mb/s */
+#define PHY_FULLDUPLEX_10M              ((uint16_t)0x0100)      /*!< Set the full-duplex mode at 10 Mb/s */
+#define PHY_HALFDUPLEX_10M              ((uint16_t)0x0000)      /*!< Set the half-duplex mode at 10 Mb/s */
+#define PHY_AutoNegotiation             ((uint16_t)0x1000)      /*!< Enable auto-negotiation function */
+#define PHY_Restart_AutoNegotiation     ((uint16_t)0x0200)      /*!< Restart auto-negotiation function */
+#define PHY_Powerdown                   ((uint16_t)0x0800)      /*!< Select the power down mode */
+#define PHY_Isolate                     ((uint16_t)0x0400)      /*!< Isolate PHY from MII */
+
+/** @defgroup PHY_basic_status_register
+  * @{
+  */
+#define PHY_AutoNego_Complete           ((uint16_t)0x0020)      /*!< Auto-Negotioation process completed */
+#define PHY_Linked_Status               ((uint16_t)0x0004)      /*!< Valid link established */
+#define PHY_Jabber_detection            ((uint16_t)0x0002)      /*!< Jabber condition detected */
+
+/** @defgroup ETH_Speed
+  * @{
+  */
+#define ETH_Speed_10M        ((uint32_t)0x00000000)
+#define ETH_Speed_100M       ((uint32_t)0x00004000)
+#define IS_ETH_SPEED(SPEED) (((SPEED) == ETH_Speed_10M) || \
+                             ((SPEED) == ETH_Speed_100M))
+
+/** @defgroup ETH_Duplex_Mode
+  * @{
+  */
+#define ETH_Mode_FullDuplex       ((uint32_t)0x00000800)
+#define ETH_Mode_HalfDuplex       ((uint32_t)0x00000000)
+#define IS_ETH_DUPLEX_MODE(MODE) (((MODE) == ETH_Mode_FullDuplex) || \
+                                  ((MODE) == ETH_Mode_HalfDuplex))
+
+uint32_t ETH_WritePHYRegister(uint8_t PHYAddress, uint8_t PHYReg, uint16_t PHYValue)
+{
+	return __fec_mii_write((fec_t *)fec_info[0].iobase, PHYAddress, PHYReg, PHYValue);
+}
+
+uint16_t ETH_ReadPHYRegister(uint8_t PHYAddress, uint8_t PHYReg)
+{
+    uint16_t PHYValue = 0;
+    __fec_mii_read((fec_t *)fec_info[0].iobase, PHYAddress, PHYReg, &PHYValue);
+	return PHYValue;
 }
 
 #define RT_USING_DP83848
@@ -496,6 +571,8 @@ static void phy_monitor_thread_entry(void *parameter)
     uint8_t phy_addr = 0xFF;
     uint8_t phy_speed_new = 0;
 
+    mxc_fec_mii_init((fec_t *)fec_info[0].iobase);
+
     /* phy search */
     {
         rt_uint32_t i;
@@ -618,31 +695,62 @@ static void phy_monitor_thread_entry(void *parameter)
 #endif
 
 extern unsigned char NET_MAC[6];
-void rt_hw_stm32_eth_init(void)
+static struct pin_desc enet_pins_desc[] = {
+	{ PINID_ENET0_MDC, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET0_MDIO, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET0_RX_EN, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET0_RXD0, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET0_RXD1, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET0_TX_EN, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET0_TXD0, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET0_TXD1, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_ENET_CLK, PIN_FUN1, PAD_8MA, PAD_3V3, 1 }
+};
+static struct pin_group enet_pins = {
+	.pins		= enet_pins_desc,
+	.nr_pins	= ARRAY_SIZE(enet_pins_desc)
+};
+
+void rt_hw_eth_init(void)
 {
-    /* PHY RESET: PC0 */
-    {
-        GPIO_InitTypeDef GPIO_InitStructure;
+    int j;
+    
+	/* Turn on ENET clocks */
+	REG_WR(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET,
+		REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET) &
+		~(BM_CLKCTRL_ENET_SLEEP | BM_CLKCTRL_ENET_DISABLE));
 
-        GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_OUT;
-        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-        GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-        GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;
+	/* Set up ENET PLL for 50 MHz */
+	REG_SET(REGS_CLKCTRL_BASE, HW_CLKCTRL_PLL2CTRL0,
+		BM_CLKCTRL_PLL2CTRL0_POWER);    /* Power on ENET PLL */
+	udelay(10);                             /* Wait 10 us */
+	REG_CLR(REGS_CLKCTRL_BASE, HW_CLKCTRL_PLL2CTRL0,
+		BM_CLKCTRL_PLL2CTRL0_CLKGATE);  /* Gate on ENET PLL */
+	REG_WR(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET,
+		REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET) |
+		BM_CLKCTRL_ENET_CLK_OUT_EN);    /* Enable pad output */
 
-        RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+    pin_set_group(&enet_pins);
+    
+	pin_gpio_direction(PINID_LCD_D16, 1);
+	pin_gpio_set(PINID_LCD_D16, 0);
+	udelay(200);
+	pin_gpio_set(PINID_LCD_D16, 1);
 
-        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-        GPIO_Init(GPIOC, &GPIO_InitStructure);
-
-        GPIO_ResetBits(GPIOC, GPIO_Pin_0);
-        rt_thread_delay(20);
-        GPIO_SetBits(GPIOC, GPIO_Pin_0);
-        rt_thread_delay(20);
+    fec_info[0].rxbd =
+        (cbd_t *)memalign(CONFIG_SYS_CACHELINE_SIZE,
+                    (PKTBUFSRX * sizeof(cbd_t)));
+    fec_info[0].txbd =
+        (cbd_t *)memalign(CONFIG_SYS_CACHELINE_SIZE,
+                   (TX_BUF_CNT * sizeof(cbd_t)));
+    fec_info[0].txbuf =
+        (char *)memalign(CONFIG_SYS_CACHELINE_SIZE, DBUF_LENGTH);
+    for (j = 0; j < PKTBUFSRX; ++j) {
+        fec_info[0].rxbuf[j] =
+            (char *)memalign(PKTSIZE_ALIGN, PKTSIZE);
     }
 
-    GPIO_Configuration();
-    NVIC_Configuration();
-
+    stm32_eth_device.priv = &fec_info[0];
     stm32_eth_device.ETH_Speed = ETH_Speed_100M;
     stm32_eth_device.ETH_Mode  = ETH_Mode_FullDuplex;
 
@@ -651,9 +759,9 @@ void rt_hw_stm32_eth_init(void)
     stm32_eth_device.dev_addr[1] = 0x80;
     stm32_eth_device.dev_addr[2] = 0xE1;
     /* generate MAC addr from 96bit unique ID (only for test). */
-    stm32_eth_device.dev_addr[3] = *(rt_uint8_t*)(0x1FFF7A10+4);
-    stm32_eth_device.dev_addr[4] = *(rt_uint8_t*)(0x1FFF7A10+2);
-    stm32_eth_device.dev_addr[5] = *(rt_uint8_t*)(0x1FFF7A10+0);
+    stm32_eth_device.dev_addr[3] = *(rt_uint8_t*)(0x10000+4);
+    stm32_eth_device.dev_addr[4] = *(rt_uint8_t*)(0x10000+2);
+    stm32_eth_device.dev_addr[5] = *(rt_uint8_t*)(0x10000+0);
 	/* load or save net mac addr */
 	if (NET_MAC[0] == 0 && NET_MAC[1] == 0 && NET_MAC[2] == 0)
 	{
@@ -662,7 +770,7 @@ void rt_hw_stm32_eth_init(void)
 		NET_MAC[2] = stm32_eth_device.dev_addr[2];
 		NET_MAC[3] = stm32_eth_device.dev_addr[3];
 		NET_MAC[4] = stm32_eth_device.dev_addr[4];
-		NET_MAC[5] = stm32_eth_device.dev_addr[5];		
+		NET_MAC[5] = stm32_eth_device.dev_addr[5];
 	}
 	else
 	{

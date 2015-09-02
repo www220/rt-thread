@@ -11,6 +11,9 @@
 #define CONFIG_APBH_DMA_V1
 #define CONFIG_MXS_DMA_REG_BASE ABPHDMA_BASE_ADDR
 
+#define CONFIG_FEC0_IOBASE		REGS_ENET_BASE
+#define CONFIG_FEC0_PHY_ADDR		-1
+
 typedef signed char s8;
 typedef unsigned char u8;
 
@@ -30,7 +33,7 @@ typedef unsigned long long u64;
 #define BITS_PER_LONG 32
 
 extern unsigned char *dma_align_mem;
-#define memalign(x,y) dma_align_mem; dma_align_mem += (u32)(((u32)(y)+15)&(u32)(~15))
+#define memalign(x,y) dma_align_mem; dma_align_mem += (u32)(((u32)(y)+31)&(u32)(~31))
 #define freealign(x)
 
 /* Dma addresses are 32-bits wide.  */

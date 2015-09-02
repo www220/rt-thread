@@ -124,7 +124,7 @@ static u32 mx28_get_pclk(void)
 
 	return pclk;
 }
-static u32 mx28_get_hclk(void)
+u32 mx28_get_hclk(void)
 {
 	u32 clkctrl, div, hclk;
 

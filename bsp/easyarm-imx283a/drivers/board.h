@@ -51,7 +51,7 @@ void rt_hw_spi_init(void);
 void rt_hw_rtc_init(void);
 void rt_hw_mtd_nand_init(void);
 
-extern volatile int wtdog_count;
+extern volatile int eth_wtdog;
 extern volatile int eth_linkstatus;
 extern volatile int wtdog_count;
 extern volatile int sys_stauts;

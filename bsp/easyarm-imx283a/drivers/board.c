@@ -96,6 +96,7 @@ static struct pin_desc gpmi_pins_desc[] = {
 };
 static struct pin_desc led_pins_desc[] = {
 	{ PINID_GPMI_RDY1, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_LCD_D16, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
 	{ PINID_LCD_D21, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
 	{ PINID_LCD_D22, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
 	{ PINID_LCD_D23, PIN_GPIO, PAD_8MA, PAD_3V3, 1 }
