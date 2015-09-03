@@ -17,12 +17,9 @@
 #include "yaffsfs.h"
 #include "yaffs_trace.h"
 #include <rtthread.h>
-
-//#include <errno.h>
-
+#include <errno.h>
 
 static int yaffsfs_lastError;
-
 void yaffsfs_SetError(int err)
 {
 	//Do whatever to set error
@@ -33,29 +30,6 @@ int yaffsfs_GetLastError(void)
 {
 	return yaffsfs_lastError;
 }
-
-
-#ifdef CONFIG_YAFFS_USE_PTHREADS
-#include <pthread.h>
-static pthread_mutex_t mutex1;
-
-
-void yaffsfs_Lock(void)
-{
-	pthread_mutex_lock( &mutex1 );
-}
-
-void yaffsfs_Unlock(void)
-{
-	pthread_mutex_unlock( &mutex1 );
-}
-
-void yaffsfs_LockInit(void)
-{
-	pthread_mutex_init( &mutex1, NULL);
-}
-
-#else
 
 static rt_mutex_t mutex = RT_NULL;
 void yaffsfs_Lock(void)
@@ -68,40 +42,71 @@ void yaffsfs_Unlock(void)
 	rt_mutex_release(mutex);
 }
 
+extern void yaffs_dev_rewind();
+extern void* yaffs_next_dev();
+
+ALIGN(RT_ALIGN_SIZE)
+static char bg_gc_func_stack[2048];
+struct rt_thread thread_gc_func;
+static void bg_gc_func(void *parameter)
+{
+	struct yaffs_dev *dev;
+	int urgent = 0;
+	int result;
+	int next_urgent;
+
+	/* Sleep for a bit to allow start up */
+	rt_thread_delay(10000);
+    
+	while (1) {
+		/* Iterate through devices, do bg gc updating ungency */
+		yaffs_dev_rewind();
+		next_urgent = 0;
+
+		while ((dev = (struct yaffs_dev*)yaffs_next_dev()) != NULL) {
+			result = yaffs_bg_gc(dev, urgent);
+			if (result > 0)
+				next_urgent = 1;
+		}
+
+		urgent = next_urgent;
+		if (next_urgent)
+			rt_thread_delay(1000);
+		else
+			rt_thread_delay(5000);
+	}
+}
+
 void yaffsfs_LockInit(void)
 {
-	mutex = rt_mutex_create("mutex", RT_IPC_FLAG_FIFO);
+    //已经初始化过了，不用重复初始化
+    if (mutex != NULL)
+        return;
+    
+	mutex = rt_mutex_create("yaffs", RT_IPC_FLAG_FIFO);
     if (mutex == RT_NULL)
     {
 		yaffs_trace(YAFFS_TRACE_ERROR,
 			"**>> yaffs error :yaffs_LockInit can't get a mutex!");
     }
 
+    rt_thread_init(&thread_gc_func,
+                   "gc_func",
+                   bg_gc_func,
+                   RT_NULL,
+                   &bg_gc_func_stack[0],
+                   sizeof(bg_gc_func_stack),RT_THREAD_PRIORITY_MAX - 2,20);
+    rt_thread_startup(&thread_gc_func);
 }
-#endif
 
 u32 yaffsfs_CurrentTime(void)
 {
 	return 0;
 }
 
-
-static int yaffs_kill_alloc = 0;
-static size_t total_malloced = 0;
-static size_t malloc_limit = 0 & 6000000;
-
 void *yaffsfs_malloc(size_t size)
 {
-	void * this;
-	if(yaffs_kill_alloc)
-		return NULL;
-	if(malloc_limit && malloc_limit <(total_malloced + size) )
-		return NULL;
-
-	this = rt_malloc(size);
-	if(this)
-		total_malloced += size;
-	return this;
+	return rt_malloc(size);
 }
 
 void yaffsfs_free(void *ptr)
@@ -111,7 +116,7 @@ void yaffsfs_free(void *ptr)
 
 void yaffsfs_OSInitialisation(void)
 {
-	yaffsfs_LockInit();
+    yaffsfs_LockInit();
 }
 
 

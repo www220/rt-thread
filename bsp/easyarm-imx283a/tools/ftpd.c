@@ -848,7 +848,7 @@ void ftpd(void)
 	if (tid != RT_NULL) return;
 	tid = rt_thread_create("ftpd",
 		ftpd_thread_entry, RT_NULL,
-		2048, 30, 5);
+		4096, 30, 5);
 	if (tid != RT_NULL) rt_thread_startup(tid);
 }
 

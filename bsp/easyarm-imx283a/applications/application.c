@@ -175,7 +175,7 @@ static void rt_thread_entry_wtdog(void* parameter)
 }
 
 ALIGN(RT_ALIGN_SIZE)
-static char thread_main_stack[32768];
+static char thread_main_stack[8192];
 struct rt_thread thread_main;
 static void rt_thread_entry_main(void* parameter)
 {
