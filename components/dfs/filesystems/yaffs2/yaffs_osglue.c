@@ -56,7 +56,7 @@ static void bg_gc_func(void *parameter)
 	int next_urgent;
 
 	/* Sleep for a bit to allow start up */
-	rt_thread_delay(20000);
+	rt_thread_delay(10000);
     
 	while (1) {
 		/* Iterate through devices, do bg gc updating ungency */
@@ -67,7 +67,7 @@ static void bg_gc_func(void *parameter)
             yaffsfs_Lock();
 			result = yaffs_bg_gc(dev, urgent);
             yaffsfs_Unlock();
-			if (result > 0)
+			if (result <= 0)
 				next_urgent = 1;
 		}
 
