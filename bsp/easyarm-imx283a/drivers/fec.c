@@ -51,8 +51,6 @@ struct rt_stm32_eth
 };
 
 static struct rt_stm32_eth stm32_eth_device;
-static struct rt_semaphore tx_wait;
-static rt_bool_t tx_is_waiting = RT_FALSE;
 
 /* Ethernet Transmit and Receive Buffers */
 #define DBUF_LENGTH		1520
@@ -190,7 +188,7 @@ static rt_err_t rt_stm32_eth_init(rt_device_t dev)
 	fecp->tcr = FEC_TCR_FDEN;
 
 	/* We use strictly polling mode only */
-	fecp->eimr = BM_ENET_MAC0_EIR_TXF|BM_ENET_MAC0_EIR_RXF;
+	fecp->eimr = BM_ENET_MAC0_EIR_RXF;
 
 	/* Clear any pending interrupt */
 	fecp->eir = 0xffffffff;
@@ -315,23 +313,7 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 	volatile fec_t *fecp = (fec_t *) (info->iobase);
     
     struct pbuf* q;
-    rt_uint32_t offset;
-
-    /* Check if the descriptor is owned by the ETHERNET DMA (when set) or CPU (when reset) */
-    while (fecp->tdar & 0x01000000)
-    {
-        rt_err_t result;
-        rt_uint32_t level;
-
-        level = rt_hw_interrupt_disable();
-        tx_is_waiting = RT_TRUE;
-        rt_hw_interrupt_enable(level);
-
-        /* it's own bit set, wait it */
-        result = rt_sem_take(&tx_wait, RT_WAITING_FOREVER);
-        if (result == RT_EOK) break;
-        if (result == -RT_ERROR) return -RT_ERROR;
-    }
+    rt_uint32_t offset,j,rc;
     
     offset = 0;
     for (q = p; q != NULL; q = q->next)
@@ -371,9 +353,25 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 
 	/* Activate transmit Buffer Descriptor polling */
 	fecp->tdar = 0x01000000;	/* Descriptor polling active    */
+
+	/* FEC fix for MCF5275, FEC unable to initial transmit data packet.
+	 * A nop will ensure the descriptor polling active completed.
+	 */
+	__asm__("nop");
+
+	j = 0;
+	while ((info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY) &&
+	       (j < FEC_MAX_TIMEOUT)) {
+		udelay(FEC_TIMEOUT_TICKET);
+		j++;
+	}
+	if (j >= FEC_MAX_TIMEOUT)
+		printf("TX timeout packet at %p\n", p);
+
+	rc = (info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY);
 	info->txIdx = (info->txIdx + 1) % TX_BUF_CNT;
 
-	return RT_EOK;
+	return (rc & BD_ENET_TX_READY) ? RT_EOK : -RT_ERROR;
 }
 
 /* reception packet. */
@@ -388,79 +386,74 @@ struct pbuf *rt_stm32_eth_rx(rt_device_t dev)
 
     /* init p pointer */
     p = RT_NULL;
-    
-	for (;;) {
+
+	do {
 		/* section 16.9.23.2 */
 		if (info->rxbd[info->rxIdx].cbd_sc & BD_ENET_RX_EMPTY) {
-			break;	/* nothing received - leave for() loop */
+			return NULL;	/* nothing received - leave for() loop */
 		}
 
 		if (info->rxbd[info->rxIdx].cbd_sc & 0x003f) {
-			printf("%s[%d] err: %x\n",
-			       __func__, __LINE__,
-			       info->rxbd[info->rxIdx].cbd_sc);
-		} else {
-            /* wtdog eth status */
-            eth_wtdog = 0;
-            
-            framelength = info->rxbd[info->rxIdx].cbd_datlen - 4;
-            swap_packet((uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr, framelength);
+			break;	/* error received - leave for() loop */
+		}
+        
+        /* wtdog eth status */
+        eth_wtdog = 0;
+        framelength = info->rxbd[info->rxIdx].cbd_datlen - 4;
+        swap_packet((uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr, framelength);
 
-            /* Get the Frame Length of the received packet: substruct 4 bytes of the CRC */
-            p = pbuf_alloc(PBUF_LINK, framelength, PBUF_RAM);
-            if (p != RT_NULL)
-            {
-                offset = 0;
-                for (q = p; q != RT_NULL; q= q->next)
-                {
-                    /* Copy the received frame into buffer from memory pointed by the current ETHERNET DMA Rx descriptor */
-                    rt_memcpy(q->payload,(uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr+offset,q->len);
-                    offset += q->len;
-                }
+        /* Get the Frame Length of the received packet: substruct 4 bytes of the CRC */
+        p = pbuf_alloc(PBUF_LINK, framelength, PBUF_RAM);
+        if (p == RT_NULL) {
+            break;
+        }
+
+        offset = 0;
+        for (q = p; q != RT_NULL; q= q->next)
+        {
+            /* Copy the received frame into buffer from memory pointed by the current ETHERNET DMA Rx descriptor */
+            rt_memcpy(q->payload,(uint8_t*)info->rxbd[info->rxIdx].cbd_bufaddr+offset,q->len);
+            offset += q->len;
+        }
 #ifdef ETH_RX_DUMP
+        {
+            rt_uint32_t i;
+            rt_uint8_t *ptr = (rt_uint8_t*)(info->rxbd[info->rxIdx].cbd_bufaddr);
+
+            STM32_ETH_PRINTF("rx_dump, len:%d\r\n", p->tot_len);
+            for(i=0; i<p->tot_len; i++)
+            {
+                STM32_ETH_PRINTF("%02x ", *ptr);
+                ptr++;
+
+                if(((i+1)%8) == 0)
                 {
-                    rt_uint32_t i;
-                    rt_uint8_t *ptr = (rt_uint8_t*)(info->rxbd[info->rxIdx].cbd_bufaddr);
-
-                    STM32_ETH_PRINTF("rx_dump, len:%d\r\n", p->tot_len);
-                    for(i=0; i<p->tot_len; i++)
-                    {
-                        STM32_ETH_PRINTF("%02x ", *ptr);
-                        ptr++;
-
-                        if(((i+1)%8) == 0)
-                        {
-                            STM32_ETH_PRINTF("  ");
-                        }
-                        if(((i+1)%16) == 0)
-                        {
-                            STM32_ETH_PRINTF("\r\n");
-                        }
-                    }
-                    STM32_ETH_PRINTF("\r\ndump done!\r\n");
+                    STM32_ETH_PRINTF("  ");
                 }
-#endif
+                if(((i+1)%16) == 0)
+                {
+                    STM32_ETH_PRINTF("\r\n");
+                }
             }
-			fecp->eir |= FEC_EIR_RXF;
-		}
+            STM32_ETH_PRINTF("\r\ndump done!\r\n");
+        }
+#endif
+	} while (0);
 
-		/* Give the buffer back to the FEC. */
-		info->rxbd[info->rxIdx].cbd_datlen = 0;
-
-		/* wrap around buffer index when necessary */
-		if (info->rxIdx == LAST_PKTBUFSRX) {
-			info->rxbd[PKTBUFSRX - 1].cbd_sc = BD_ENET_RX_W_E;
-			info->rxIdx = 0;
-		} else {
-			info->rxbd[info->rxIdx].cbd_sc = BD_ENET_RX_EMPTY;
-			info->rxIdx++;
-		}
-
-		/* Try to fill Buffer Descriptors */
-		fecp->rdar = 0x01000000; /* Descriptor polling active    */
-        break;
+    /* Give the buffer back to the FEC. */
+	info->rxbd[info->rxIdx].cbd_datlen = 0;
+	/* wrap around buffer index when necessary */
+	if (info->rxIdx == LAST_PKTBUFSRX) {
+		info->rxbd[PKTBUFSRX - 1].cbd_sc = BD_ENET_RX_W_E;
+		info->rxIdx = 0;
+	} else {
+		info->rxbd[info->rxIdx].cbd_sc = BD_ENET_RX_EMPTY;
+		info->rxIdx++;
 	}
 
+    /* Try to fill Buffer Descriptors */
+	fecp->rdar = 0x01000000; /* Descriptor polling active    */
+        
 	return p;
 }
 
@@ -804,15 +797,6 @@ static struct pin_group enet_pins = {
 void rt_hw_enetmac_handler(int vector, void *param)
 {
     register rt_uint32_t ir = REG_RD(0x800F0004, HW_ENET_MAC0_EIR);
-    if (ir & BM_ENET_MAC0_EIR_TXF)
-    {
-        STM32_ETH_PRINTF("ETH_DMA_IT_T\r\n");
-        if (tx_is_waiting == RT_TRUE)
-        {
-            tx_is_waiting = RT_FALSE;
-            rt_sem_release(&tx_wait);
-        }
-    }
     if (ir & BM_ENET_MAC0_EIR_RXF)
     {
         STM32_ETH_PRINTF("ETH_DMA_IT_R\r\n");
@@ -896,9 +880,6 @@ void rt_hw_eth_init(void)
 
     stm32_eth_device.parent.eth_rx     = rt_stm32_eth_rx;
     stm32_eth_device.parent.eth_tx     = rt_stm32_eth_tx;
-
-    /* init tx semaphore */
-    rt_sem_init(&tx_wait, "tx_wait", 0, RT_IPC_FLAG_FIFO);
 
     /* register eth device */
     eth_device_init(&(stm32_eth_device.parent), "e0");
