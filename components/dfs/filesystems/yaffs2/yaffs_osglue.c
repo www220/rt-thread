@@ -46,7 +46,7 @@ extern void yaffs_dev_rewind();
 extern void* yaffs_next_dev();
 
 ALIGN(RT_ALIGN_SIZE)
-static char bg_gc_func_stack[2048];
+static char bg_gc_func_stack[4096];
 struct rt_thread thread_gc_func;
 static void bg_gc_func(void *parameter)
 {
@@ -56,7 +56,7 @@ static void bg_gc_func(void *parameter)
 	int next_urgent;
 
 	/* Sleep for a bit to allow start up */
-	rt_thread_delay(10000);
+	rt_thread_delay(20000);
     
 	while (1) {
 		/* Iterate through devices, do bg gc updating ungency */
@@ -64,7 +64,9 @@ static void bg_gc_func(void *parameter)
 		next_urgent = 0;
 
 		while ((dev = (struct yaffs_dev*)yaffs_next_dev()) != NULL) {
+            yaffsfs_Lock();
 			result = yaffs_bg_gc(dev, urgent);
+            yaffsfs_Unlock();
 			if (result > 0)
 				next_urgent = 1;
 		}
