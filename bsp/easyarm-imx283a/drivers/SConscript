@@ -12,8 +12,6 @@ platform.c
 basedev_src = Split("""
 board.c
 usart.c
-nand.c
-apbh_dma.c
 """)
 
 basesim_src = Split("""
@@ -31,7 +29,7 @@ win32/pktdrv.c
 """)
 
 rtcdev_src = Split("""
-devrtc.c
+rtc.c
 """)
 
 rtcsim_src = Split("""
@@ -49,6 +47,11 @@ simw25qxx.c
 
 elmdev_src = Split("""
 w25ftl.c
+""")
+
+nanddev_src = Split("""
+nand.c
+apbh_dma.c
 """)
 
 if rtconfig.PLATFORM != 'cl':
@@ -77,9 +80,12 @@ else:
     if GetDepend(['RT_USING_SPI']):
         src += spisim_src
 
+if GetDepend(['RT_USING_MTD_NAND']):
+    src += nanddev_src
+
 if GetDepend(['RT_USING_DFS_ELMFAT']):
     src += elmdev_src
-    
+
 CPPPATH = [cwd]
 
 group = DefineGroup('Drivers', src, depend = [''], CPPPATH = CPPPATH)

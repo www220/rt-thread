@@ -44,7 +44,7 @@
 #ifdef RT_USING_DFS_ELMFAT
 #include <dfs_elm.h>
 #endif
-#ifdef RT_USING_DFS_YAFFS
+#ifdef RT_USING_DFS_YAFFS2
 extern void dfs_yaffs_init(void);
 #endif
 #ifdef RT_USING_DFS_DEVFS
@@ -201,7 +201,7 @@ static void rt_thread_entry_main(void* parameter)
     elm_init();
     w25ftl_flash_init("ftl0", "flash0");
 #endif
-#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS)
+#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     nand_init();
     dfs_yaffs_init();
 #endif
@@ -220,7 +220,7 @@ static void rt_thread_entry_main(void* parameter)
     else
         rt_kprintf("Mount /mnt failed!\n");
 #endif
-#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS)
+#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     if (dfs_mount("nand0", "/mnt", "yaffs2", 0, 0) == 0)
         rt_kprintf("Mount /mnt ok!\n");
     else

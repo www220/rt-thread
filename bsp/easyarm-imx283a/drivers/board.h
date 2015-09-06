@@ -33,6 +33,7 @@
 #include "regs-clkctrl.h"
 #include "regs-ocotp.h"
 #include "regs-enet.h"
+#include "regs-rtc.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64
@@ -72,5 +73,77 @@ extern void __const_udelay(unsigned long);
 	  ((n) > (MAX_UDELAY_MS * 1000) ? __bad_udelay() :		\
 			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
 	  __udelay(n))
+
+#include <rtthread.h>
+static inline s32 mxs_reset_block(u32 hwreg, int is_enable)
+{
+	int timeout;
+    #define SFTRST 0x80000000
+    #define CLKGATE 0x40000000
+
+	/* the process of software reset of IP block is done
+	   in several steps:
+
+	   - clear SFTRST and wait for block is enabled;
+	   - clear clock gating (CLKGATE bit);
+	   - set the SFTRST again and wait for block is in reset;
+	   - clear SFTRST and wait for reset completion.
+	 */
+	/* clear SFTRST */
+	REG_CLR_ADDR(hwreg, SFTRST);
+
+	for (timeout = 1000000; timeout > 0; timeout--)
+		/* still in SFTRST state ? */
+		if ((REG_RD_ADDR(hwreg) & SFTRST) == 0)
+			break;
+		if (timeout <= 0) {
+			rt_kprintf("%s(%p): timeout when enabling\n",
+				__func__, hwreg);
+			return -1;
+	}
+
+	/* clear CLKGATE */
+	REG_CLR_ADDR(hwreg, CLKGATE);
+
+	if (is_enable) {
+		/* now again set SFTRST */
+		REG_SET_ADDR(hwreg, SFTRST);
+		for (timeout = 1000000; timeout > 0; timeout--)
+			/* poll until CLKGATE set */
+			if (REG_RD_ADDR(hwreg) & CLKGATE)
+				break;
+		if (timeout <= 0) {
+			rt_kprintf("%s(%p): timeout when resetting\n",
+				__func__, hwreg);
+			return -1;
+		}
+
+		REG_CLR_ADDR(hwreg, SFTRST);
+		for (timeout = 1000000; timeout > 0; timeout--)
+			/* still in SFTRST state ? */
+			if ((REG_RD_ADDR(hwreg) & SFTRST) == 0)
+				break;
+		if (timeout <= 0) {
+			rt_kprintf("%s(%p): timeout when enabling "
+				"after reset\n", __func__, hwreg);
+			return -1;
+		}
+
+		/* clear CLKGATE */
+		REG_CLR_ADDR(hwreg, CLKGATE);
+	}
+	for (timeout = 1000000; timeout > 0; timeout--)
+		/* still in SFTRST state ? */
+		if ((REG_RD_ADDR(hwreg) & CLKGATE) == 0)
+			break;
+
+	if (timeout <= 0) {
+		rt_kprintf("%s(%p): timeout when unclockgating\n",
+			__func__, hwreg);
+		return -1;
+	}
+
+	return 0;
+}
 
 #endif
