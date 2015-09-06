@@ -28,10 +28,24 @@ struct device_part
 {
 	struct rt_mtd_nand_device *dev;
 	ynandif_Geometry g;
+    void *yaffs_dev;
 };
 static struct device_part nand_part[NAND_DEVICE_PART_MAX] = {{0}};
 
-extern int yaffs_start(const char * mountpath, ynandif_Geometry * g);
+static int nand_find_dev = -1;
+void yaffs_dev_rewind() { nand_find_dev = -1; }
+void* yaffs_next_dev() 
+{
+ 	for (nand_find_dev ++; nand_find_dev < NAND_DEVICE_PART_MAX ; nand_find_dev ++)
+	{
+		if (nand_part[nand_find_dev].dev != RT_NULL
+            && nand_part[nand_find_dev].yaffs_dev != RT_NULL)
+			return nand_part[nand_find_dev].yaffs_dev;
+	}
+    return RT_NULL;
+}
+
+extern void* yaffs_start(const char * mountpath, ynandif_Geometry * g);
 extern void yaffs_config(ynandif_Geometry * g, struct rt_mtd_nand_device * dev);
 
 static int dfs_yaffs_mount(struct dfs_filesystem* fs,
@@ -54,7 +68,7 @@ static int dfs_yaffs_mount(struct dfs_filesystem* fs,
 	yaffs_config(&nand_part[index].g, RT_MTD_NAND_DEVICE(fs->dev_id));
 
 	/*3. start up yaffs2 */
-	yaffs_start(fs->path, &nand_part[index].g);
+	nand_part[index].yaffs_dev = yaffs_start(fs->path, &nand_part[index].g);
 	if (yaffs_mount(fs->path) < 0)
 	{	
 		return yaffsfs_GetLastError();

@@ -133,12 +133,10 @@ unsigned yaffs_trace_mask =
 
 	0;
 
-int yaffs_start(const char * mount_point, ynandif_Geometry * g)
+void* yaffs_start(const char * mount_point, ynandif_Geometry * g)
 {
 	// Stuff to configure YAFFS
 	// Stuff to initialise anything special (eg lock semaphore).
 	yaffsfs_OSInitialisation();
-	yaffs_add_dev_from_geometry(mount_point, g);
-
-	return 0;
+	return yaffs_add_dev_from_geometry(mount_point, g);
 }

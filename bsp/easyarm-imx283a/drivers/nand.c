@@ -3,7 +3,6 @@
 #include <rtdevice.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "board.h"
 #include "nand.h"
 #include "apbh_dma.h"
@@ -731,7 +730,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
 			return;
 		}
 
-		memset(cmd_queue, 0, GPMI_NFC_COMMAND_BUFFER_SIZE);
+		rt_memset(cmd_queue, 0, GPMI_NFC_COMMAND_BUFFER_SIZE);
 		cmd_Q_len = 0;
 	}
 
@@ -826,7 +825,7 @@ static void nand_write_buf(struct rt_mtd_nand_device *mtd,
 			return;
 		}
 
-		memset(data_buf, 0, PAGE_SIZE);
+		rt_memset(data_buf, 0, PAGE_SIZE);
 		oob_buf = data_buf + PAGE_DATA_SIZE;
 	}
     
@@ -836,7 +835,7 @@ static void nand_write_buf(struct rt_mtd_nand_device *mtd,
 	if (!buf)
 		printf("[%s] Buffer pointer is NULL\n", __func__);
 
-	memcpy(data_buf, buf, len);
+	rt_memcpy(data_buf, buf, len);
 
 	/* Ask the NFC. */
 #ifdef CONFIG_ARCH_MMU
@@ -875,7 +874,7 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 			return;
 		}
 
-		memset(data_buf, 0, PAGE_SIZE);
+		rt_memset(data_buf, 0, PAGE_SIZE);
 		oob_buf = data_buf + PAGE_DATA_SIZE;
 	}
     
@@ -895,7 +894,7 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 			(dma_addr_t)data_buf, len);
 #endif
 
-	memcpy(buf, data_buf, len);
+	rt_memcpy(buf, data_buf, len);
 }
 
 /**
@@ -1120,9 +1119,9 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
     
     /* Copy Read Buf */
     if (data && data_len)
-        memcpy(data,data_buf,data_len);
+        rt_memcpy(data,data_buf,data_len);
     if (spare && spare_len)
-        memcpy(spare,oob_buf,spare_len);
+        rt_memcpy(spare,oob_buf,spare_len);
 
     if (error > 0)
         return -RT_ERROR;
@@ -1142,9 +1141,9 @@ static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
 	nand_command(device, NAND_CMD_SEQIN, 0x00, page);
 
     if (data && data_len)
-        memcpy(data_buf, data, data_len);
+        rt_memcpy(data_buf, data, data_len);
     if (oob && spare_len)
-        memcpy(oob_buf, oob, spare_len);
+        rt_memcpy(oob_buf, oob, spare_len);
     
 	/* Handle block mark swapping. */
 	gpmi_nfc_block_mark_swapping(data_buf, oob_buf);

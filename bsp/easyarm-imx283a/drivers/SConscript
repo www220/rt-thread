@@ -22,7 +22,7 @@ simusart.c
 """)
 
 ethdev_src = Split("""
-deveth.c
+fec.c
 """)
 
 ethsim_src = Split("""
