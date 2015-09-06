@@ -1126,7 +1126,7 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
     if (error > 0)
         return -RT_ERROR;
     if (error == 0 && fixnum > 0)
-        return -RT_EFULL;
+        return RT_ERROR;
 	return RT_EOK;
 }
 

@@ -241,6 +241,8 @@ struct yaffs_dev *
 		dev->param.no_tags_ecc		  = geometry->hasECC;
 		dev->param.is_yaffs2		  = geometry->useYaffs2;
 		dev->param.n_reserved_blocks	  = 5;
+		dev->param.refresh_period		  = 500;
+		dev->refresh_skip			  = 500;
 		dev->driver_context		  = (void *)geometry;
 		dev->os_context		  = (void *)(geometry->privateData);
 
