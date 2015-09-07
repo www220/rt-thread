@@ -1377,7 +1377,7 @@ void nand_init(void)
 void nand_eraseall()
 {
     int index;
-    for (index = _nanddrv_file_device.block_start; index < _nanddrv_file_device.block_total; index ++)
+    for (index = _nanddrv_file_device.block_start; index < _nanddrv_file_device.block_end; index ++)
     {
         if (nanddrv_file_erase_block(&_nanddrv_file_device, index) != 0)
             rt_kprintf("Nand Erase %d BadBlock\n", index);

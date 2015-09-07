@@ -12,6 +12,7 @@ platform.c
 basedev_src = Split("""
 board.c
 usart.c
+cpuusage.c
 """)
 
 basesim_src = Split("""
