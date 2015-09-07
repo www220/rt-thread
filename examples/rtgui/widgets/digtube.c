@@ -90,7 +90,7 @@ rt_bool_t rtgui_digtube_event_handler(struct rtgui_object *object, struct rtgui_
 					disbuf[i] = (disbuf[i] >= '0' && disbuf[i] <= '9') ? disbuf[i] - '0':
 						disbuf[i] - 'a' + 10;
 
-					disbuf[i] = digtube_code_table[disbuf[i]];
+					disbuf[i] = digtube_code_table[(int)disbuf[i]];
 				}
 			}
 

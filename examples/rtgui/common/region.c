@@ -2021,7 +2021,7 @@ rtgui_rect_t *rtgui_region_extents(rtgui_region_t *region)
    if mapping time can be improved.  But right now I've been at work 12 hours,
    so forget it.
 */
-
+#if 0
 static void QuickSortSpans(
     rtgui_point_t spans[],
     int     widths[],
@@ -2114,6 +2114,7 @@ static void QuickSortSpans(
     }
     while (numSpans > 1);
 }
+#endif
 
 void rtgui_region_dump(rtgui_region_t *region)
 {

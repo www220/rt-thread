@@ -691,7 +691,7 @@ void rtgui_dc_draw_arc(struct rtgui_dc *dc, rt_int16_t x, rt_int16_t y, rt_int16
      * Draw arc
      */
 
-    // Octant labelling
+    /* Octant labelling
     //
     //  \ 5 | 6 /
     //   \  |  /
@@ -702,7 +702,7 @@ void rtgui_dc_draw_arc(struct rtgui_dc *dc, rt_int16_t x, rt_int16_t y, rt_int16
     //  3 / | \ 0
     //   /  |  \
     //  / 2 | 1 \
-    //      +y
+    //      +y */
 
     drawoct = 0; // 0x00000000
     // whether or not to keep drawing a given octant.
@@ -1314,7 +1314,7 @@ void rtgui_dc_draw_pie(struct rtgui_dc *dc, rt_int16_t x, rt_int16_t y, rt_int16
 }
 RTM_EXPORT(rtgui_dc_draw_pie);
 
-// Octant labelling
+/* Octant labelling
 //
 //  \ 5 | 6 /
 //   \  |  /
@@ -1325,7 +1325,7 @@ RTM_EXPORT(rtgui_dc_draw_pie);
 //  3 / | \ 0
 //   /  |  \
 //  / 2 | 1 \
-//      +y
+//      +y */
 static void _draw_octant(struct rtgui_dc *dc,
                          rt_int16_t ox, rt_int16_t oy,
                          rt_int16_t y1, rt_int16_t y2, rt_int16_t x, int oct)
@@ -1380,7 +1380,7 @@ static void _fill_small_pie(struct rtgui_dc *dc,
     /* Midpoint circle algorithm. */
     int dk, x, y;
     /* Start X, end X, */
-    rt_int16_t sx, ex, ty, my;
+    rt_int16_t sx, ex, ty = 0, my;
     enum {ST_NONE, ST_ARC, ST_TRI} st;
 
     RT_ASSERT(0 <= start && start <= 45);
@@ -1690,7 +1690,7 @@ RTM_EXPORT(rtgui_dc_get_rect);
 
 rt_uint8_t rtgui_dc_get_pixel_format(struct rtgui_dc *dc)
 {
-    rt_uint8_t pixel_fmt;
+    rt_uint8_t pixel_fmt = 0;
 
     RT_ASSERT(dc != RT_NULL);
 

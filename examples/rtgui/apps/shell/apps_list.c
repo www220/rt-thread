@@ -132,6 +132,9 @@ rt_bool_t apps_list_event_handler(struct rtgui_object *object, struct rtgui_even
     case RTGUI_EVENT_APP_DESTROY:
         _handle_app_destroy((struct rtgui_event_application *) event);
         break;
+        
+    default:
+        break;
     }
 
     return RT_TRUE;

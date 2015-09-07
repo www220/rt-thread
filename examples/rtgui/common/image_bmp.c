@@ -302,7 +302,7 @@ static rt_bool_t rtgui_image_bmp_load(struct rtgui_image *image, struct rtgui_fi
             rt_uint8_t skipLength;
             rt_uint16_t y;
             rt_uint8_t bytePerPixel;
-            rt_int8_t scale1, scale2;
+            rt_int8_t scale1 = 0, scale2 = 0;
 
             bytePerPixel = _UI_BITBYTES(bmp->bit_per_pixel);
             imageWidth = image->w * bytePerPixel;       /* Scaled width in byte */
@@ -524,7 +524,7 @@ static void rtgui_image_bmp_blit(struct rtgui_image *image, struct rtgui_dc *dc,
             rt_uint16_t readLength, readIndex, loadIndex;
             rt_uint8_t skipLength;
             rt_uint16_t x, y;
-            rt_int8_t scale1, scale2;
+            rt_int8_t scale1 = 0, scale2 = 0;
             rt_uint16_t y_start = dst_rect->y1 + h - 1;
 
             /* Read the pixels.  Note that the bmp image is upside down */
