@@ -407,7 +407,7 @@ struct sdlfb_device
     struct rt_device parent;
 
     struct mxs_platform_fb_entry* entry;
-    rt_uint8_t *phys;
+    rt_uint8_t *phys[2];
     int memsize;
 };
 struct sdlfb_device _device;
@@ -431,7 +431,7 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
     device = (struct sdlfb_device *)dev;
     
     RT_ASSERT(device != RT_NULL);
-    RT_ASSERT(device->phys != RT_NULL);
+    RT_ASSERT(device->entry != RT_NULL);
 
     switch (cmd) 
     {
@@ -441,16 +441,16 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
         
         info->bits_per_pixel = 16;
         info->pixel_format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-        info->framebuffer = device->phys;
-        info->width = device->entry->x_res;
-        info->height = device->entry->y_res;
+        info->framebuffer = device->phys[1];
+        info->width = device->entry->y_res;
+        info->height = device->entry->x_res;
     break; }
     
     case RTGRAPHIC_CTRL_RECT_UPDATE: {
         struct rt_device_rect_info *rect;
         rect = (struct rt_device_rect_info *)args;
         
-        rt_kprintf("update %d %d %d %d\n",rect->x,rect->y,rect->width,rect->height);
+        _device.entry->pan_display((dma_addr_t)_device.phys[1]);
         break; }
     }
     
@@ -475,8 +475,10 @@ int lcd_init(void)
     
     _device.entry = &fb_entry;
     _device.memsize = fb_entry.y_res * fb_entry.x_res * fb_entry.bpp / 8;
-    _device.phys = memalign_max(32, _device.memsize);
-    ret = fb_entry.init_panel(RT_DEVICE(&_device),(dma_addr_t)_device.phys,_device.memsize,&fb_entry);
+    _device.phys[0] = memalign_max(32, _device.memsize);
+    _device.phys[1] = memalign_max(32, _device.memsize);
+    rt_memset((void *)_device.phys[0],80,_device.memsize);
+    ret = fb_entry.init_panel(RT_DEVICE(&_device),(dma_addr_t)_device.phys[0],_device.memsize,&fb_entry);
     if (ret != 0)
     {
 		rt_kprintf("cannot initialize LCD panel\n");
@@ -485,7 +487,7 @@ int lcd_init(void)
     init_timings();
     fb_entry.run_panel();
     fb_entry.blank_panel(0);
-    bl_data.set_bl_intensity(&bl_data,bl_data.bl_default_intensity);
+    bl_data.set_bl_intensity(&bl_data,bl_data.bl_max_intensity);
     
     _device.parent.type = RT_Device_Class_Graphic;
     _device.parent.init = sdlfb_init;
@@ -497,6 +499,16 @@ int lcd_init(void)
 
     rt_device_register(RT_DEVICE(&_device), "sdl", RT_DEVICE_FLAG_RDWR);
     rtgui_graphic_set_device(RT_DEVICE(&_device));
+    
+    __asm__("nop");
+    __asm__("nop");
+    __asm__("nop");
+    __asm__("nop");
+    __asm__("nop");
+    __asm__("nop");
+    __asm__("nop");
+    __asm__("nop");
+    __asm__("nop");
     return 0;
     
 out_panel:
@@ -517,15 +529,7 @@ void lcd_blank(int blank)
     rt_kprintf("lcd blank:%d\n",blank);
 }
 
-void lcd_test()
-{
-    static rt_uint8_t tt = 0;
-    rt_memset(_device.phys,tt++,_device.memsize);
-    _device.entry->pan_display((dma_addr_t)_device.phys+480*2);
-}
-
 FINSH_FUNCTION_EXPORT(lcd_intensity, set lcd intensity);
 FINSH_FUNCTION_EXPORT(lcd_blank, set lcd blank);
-FINSH_FUNCTION_EXPORT(lcd_test, test lcd);
 
 #endif //RT_USING_FINSH
