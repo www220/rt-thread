@@ -10,7 +10,8 @@
 #define O_EXCL          0x0000800
 #define O_TRUNC         0x0000400
 #define O_APPEND        0x0000008
-#define O_DIRECTORY     0x0020000
 #define O_BINARY        0x0010000
+#define O_TEXT          0x0020000
+#define O_DIRECTORY     0x0200000
 
 #endif

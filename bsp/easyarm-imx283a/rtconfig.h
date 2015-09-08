@@ -84,7 +84,7 @@
 #define RT_USING_DEVICE_IPC
 #define RT_USING_SERIAL
 //#define RT_USING_SPI
-//#define RT_USING_RTC
+#define RT_USING_RTC
 #define RT_MTD_NAND_DEBUG
 #define RT_USING_MTD_NAND
 
@@ -115,7 +115,7 @@
 #define RT_DFS_ELM_MAX_LFN			255
 #define RT_DFS_ELM_MAX_SECTOR_SIZE  4096
 
-#define RT_USING_DFS_YAFFS
+#define RT_USING_DFS_YAFFS2
 
 #define RT_USING_DFS_ROMFS
 #define DFS_ROMFS_ROOT
@@ -188,5 +188,43 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 #define CHECKSUM_GEN_TCP                1
 #define CHECKSUM_GEN_IP                 1
 #define CHECKSUM_GEN_UDP                1
+
+/* SECTION: RT-Thread/GUI */
+#define RT_USING_RTGUI
+
+/* name length of RTGUI object */
+#define RTGUI_NAME_MAX		12
+/* support 16 weight font */
+#define RTGUI_USING_FONT16
+/* support Chinese font */
+#define RTGUI_USING_FONTHZ
+/* use DFS as file interface */
+#define RTGUI_USING_DFS_FILERW
+/* use font file as Chinese font */
+/* #define RTGUI_USING_HZ_FILE */
+/* use Chinese bitmap font */
+#define RTGUI_USING_HZ_BMP
+/* use small size in RTGUI */
+#define RTGUI_USING_SMALL_SIZE
+/* use mouse cursor */
+/* #define RTGUI_USING_MOUSE_CURSOR */
+/* default font size in RTGUI */
+#define RTGUI_DEFAULT_FONT_SIZE	16
+
+/* image support */
+#define RTGUI_IMAGE_XPM
+#define RTGUI_IMAGE_BMP
+/* #define RTGUI_IMAGE_JPEG */
+/* #define RTGUI_IMAGE_PNG */
+#define RTGUI_IMAGE_TJPGD
+#define RTGUI_IMAGE_LODEPNG
+#define RTGUI_IMAGE_CONTAINER
+#define RTGUI_USING_WINMOVE
+#define RTGUI_USING_NOTEBOOK_IMAGE
+#define RTGUI_USING_DIALOG
+#define RTGUI_USING_APP_SHELL
+
+#define RTGUI_USING_ID_CHECK
+#define RT_USING_TTF
 
 #endif

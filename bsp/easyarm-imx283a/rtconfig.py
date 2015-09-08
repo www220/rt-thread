@@ -9,7 +9,7 @@ if os.getenv('RTT_CC'):
 
 if  CROSS_TOOL == 'gcc':
 	PLATFORM 	= 'gcc'
-	EXEC_PATH 	= r'C:/Program Files (x86)/CodeSourcery/Sourcery G++ Lite/bin'
+	EXEC_PATH 	= r'C:/Program Files (x86)/GNU Tools ARM Embedded/4.9 2015q2/bin'
 
 if os.getenv('RTT_EXEC_PATH'):
 	EXEC_PATH = os.getenv('RTT_EXEC_PATH')
@@ -33,12 +33,12 @@ if PLATFORM == 'gcc':
     OBJDUMP = PREFIX + 'objdump'
     OBJCPY = PREFIX + 'objcopy'
 
-    DEVICE = ' -mcpu=arm926ej-s -Wall'
+    DEVICE = ' -mcpu=arm926ej-s -Wall -Wno-unused-but-set-variable'
     CFLAGS = DEVICE
     AFLAGS = '-c'+ DEVICE + ' -x assembler-with-cpp'
     AFLAGS += ' -Iplatform'
     LFLAGS = DEVICE
-    LFLAGS += ' -Wl,--gc-sections,-cref,-Map=' + MAP_FILE
+    LFLAGS += ' -lm -Wl,--gc-sections,-cref,-Map=' + MAP_FILE
     LFLAGS += ' -T imx283_ram.ld'
 
     CPATH = ''

@@ -809,7 +809,10 @@ void rt_hw_enetmac_handler(int vector, void *param)
 void rt_hw_eth_init(void)
 {
     int j;
-    
+
+    /* Set up EMAC pins */
+    pin_set_group(&enet_pins);
+
 	/* Turn on ENET clocks */
 	REG_WR(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET,
 		REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET) &
@@ -824,8 +827,6 @@ void rt_hw_eth_init(void)
 	REG_WR(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET,
 		REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET) |
 		BM_CLKCTRL_ENET_CLK_OUT_EN);    /* Enable pad output */
-
-    pin_set_group(&enet_pins);
     
 	pin_gpio_direction(PINID_LCD_D16, 1);
 	pin_gpio_set(PINID_LCD_D16, 0);

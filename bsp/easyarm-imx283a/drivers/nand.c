@@ -1126,7 +1126,7 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
     if (error > 0)
         return -RT_ERROR;
     if (error == 0 && fixnum > 0)
-        return -RT_EFULL;
+        return RT_ERROR;
 	return RT_EOK;
 }
 
@@ -1245,6 +1245,28 @@ static inline void __enable_gpmi_clk(void)
 	      1);
 }
 
+static struct pin_desc gpmi_pins_desc[] = {
+	{ PINID_GPMI_D00, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_D01, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_D02, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_D03, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_D04, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_D05, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_D06, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_D07, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_RDN, PIN_FUN1, PAD_8MA, PAD_3V3, 0 },
+	{ PINID_GPMI_WRN, PIN_FUN1, PAD_8MA, PAD_3V3, 0 },
+	{ PINID_GPMI_ALE, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_CLE, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_RDY0, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_CE0N, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_GPMI_RESETN, PIN_FUN1, PAD_8MA, PAD_3V3, 0 }
+};
+static struct pin_group gpmi_pins = {
+	.pins		= gpmi_pins_desc,
+	.nr_pins	= ARRAY_SIZE(gpmi_pins_desc)
+};
+
 void rt_hw_mtd_nand_init(void)
 {
 	u32 block_count;
@@ -1252,6 +1274,9 @@ void rt_hw_mtd_nand_init(void)
 	u32 metadata_size;
 	u32 page_size;
     u32 blk_mark_bit_offs;
+
+    /* Set up GPMI pins */
+	pin_set_group(&gpmi_pins);
 
 	/* Reset the GPMI block. */
     __enable_gpmi_clk();
@@ -1377,7 +1402,7 @@ void nand_init(void)
 void nand_eraseall()
 {
     int index;
-    for (index = _nanddrv_file_device.block_start; index < _nanddrv_file_device.block_total; index ++)
+    for (index = _nanddrv_file_device.block_start; index < _nanddrv_file_device.block_end; index ++)
     {
         if (nanddrv_file_erase_block(&_nanddrv_file_device, index) != 0)
             rt_kprintf("Nand Erase %d BadBlock\n", index);

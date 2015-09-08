@@ -44,7 +44,7 @@
 #ifdef RT_USING_DFS_ELMFAT
 #include <dfs_elm.h>
 #endif
-#ifdef RT_USING_DFS_YAFFS
+#ifdef RT_USING_DFS_YAFFS2
 extern void dfs_yaffs_init(void);
 #endif
 #ifdef RT_USING_DFS_DEVFS
@@ -67,7 +67,7 @@ extern void list_date(void);
 #endif
 
 #ifdef RT_USING_LIBC
-extern void libc_system_init(const char* tty_name);
+extern void libc_system_init(void);
 #endif
 
 #ifdef RT_USING_LWIP
@@ -82,6 +82,11 @@ extern void lwip_sys_init(void);
 #ifdef RT_USING_FINSH
 extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
+#endif
+
+#ifdef RT_USING_RTGUI
+extern int rtgui_system_server_init(void);
+extern int lcd_init(void);
 #endif
 
 volatile int eth_wtdog = 0;
@@ -201,7 +206,7 @@ static void rt_thread_entry_main(void* parameter)
     elm_init();
     w25ftl_flash_init("ftl0", "flash0");
 #endif
-#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS)
+#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     nand_init();
     dfs_yaffs_init();
 #endif
@@ -220,7 +225,7 @@ static void rt_thread_entry_main(void* parameter)
     else
         rt_kprintf("Mount /mnt failed!\n");
 #endif
-#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS)
+#if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     if (dfs_mount("nand0", "/mnt", "yaffs2", 0, 0) == 0)
         rt_kprintf("Mount /mnt ok!\n");
     else
@@ -230,7 +235,7 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
 #ifdef RT_USING_LIBC
-    libc_system_init(CONSOLE_DEVICE);
+    libc_system_init();
 #endif
 
     /* LwIP Initialization */
@@ -246,6 +251,12 @@ static void rt_thread_entry_main(void* parameter)
 #ifdef RT_USING_SQLITE
     sqlite3_initialize();
     rt_kprintf("Sqlite3 initialized!\n");
+#endif
+
+#ifdef RT_USING_RTGUI
+    rtgui_system_server_init();
+    lcd_init();
+    rt_kprintf("RtGUI initialized!\n");
 #endif
 
     /* list date */

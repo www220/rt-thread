@@ -930,6 +930,7 @@ static int yaffs2_ybicmp(const void *a, const void *b)
 	return aseq - bseq;
 }
 
+static int scan_chunk = -100;
 static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
 		struct yaffs_block_info *bi,
 		int blk, int chunk_in_block,
@@ -1001,6 +1002,12 @@ static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
 					dev->alloc_block = blk;
 					dev->alloc_page = chunk_in_block;
 					dev->alloc_block_finder = blk;
+                    //check decreasing
+                    if (scan_chunk == chunk_in_block)
+                        scan_chunk--;
+                    //error
+                    else
+                        scan_chunk = -1;
 				} else {
 					/* This is a partially written block
 					 * that is not the current
@@ -1009,6 +1016,8 @@ static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
 					yaffs_trace(YAFFS_TRACE_SCAN,
 						"Partially written block %d detected. gc will fix this.",
 						blk);
+                    //error
+                    scan_chunk = -1;
 				}
 			}
 		}
@@ -1477,6 +1486,9 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
 			c = dev->chunks_per_summary - 1;
 		else
 			c = dev->param.chunks_per_block - 1;
+        //init scan_chunk
+        if (scan_chunk == -100)
+            scan_chunk = c;
 
 		for (/* c is already initialised */;
 		     !alloc_failed && c >= 0 &&
@@ -1507,7 +1519,21 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
 		}
 	}
 
-	yaffs_skip_rest_of_block(dev);
+    //show scan_chuck
+    if (dev->alloc_block > 0) {
+        bi = yaffs_get_block_info(dev, dev->alloc_block);
+        if (bi->block_state == YAFFS_BLOCK_STATE_ALLOCATING) {
+            if (scan_chunk < 0 || scan_chunk+1 != bi->pages_in_use) {
+                yaffs_trace(YAFFS_TRACE_SCAN, " Alloc_Block:%d Page_In_Use:%d State_Full",
+                            dev->alloc_block, bi->pages_in_use); 
+                bi->block_state = YAFFS_BLOCK_STATE_FULL;
+                dev->alloc_block = -1;
+            } else {
+                yaffs_trace(YAFFS_TRACE_SCAN, " Alloc_Block:%d Alloc_Page:%d",
+                            dev->alloc_block, dev->alloc_page);
+            }
+        }
+    }
 
 	if (alt_block_index)
 		vfree(block_index);

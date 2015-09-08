@@ -32,22 +32,6 @@ extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
 #endif
 
-/**
- * @addtogroup at91sam9260
- */
-
-/*@{*/
-#if defined(__CC_ARM)
-extern int Image$$ER_ZI$$ZI$$Limit;
-#define HEAP_BEGIN  (&Image$$ER_ZI$$ZI$$Limit)
-#elif (defined (__GNUC__))
-extern unsigned char __bss_end__;
-#define HEAP_BEGIN  (&__bss_end__)
-#elif (defined (__ICCARM__))
-#pragma section=".noinit"
-#define HEAP_BEGIN  (__section_end(".noinit"))
-#endif
-
 /*******************************************************************************
 * Function Name  : assert_failed
 * Description    : Reports the name of the source file and the source line number

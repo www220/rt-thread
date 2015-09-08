@@ -31,9 +31,3 @@ void inittmppath(void)
 #endif
 }
 
-void cpu_usage_idle_hook(void)
-{
-    wtdog_count = 0;
-}
-
-

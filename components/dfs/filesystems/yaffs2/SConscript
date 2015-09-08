@@ -32,6 +32,6 @@ src = src + yaffs
  
 CPPPATH = [cwd, cwd + '/yaffs/direct', cwd + '/yaffs', cwd + '/yaffs/direct/basic-test']
 
-group = DefineGroup('Filesystem', src , depend = ['RT_USING_DFS', 'RT_USING_DFS_YAFFS'], CPPPATH = CPPPATH)
+group = DefineGroup('Filesystem', src , depend = ['RT_USING_DFS', 'RT_USING_DFS_YAFFS2'], CPPPATH = CPPPATH)
 
 Return('group')

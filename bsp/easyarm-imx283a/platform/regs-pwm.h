@@ -26,9 +26,8 @@
 #ifndef __ARCH_ARM___PWM_H
 #define __ARCH_ARM___PWM_H
 
-#include <mach/mx28.h>
+#include <mx28.h>
 
-#define REGS_PWM_BASE IO_ADDRESS(PWM_PHYS_ADDR)
 #define REGS_PWM_PHYS (0x80064000)
 #define REGS_PWM_SIZE 0x00002000
 

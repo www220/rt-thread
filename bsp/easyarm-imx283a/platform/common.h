@@ -12,7 +12,7 @@
 #define CONFIG_MXS_DMA_REG_BASE ABPHDMA_BASE_ADDR
 
 #define CONFIG_FEC0_IOBASE		REGS_ENET_BASE
-#define CONFIG_FEC0_PHY_ADDR		-1
+#define CONFIG_FEC0_PHY_ADDR	-1
 
 typedef signed char s8;
 typedef unsigned char u8;
@@ -25,12 +25,6 @@ typedef unsigned int u32;
 
 typedef signed long long s64;
 typedef unsigned long long u64;
-
-#define uint32_t u32
-#define uint16_t u16
-#define uint8_t u8
-
-#define BITS_PER_LONG 32
 
 extern unsigned char *dma_align_mem;
 #define memalign(x,y) dma_align_mem; dma_align_mem += (u32)(((u32)(y)+31)&(u32)(~31))
