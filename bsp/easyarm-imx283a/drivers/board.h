@@ -35,6 +35,7 @@
 #include "regs-enet.h"
 #include "regs-rtc.h"
 #include "regs-lcdif.h"
+#include "regs-pwm.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64
@@ -76,11 +77,11 @@ extern void __const_udelay(unsigned long);
 	  __udelay(n))
 
 #include <rtthread.h>
-static inline s32 mxs_reset_block(u32 hwreg, int is_enable)
+#define SFTRST 0x80000000
+#define CLKGATE 0x40000000
+static inline int mxs_reset_clock(u32 hwreg, int is_enable)
 {
 	int timeout;
-    #define SFTRST 0x80000000
-    #define CLKGATE 0x40000000
 
 	/* the process of software reset of IP block is done
 	   in several steps:
@@ -145,6 +146,22 @@ static inline s32 mxs_reset_block(u32 hwreg, int is_enable)
 	}
 
 	return 0;
+}
+
+static inline int mxs_clock_enable(u32 hwreg)
+{
+	unsigned int reg = readl(hwreg);
+	reg &= ~CLKGATE;
+	writel(reg, hwreg);
+
+	return 0;
+}
+
+static inline void mxs_clock_disable(u32 hwreg)
+{
+	unsigned int reg = readl(hwreg);
+	reg |= CLKGATE;
+	writel(reg, hwreg);
 }
 
 #endif

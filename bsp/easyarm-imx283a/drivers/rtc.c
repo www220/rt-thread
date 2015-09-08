@@ -49,7 +49,7 @@ static int RTC_Configuration(void)
     clk |= BM_RTC_PERSISTENT0_CLOCKSOURCE | BM_RTC_PERSISTENT0_XTAL32KHZ_PWRUP;
     writel(clk, REGS_RTC_BASE + HW_RTC_PERSISTENT0);
 
-    return mxs_reset_block(REGS_RTC_BASE + HW_RTC_CTRL, 1);
+    return mxs_reset_clock(REGS_RTC_BASE + HW_RTC_CTRL, 1);
 }
 
 static struct rt_device rtc;

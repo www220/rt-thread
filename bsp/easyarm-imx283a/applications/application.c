@@ -86,7 +86,7 @@ extern void finsh_set_device(const char* device);
 
 #ifdef RT_USING_RTGUI
 extern int rtgui_system_server_init(void);
-extern void lcd_init(void);
+extern int lcd_init(void);
 #endif
 
 volatile int eth_wtdog = 0;
