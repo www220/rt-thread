@@ -37,8 +37,8 @@
 #include "pinctrl.h"
 
 //	<i>Default: 64
-#define HEAP_SIZE         64
-#define HEAP_END          (0x40000000 + HEAP_SIZE * 1024 * 1024)
+#define HEAP_BEGIN        0x40400000
+#define HEAP_END          0x43F00000
 
 #define RT_USING_DBGU
 //#deiine RT_USING_UART1

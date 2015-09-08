@@ -71,8 +71,8 @@ void calibrate_delay(void)
 static struct mem_desc hw_mem_desc[] =
 {
 	{ 0x00000000, 0xFFFFFFFF, 0x00000000, RW_NCNB },     /* None cached for 4G memory */
-	{ 0x40000000, 0x43EFFFFF, 0x40000000, RW_CB },       /* 63M cached SDRAM memory */
-	{ 0x43F00000, 0x43FFFFFF, 0x43F00000, RW_NCNB },     /* 1M none-cached SDRAM */
+	{ 0x40000000, HEAP_END-1, 0x40000000, RW_CB },       /* 63M cached SDRAM memory */
+	{ HEAP_END,   0x43FFFFFF, 0x43F00000, RW_NCNB },     /* 1M none-cached SDRAM */
 	{ 0x00000000, 0x00020000, 0x00000000, RW_NCNB },     /* isr vector table */
 };
 /* None-cached RAM DMA */

@@ -84,6 +84,10 @@ extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
 #endif
 
+#ifdef RT_USING_RTGUI
+extern int rtgui_system_server_init(void);
+#endif
+
 volatile int eth_wtdog = 0;
 volatile int eth_linkstatus = 0;
 volatile int wtdog_count = 0;
@@ -246,6 +250,11 @@ static void rt_thread_entry_main(void* parameter)
 #ifdef RT_USING_SQLITE
     sqlite3_initialize();
     rt_kprintf("Sqlite3 initialized!\n");
+#endif
+
+#ifdef RT_USING_RTGUI
+    rtgui_system_server_init();
+    rt_kprintf("RtGUI initialized!\n");
 #endif
 
     /* list date */
