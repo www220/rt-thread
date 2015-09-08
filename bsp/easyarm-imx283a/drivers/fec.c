@@ -898,6 +898,6 @@ void rt_hw_eth_init(void)
             rt_thread_startup(tid);
     }
 
-    rt_hw_interrupt_install(IRQ_ENET_MAC0, rt_hw_enetmac_handler, RT_NULL, "ENetMac");
+    rt_hw_interrupt_install(IRQ_ENET_MAC0, rt_hw_enetmac_handler, RT_NULL, "EMac");
     rt_hw_interrupt_umask(IRQ_ENET_MAC0);
 }

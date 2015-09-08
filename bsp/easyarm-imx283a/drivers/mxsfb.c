@@ -436,13 +436,11 @@ static rt_err_t  sdlfb_close(rt_device_t dev)
     return RT_EOK;
 }
 
-static rt_mutex_t sdllock;
 static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 {
     struct sdlfb_device *device;
-
-    rt_mutex_take(sdllock, RT_WAITING_FOREVER);
     device = (struct sdlfb_device *)dev;
+    
     RT_ASSERT(device != RT_NULL);
     RT_ASSERT(device->phys != RT_NULL);
 
@@ -450,23 +448,23 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
     {
     case RTGRAPHIC_CTRL_GET_INFO: {
         struct rt_device_graphic_info *info;
-
         info = (struct rt_device_graphic_info *) args;
+        
         info->bits_per_pixel = 16;
         info->pixel_format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
         info->framebuffer = device->phys;
         info->width = device->entry->x_res;
-        info->height = device->entry->x_res;
+        info->height = device->entry->y_res;
     break; }
     
     case RTGRAPHIC_CTRL_RECT_UPDATE: {
         struct rt_device_rect_info *rect;
         rect = (struct rt_device_rect_info *)args;
+        
         rt_kprintf("update %d %d %d %d\n",rect->x,rect->y,rect->width,rect->height);
         break; }
     }
     
-    rt_mutex_release(sdllock);
     return RT_EOK;
 }
 
@@ -497,8 +495,10 @@ int lcd_init(void)
     }
     init_timings();
     fb_entry.run_panel();
+    fb_entry.blank_panel(0);
     bl_data.set_bl_intensity(&bl_data,bl_data.bl_default_intensity);
     
+    _device.parent.type = RT_Device_Class_Graphic;
     _device.parent.init = sdlfb_init;
     _device.parent.open = sdlfb_open;
     _device.parent.close = sdlfb_close;
@@ -507,8 +507,6 @@ int lcd_init(void)
     _device.parent.control = sdlfb_control;
 
     rt_device_register(RT_DEVICE(&_device), "sdl", RT_DEVICE_FLAG_RDWR);
-    sdllock = rt_mutex_create("fb", RT_IPC_FLAG_FIFO);
-    
     rtgui_graphic_set_device(RT_DEVICE(&_device));
     return 0;
     
@@ -530,7 +528,15 @@ void lcd_blank(int blank)
     rt_kprintf("lcd blank:%d\n",blank);
 }
 
+void lcd_test()
+{
+    static rt_uint8_t tt = 0;
+    rt_memset(_device.phys,tt++,_device.memsize);
+    _device.entry->pan_display((dma_addr_t)_device.phys+480*2);
+}
+
 FINSH_FUNCTION_EXPORT(lcd_intensity, set lcd intensity);
 FINSH_FUNCTION_EXPORT(lcd_blank, set lcd blank);
+FINSH_FUNCTION_EXPORT(lcd_test, test lcd);
 
 #endif //RT_USING_FINSH
