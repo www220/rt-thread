@@ -413,6 +413,64 @@ static struct pin_group lcd_pins = {
 	.nr_pins	= ARRAY_SIZE(lcd_pins_desc)
 };
 
+struct sdlfb_device
+{
+    struct rt_device parent;
+
+    struct mxs_platform_fb_entry* entry;
+    rt_uint8_t *phys;
+    int memsize;
+};
+struct sdlfb_device _device;
+
+static rt_err_t  sdlfb_init(rt_device_t dev)
+{
+    return RT_EOK;
+}
+static rt_err_t  sdlfb_open(rt_device_t dev, rt_uint16_t oflag)
+{
+    return RT_EOK;
+}
+static rt_err_t  sdlfb_close(rt_device_t dev)
+{
+    return RT_EOK;
+}
+
+static rt_mutex_t sdllock;
+static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
+{
+    struct sdlfb_device *device;
+
+    rt_mutex_take(sdllock, RT_WAITING_FOREVER);
+    device = (struct sdlfb_device *)dev;
+    RT_ASSERT(device != RT_NULL);
+    RT_ASSERT(device->phys != RT_NULL);
+
+    switch (cmd) 
+    {
+    case RTGRAPHIC_CTRL_GET_INFO: {
+        struct rt_device_graphic_info *info;
+
+        info = (struct rt_device_graphic_info *) args;
+        info->bits_per_pixel = 16;
+        info->pixel_format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
+        info->framebuffer = device->phys;
+        info->width = device->entry->x_res;
+        info->height = device->entry->x_res;
+    break; }
+    
+    case RTGRAPHIC_CTRL_RECT_UPDATE: {
+        struct rt_device_rect_info *rect;
+        rect = (struct rt_device_rect_info *)args;
+        rt_kprintf("update %d %d %d %d\n",rect->x,rect->y,rect->width,rect->height);
+        break; }
+    }
+    
+    rt_mutex_release(sdllock);
+    return RT_EOK;
+}
+
+extern rt_err_t rtgui_graphic_set_device(rt_device_t device);
 int lcd_init(void)
 {
     int ret = 0;
@@ -427,7 +485,11 @@ int lcd_init(void)
 		rt_kprintf("cannot initialize LCD backlight\n");
         goto out_panel;
     }
-    ret = fb_entry.init_panel(0,0,0,&fb_entry);
+    
+    _device.entry = &fb_entry;
+    _device.memsize = fb_entry.y_res * fb_entry.x_res * fb_entry.bpp / 8;
+    _device.phys = memalign_max(32, _device.memsize);
+    ret = fb_entry.init_panel(RT_DEVICE(&_device),(dma_addr_t)_device.phys,_device.memsize,&fb_entry);
     if (ret != 0)
     {
 		rt_kprintf("cannot initialize LCD panel\n");
@@ -436,7 +498,20 @@ int lcd_init(void)
     init_timings();
     fb_entry.run_panel();
     bl_data.set_bl_intensity(&bl_data,bl_data.bl_default_intensity);
+    
+    _device.parent.init = sdlfb_init;
+    _device.parent.open = sdlfb_open;
+    _device.parent.close = sdlfb_close;
+    _device.parent.read = RT_NULL;
+    _device.parent.write = RT_NULL;
+    _device.parent.control = sdlfb_control;
 
+    rt_device_register(RT_DEVICE(&_device), "sdl", RT_DEVICE_FLAG_RDWR);
+    sdllock = rt_mutex_create("fb", RT_IPC_FLAG_FIFO);
+    
+    rtgui_graphic_set_device(RT_DEVICE(&_device));
+    return 0;
+    
 out_panel:
     return ret;
 }
