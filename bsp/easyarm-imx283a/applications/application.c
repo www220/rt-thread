@@ -67,7 +67,7 @@ extern void list_date(void);
 #endif
 
 #ifdef RT_USING_LIBC
-extern void libc_system_init(const char* tty_name);
+extern void libc_system_init(void);
 #endif
 
 #ifdef RT_USING_LWIP
@@ -86,6 +86,7 @@ extern void finsh_set_device(const char* device);
 
 #ifdef RT_USING_RTGUI
 extern int rtgui_system_server_init(void);
+extern void lcd_init(void);
 #endif
 
 volatile int eth_wtdog = 0;
@@ -234,7 +235,7 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
 #ifdef RT_USING_LIBC
-    libc_system_init(CONSOLE_DEVICE);
+    libc_system_init();
 #endif
 
     /* LwIP Initialization */
@@ -254,6 +255,7 @@ static void rt_thread_entry_main(void* parameter)
 
 #ifdef RT_USING_RTGUI
     rtgui_system_server_init();
+    lcd_init();
     rt_kprintf("RtGUI initialized!\n");
 #endif
 

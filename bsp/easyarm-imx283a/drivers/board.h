@@ -34,6 +34,7 @@
 #include "regs-ocotp.h"
 #include "regs-enet.h"
 #include "regs-rtc.h"
+#include "regs-lcdif.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64

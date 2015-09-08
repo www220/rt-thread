@@ -37,22 +37,14 @@ rtcsim_src = Split("""
 simrtc.c
 """)
 
-spidev_src = Split("""
-devspi.c
-w25qxx.c
-""")
-
-spisim_src = Split("""
-simw25qxx.c
-""")
-
-elmdev_src = Split("""
-w25ftl.c
-""")
-
 nanddev_src = Split("""
 nand.c
 apbh_dma.c
+""")
+
+lcddev_src = Split("""
+lcdif.c
+mxsfb.c
 """)
 
 if rtconfig.PLATFORM != 'cl':
@@ -75,17 +67,12 @@ else:
         src += rtcsim_src
 
 if rtconfig.PLATFORM != 'cl':
-    if GetDepend(['RT_USING_SPI']):
-        src += spidev_src
-else:
-    if GetDepend(['RT_USING_SPI']):
-        src += spisim_src
-
-if GetDepend(['RT_USING_MTD_NAND']):
-    src += nanddev_src
-
-if GetDepend(['RT_USING_DFS_ELMFAT']):
-    src += elmdev_src
+    if GetDepend(['RT_USING_MTD_NAND']):
+        src += nanddev_src
+        
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_RTGUI']):
+        src += lcddev_src
 
 CPPPATH = [cwd]
 
