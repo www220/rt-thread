@@ -30,8 +30,8 @@ extern unsigned char *dma_align_mem;
 #define memalign(x,y) dma_align_mem; dma_align_mem += (u32)(((u32)(y)+31)&(u32)(~31))
 #define freealign(x)
 
-extern unsigned char *dma_align_mem_max;
-#define memalign_max(x,y) dma_align_mem_max; dma_align_mem_max += (u32)(((u32)(y)+31)&(u32)(~31))
+extern unsigned char *dma_align_max;
+#define memalign_max(x,y) dma_align_max; dma_align_max += (u32)(((u32)(y)+31)&(u32)(~31))
 #define freealign_max(x)
 
 /* Dma addresses are 32-bits wide.  */

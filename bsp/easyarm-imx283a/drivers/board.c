@@ -77,7 +77,7 @@ static struct mem_desc hw_mem_desc[] =
 };
 /* None-cached RAM DMA */
 unsigned char * dma_align_mem = (unsigned char *)0x00000100;
-unsigned char * dma_align_mem_max = (unsigned char *)HEAP_END;
+unsigned char * dma_align_max = (unsigned char *)HEAP_END;
 
 static struct pin_desc led_pins_desc[] = {
 	{ PINID_GPMI_RDY1, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },

@@ -200,10 +200,6 @@ static int lcdif_set_rate(unsigned long rate)
 			return -ETIMEDOUT;
 	}
 	/* Switch to ref_pix source */
-	reg_val = readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC1);
-	reg_val &= ~BM_CLKCTRL_FRAC1_CLKGATEPIX;
-	writel(reg_val, CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC1);
-
 	reg_val = BM_CLKCTRL_CLKSEQ_BYPASS_DIS_LCDIF;
 	writel(reg_val, CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_CLR);
 
@@ -221,10 +217,10 @@ static int init_panel(struct rt_device *dev, dma_addr_t phys, int memsize,
 {
 	int ret = 0;
 
-    mxs_clock_enable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF);
+    mxs_clock_enable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF, BM_CLKCTRL_DIS_LCDIF_CLKGATE);
 	ret = lcdif_set_rate(pentry->dclk_f);	/* Hz */
     if (ret) {                
-		mxs_clock_disable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF);            
+		mxs_clock_disable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF, BM_CLKCTRL_DIS_LCDIF_CLKGATE);            
 		goto out;        
 	}
 
@@ -267,7 +263,7 @@ static void release_panel(struct rt_device *dev,
 {
 	release_dotclk_panel();
 	mxs_lcdif_dma_release();
-	mxs_clock_disable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF);            
+	mxs_clock_disable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF, BM_CLKCTRL_DIS_LCDIF_CLKGATE);            
 }
 
 static int blank_panel(int blank)
@@ -293,10 +289,7 @@ static int blank_panel(int blank)
 
 static int init_bl(struct mxs_platform_bl_data *data)
 {
-    unsigned int reg = readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL);
-	reg &= ~BM_CLKCTRL_XTAL_PWM_CLK24M_GATE;
-    writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL);
-    
+    mxs_clock_enable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL, BM_CLKCTRL_XTAL_PWM_CLK24M_GATE);
 	mxs_reset_clock(REGS_PWM_BASE, 1);
 
 	writel(BF_PWM_ACTIVEn_INACTIVE(0) |
@@ -314,8 +307,6 @@ static int init_bl(struct mxs_platform_bl_data *data)
 
 static void free_bl(struct mxs_platform_bl_data *data)
 {
-    unsigned int reg;
-
 	writel(BF_PWM_ACTIVEn_INACTIVE(0) |
 		     BF_PWM_ACTIVEn_ACTIVE(0),
 		     REGS_PWM_BASE + HW_PWM_ACTIVEn(3));
@@ -326,9 +317,7 @@ static void free_bl(struct mxs_platform_bl_data *data)
 		     REGS_PWM_BASE + HW_PWM_PERIODn(3));
 	writel(BM_PWM_CTRL_PWM3_ENABLE, REGS_PWM_BASE + HW_PWM_CTRL_CLR);
 
-    reg = readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL);
-	reg |= BM_CLKCTRL_XTAL_PWM_CLK24M_GATE;
-    writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL);
+    mxs_clock_disable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL, BM_CLKCTRL_XTAL_PWM_CLK24M_GATE);
 }
 
 static int values[] = { 0, 4, 9, 14, 20, 27, 35, 45, 57, 75, 100 };

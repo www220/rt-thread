@@ -77,11 +77,11 @@ extern void __const_udelay(unsigned long);
 	  __udelay(n))
 
 #include <rtthread.h>
-#define SFTRST 0x80000000
-#define CLKGATE 0x40000000
 static inline int mxs_reset_clock(u32 hwreg, int is_enable)
 {
 	int timeout;
+#define SFTRST 0x80000000
+#define CLKGATE 0x40000000
 
 	/* the process of software reset of IP block is done
 	   in several steps:
@@ -148,19 +148,17 @@ static inline int mxs_reset_clock(u32 hwreg, int is_enable)
 	return 0;
 }
 
-static inline int mxs_clock_enable(u32 hwreg)
+static inline void mxs_clock_enable(u32 hwreg, u32 gate)
 {
 	unsigned int reg = readl(hwreg);
-	reg &= ~CLKGATE;
+	reg &= ~gate;
 	writel(reg, hwreg);
-
-	return 0;
 }
 
-static inline void mxs_clock_disable(u32 hwreg)
+static inline void mxs_clock_disable(u32 hwreg, u32 gate)
 {
 	unsigned int reg = readl(hwreg);
-	reg |= CLKGATE;
+	reg |= gate;
 	writel(reg, hwreg);
 }
 
