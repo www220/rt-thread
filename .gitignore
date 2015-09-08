@@ -21,3 +21,4 @@ documentation/html
 *.a
 *.i
 *.d
+/bsp/easyarm-imx283a/elftosb/imx28_ivt_uboot.sb
