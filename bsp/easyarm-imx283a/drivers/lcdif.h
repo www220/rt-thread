@@ -61,23 +61,10 @@ struct mxs_platform_fb_entry {
 	void (*stop_panel) (void);
 	int (*pan_display) (dma_addr_t);
 	int (*update_panel) (void *, struct mxs_platform_fb_entry *);
-	struct list_head link;
 	struct mxs_platform_bl_data *bl_data;
 };
 
-struct mxs_platform_fb_data {
-	struct list_head list;
-	struct mxs_platform_fb_entry *cur;
-	struct mxs_platform_fb_entry *next;
-};
-
-#define MXS_LCDIF_PANEL_INIT	1
-#define MXS_LCDIF_PANEL_RELEASE	2
-
 struct mxs_platform_bl_data {
-	struct list_head list;
-	struct regulator *regulator;
-	int bl_gpio;
 	int bl_max_intensity;
 	int bl_cons_intensity;
 	int bl_default_intensity;
@@ -85,37 +72,6 @@ struct mxs_platform_bl_data {
 	int (*set_bl_intensity) (struct mxs_platform_bl_data *, int);
 	void (*free_bl) (struct mxs_platform_bl_data *);
 };
-
-static inline void mxs_lcd_register_entry(struct mxs_platform_fb_entry
-					  *pentry, struct mxs_platform_fb_data
-					  *pdata)
-{
-	list_add_tail(&pentry->link, &pdata->list);
-	if (!pdata->cur)
-		pdata->cur = pentry;
-}
-
-static inline void mxs_lcd_move_pentry_up(struct mxs_platform_fb_entry
-					  *pentry, struct mxs_platform_fb_data
-					  *pdata)
-{
-	list_move(&pentry->link, &pdata->list);
-}
-
-static inline int mxs_lcd_iterate_pdata(struct mxs_platform_fb_data
-					*pdata,
-					int (*func) (struct
-						     mxs_platform_fb_entry
-						     * pentry, void *data,
-						     int ret_prev), void *data)
-{
-	struct mxs_platform_fb_entry *pentry;
-	int ret = 0;
-	list_for_each_entry(pentry, &pdata->list, link) {
-		ret = func(pentry, data, ret);
-	}
-	return ret;
-}
 
 void mxs_init_lcdif(void);
 int mxs_lcdif_dma_init(struct rt_device *dev, dma_addr_t phys, int memsize);

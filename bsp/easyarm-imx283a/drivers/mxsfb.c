@@ -193,13 +193,17 @@ static int lcdif_set_rate(unsigned long rate)
 
 	{
 		int i;
-		for (i = 10000; i; i--)
+		for (i = 100000; i; i--)
 			if ((readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF) & (1 << 29)) == 0)
 				break;
 		if (!i)
 			return -ETIMEDOUT;
 	}
 	/* Switch to ref_pix source */
+	reg_val = readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC1);
+	reg_val &= ~BM_CLKCTRL_FRAC1_CLKGATEPIX;
+	writel(reg_val, CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC1);
+
 	reg_val = BM_CLKCTRL_CLKSEQ_BYPASS_DIS_LCDIF;
 	writel(reg_val, CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_CLR);
 
@@ -263,12 +267,27 @@ static void release_panel(struct rt_device *dev,
 {
 	release_dotclk_panel();
 	mxs_lcdif_dma_release();
+	mxs_clock_disable(CLKCTRL_BASE_ADDR + HW_CLKCTRL_DIS_LCDIF);            
 }
 
 static int blank_panel(int blank)
 {
 	int ret = 0, count;
 
+	if (blank) {
+		writel(BM_LCDIF_CTRL_BYPASS_COUNT,
+			     REGS_LCDIF_BASE + HW_LCDIF_CTRL_CLR);
+		for (count = 100000; count; count--) {
+			if (readl(REGS_LCDIF_BASE + HW_LCDIF_STAT) &
+			    BM_LCDIF_STAT_TXFIFO_EMPTY)
+				break;
+			udelay(1);
+		}
+		rt_thread_delay(1);
+	} else {
+		writel(BM_LCDIF_CTRL_BYPASS_COUNT,
+			     REGS_LCDIF_BASE + HW_LCDIF_CTRL_SET);
+	}
 	return ret;
 }
 
@@ -295,6 +314,8 @@ static int init_bl(struct mxs_platform_bl_data *data)
 
 static void free_bl(struct mxs_platform_bl_data *data)
 {
+    unsigned int reg;
+
 	writel(BF_PWM_ACTIVEn_INACTIVE(0) |
 		     BF_PWM_ACTIVEn_ACTIVE(0),
 		     REGS_PWM_BASE + HW_PWM_ACTIVEn(3));
@@ -304,6 +325,10 @@ static void free_bl(struct mxs_platform_bl_data *data)
 		     BF_PWM_PERIODn_PERIOD(399),
 		     REGS_PWM_BASE + HW_PWM_PERIODn(3));
 	writel(BM_PWM_CTRL_PWM3_ENABLE, REGS_PWM_BASE + HW_PWM_CTRL_CLR);
+
+    reg = readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL);
+	reg |= BM_CLKCTRL_XTAL_PWM_CLK24M_GATE;
+    writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_XTAL);
 }
 
 static int values[] = { 0, 4, 9, 14, 20, 27, 35, 45, 57, 75, 100 };
@@ -313,6 +338,8 @@ static int set_bl_intensity(struct mxs_platform_bl_data *data,
 {
 	int scaled_int;
 
+    if (intensity < 0)
+        intensity = 0;
 	scaled_int = values[intensity / 10];
 	if (scaled_int < 100) {
 		int rem = intensity - 10 * (intensity / 10);	// r = i % 10; 
@@ -331,10 +358,6 @@ static int set_bl_intensity(struct mxs_platform_bl_data *data,
 
 	return 0;
 }
-
-static struct mxs_platform_fb_data mxs_framebuffer_pdata = {
-    .list = LIST_HEAD_INIT(mxs_framebuffer_pdata.list),
-};
 
 static struct mxs_platform_bl_data bl_data = {
     .bl_max_intensity = 100,
@@ -412,7 +435,27 @@ int lcd_init(void)
     }
     init_timings();
     fb_entry.run_panel();
+    bl_data.set_bl_intensity(&bl_data,bl_data.bl_default_intensity);
 
 out_panel:
     return ret;
 }
+
+#if defined(RT_USING_FINSH)
+#include <finsh.h>
+void lcd_intensity(int intensity)
+{
+    bl_data.set_bl_intensity(&bl_data, intensity);
+    rt_kprintf("lcd intensity:%d\n",intensity);
+}
+
+void lcd_blank(int blank)
+{
+    fb_entry.blank_panel(blank);
+    rt_kprintf("lcd blank:%d\n",blank);
+}
+
+FINSH_FUNCTION_EXPORT(lcd_intensity, set lcd intensity);
+FINSH_FUNCTION_EXPORT(lcd_blank, set lcd blank);
+
+#endif //RT_USING_FINSH
