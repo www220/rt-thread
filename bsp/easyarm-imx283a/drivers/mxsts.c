@@ -139,6 +139,22 @@ static inline void enter_state_touch_verify(struct mxs_ts_info *info)
 }
 
 #define TOUCH_DEBOUNCE_TOLERANCE	100
+#define ABS_X 0
+#define ABS_Y 1
+#define ABS_PRESSURE 2
+static int touch_data[4];
+void input_report_abs(int type, int data) { touch_data[type] = data; }
+void input_sync()
+{
+    if (touch_data[2] != touch_data[3])
+    {
+        rtgui_touch_post((touch_data[2]?RTGUI_TOUCH_DOWN:RTGUI_TOUCH_UP), (3800-touch_data[0])/10, (touch_data[1]-600)/10);
+        rt_kprintf("click %d %d %d\n",(3800-touch_data[0])/10,(touch_data[1]-600)/10,touch_data[2]);
+       touch_data[3] = touch_data[2];
+    }
+    rtgui_touch_post(RTGUI_TOUCH_MOTION, (3800-touch_data[0])/10, (touch_data[1]-600)/10);
+    rt_kprintf("                              touch %d %d %d\n",(3800-touch_data[0])/10,(touch_data[1]-600)/10,touch_data[2]);
+}
 
 static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 			int pressure)
@@ -158,7 +174,6 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 			}
 		}
 		if (info->sample_count > 4){
-            rtgui_touch_post(RTGUI_TOUCH_MOTION, info->x, info->y);
 			enter_state_y_plane(info);
 		}
 		else
@@ -180,7 +195,6 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 			}
 		}
 		if (info->sample_count > 4) {
-            rtgui_touch_post(RTGUI_TOUCH_MOTION, info->x, info->y);
 			enter_state_touch_verify(info);
 		}
 		else
@@ -189,16 +203,18 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 		break;
 
 	case TS_STATE_TOUCH_VERIFY:
+		input_report_abs(ABS_Y, info->x); //info->x 反应y方向的变化
+		input_report_abs(ABS_X, info->y);
+		input_report_abs(ABS_PRESSURE, pressure);
+		input_sync();
 	case TS_STATE_TOUCH_DETECT:
 		if (pressure) {
-            rtgui_touch_post(RTGUI_TOUCH_DOWN, info->x, info->y);
+			input_report_abs(ABS_PRESSURE, pressure);
 			enter_state_x_plane(info);
 			hw_lradc_set_delay_trigger_kick(
 					LRADC_DELAY_TRIGGER_TOUCHSCREEN, 1);
-		} else {
-            rtgui_touch_post(RTGUI_TOUCH_UP, info->x, info->y);
+		} else
 			enter_state_touch_detect(info);
-        }
 		break;
         
     default:
