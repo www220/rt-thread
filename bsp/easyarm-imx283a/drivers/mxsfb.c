@@ -461,10 +461,11 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
     return RT_EOK;
 }
 
+#include "im.h"
 extern rt_err_t rtgui_graphic_set_device(rt_device_t device);
 int lcd_init(void)
 {
-    int ret = 0;
+    int ret = 0,i;
     
     /* Set up LCD pins */
 	pin_set_group(&lcd_pins);
@@ -484,7 +485,7 @@ int lcd_init(void)
     _device.phys[2] = memalign_max(32, _device.memsize);
     //初始化启动使用第一个缓存区
     _frame_flg = 0;
-    rt_memset((void *)_device.phys[0],80,_device.memsize);
+    rt_memcpy((void *)_device.phys[0],gImage_im,_device.memsize);
     ret = fb_entry.init_panel(RT_DEVICE(&_device),(dma_addr_t)_device.phys[0],_device.memsize,&fb_entry);
     if (ret != 0)
     {
@@ -494,6 +495,12 @@ int lcd_init(void)
     init_timings();
     fb_entry.run_panel();
     fb_entry.blank_panel(0);
+    //延时一下让图片加载完成
+    for (i=0; i<100; i+=20)
+    {
+        bl_data.set_bl_intensity(&bl_data,i);
+        rt_thread_delay(100);
+    }
     bl_data.set_bl_intensity(&bl_data,bl_data.bl_max_intensity);
     
     _device.parent.type = RT_Device_Class_Graphic;
@@ -506,17 +513,6 @@ int lcd_init(void)
 
     rt_device_register(RT_DEVICE(&_device), "sdl", RT_DEVICE_FLAG_RDWR);
     rtgui_graphic_set_device(RT_DEVICE(&_device));
-
-    //某些情况下elftosb代码会计算calcsum失败，用这个代码来凑数
-    __asm__("nop");
-    __asm__("nop");
-    __asm__("nop");
-    __asm__("nop");
-    __asm__("nop");
-    __asm__("nop");
-    __asm__("nop");
-    __asm__("nop");
-    __asm__("nop");
     return 0;
     
 out_panel:

@@ -87,7 +87,7 @@ static rt_bool_t rtgui_image_bmp_check(struct rtgui_filerw *file)
         }
 
         /* Read BMP header size */
-        if (*(rt_uint32_t *)&buffer[14] == 12)
+        if (buffer[14] == 12 && buffer[15] == 0)
         {
             /* Bitmap Header Version 2.x */
             if (rtgui_filerw_read(file, (void *)buffer, 8, 1) != 8)
