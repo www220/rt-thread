@@ -407,10 +407,11 @@ struct sdlfb_device
     struct rt_device parent;
 
     struct mxs_platform_fb_entry* entry;
-    rt_uint8_t *phys[2];
+    rt_uint8_t *phys[3];
     int memsize;
 };
-struct sdlfb_device _device;
+static struct sdlfb_device _device;
+static volatile rt_uint32_t _frame_flg;
 
 static rt_err_t  sdlfb_init(rt_device_t dev)
 {
@@ -441,7 +442,7 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
         
         info->bits_per_pixel = 16;
         info->pixel_format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-        info->framebuffer = device->phys[1];
+        info->framebuffer = device->phys[2];
         info->width = device->entry->y_res;
         info->height = device->entry->x_res;
     break; }
@@ -449,8 +450,11 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
     case RTGRAPHIC_CTRL_RECT_UPDATE: {
         struct rt_device_rect_info *rect;
         rect = (struct rt_device_rect_info *)args;
-        
-        _device.entry->pan_display((dma_addr_t)_device.phys[1]);
+        //不停的交替两个缓存
+        if (++_frame_flg >= 2)
+            _frame_flg = 0;
+        rt_memcpy(device->phys[_frame_flg],device->phys[2],device->memsize);
+        device->entry->pan_display((dma_addr_t)device->phys[_frame_flg]);
         break; }
     }
     
@@ -477,6 +481,9 @@ int lcd_init(void)
     _device.memsize = fb_entry.y_res * fb_entry.x_res * fb_entry.bpp / 8;
     _device.phys[0] = memalign_max(32, _device.memsize);
     _device.phys[1] = memalign_max(32, _device.memsize);
+    _device.phys[2] = memalign_max(32, _device.memsize);
+    //初始化启动使用第一个缓存区
+    _frame_flg = 0;
     rt_memset((void *)_device.phys[0],80,_device.memsize);
     ret = fb_entry.init_panel(RT_DEVICE(&_device),(dma_addr_t)_device.phys[0],_device.memsize,&fb_entry);
     if (ret != 0)
@@ -499,7 +506,8 @@ int lcd_init(void)
 
     rt_device_register(RT_DEVICE(&_device), "sdl", RT_DEVICE_FLAG_RDWR);
     rtgui_graphic_set_device(RT_DEVICE(&_device));
-    
+
+    //某些情况下elftosb代码会计算calcsum失败，用这个代码来凑数
     __asm__("nop");
     __asm__("nop");
     __asm__("nop");
