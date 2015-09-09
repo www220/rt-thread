@@ -87,6 +87,7 @@ extern void finsh_set_device(const char* device);
 #ifdef RT_USING_RTGUI
 extern int rtgui_system_server_init(void);
 extern int lcd_init(void);
+extern int touch_init(void);
 #endif
 
 volatile int eth_wtdog = 0;
@@ -256,6 +257,7 @@ static void rt_thread_entry_main(void* parameter)
 #ifdef RT_USING_RTGUI
     rtgui_system_server_init();
     lcd_init();
+    touch_init();
     rt_kprintf("RtGUI initialized!\n");
 #endif
 

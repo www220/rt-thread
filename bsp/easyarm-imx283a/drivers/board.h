@@ -36,6 +36,7 @@
 #include "regs-rtc.h"
 #include "regs-lcdif.h"
 #include "regs-pwm.h"
+#include "regs-lradc.h"
 #include "pinctrl.h"
 
 //	<i>Default: 64

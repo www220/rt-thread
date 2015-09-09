@@ -45,6 +45,7 @@ apbh_dma.c
 lcddev_src = Split("""
 lcdif.c
 mxsfb.c
+mxsts.c
 """)
 
 if rtconfig.PLATFORM != 'cl':
