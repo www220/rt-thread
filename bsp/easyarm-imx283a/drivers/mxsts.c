@@ -158,6 +158,7 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 			}
 		}
 		if (info->sample_count > 4){
+            rtgui_touch_post(RTGUI_TOUCH_MOTION, info->x, info->y);
 			enter_state_y_plane(info);
 		}
 		else
@@ -179,6 +180,7 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 			}
 		}
 		if (info->sample_count > 4) {
+            rtgui_touch_post(RTGUI_TOUCH_MOTION, info->x, info->y);
 			enter_state_touch_verify(info);
 		}
 		else
@@ -189,11 +191,14 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 	case TS_STATE_TOUCH_VERIFY:
 	case TS_STATE_TOUCH_DETECT:
 		if (pressure) {
+            rtgui_touch_post(RTGUI_TOUCH_DOWN, info->x, info->y);
 			enter_state_x_plane(info);
 			hw_lradc_set_delay_trigger_kick(
 					LRADC_DELAY_TRIGGER_TOUCHSCREEN, 1);
-		} else
+		} else {
+            rtgui_touch_post(RTGUI_TOUCH_UP, info->x, info->y);
 			enter_state_touch_detect(info);
+        }
 		break;
         
     default:
@@ -229,72 +234,9 @@ static void rt_hw_touch_handler(int irq, void *param)
 	process_lradc(info, x_plus, y_plus, pressure);//y_plus is x zuobiao , x_plus is y zuobiao
 }
 
-#define IS_TOUCH_UP() 0
-#define touch_int_enable(x)
-
-struct rt_event touch_event;
-static void touch_thread_entry(void *parameter)
-{
-    rt_bool_t touch_down = RT_FALSE;
-    rt_uint32_t event_value;
-
-    while (1)
-    {
-        if (rt_event_recv(&touch_event,
-                          1,
-                          RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
-                          RT_WAITING_FOREVER,
-                          &event_value)
-                == RT_EOK)
-        {
-            while (1)
-            {
-                if (IS_TOUCH_UP())
-                {
-                    if (touch_down != RT_TRUE)
-                    {
-                        touch_int_enable(RT_TRUE);
-                        break;
-                    }
-
-                    //rtgui_touch_post(RTGUI_TOUCH_UP, touch->x, touch->y);
-
-                    /* clean */
-                    touch_down = RT_FALSE;
-                    touch_int_enable(RT_TRUE);
-                    break;
-                } /* touch up */
-                else /* touch down or move */
-                {
-                    int type = RTGUI_TOUCH_DOWN;
-                    if (touch_down == RT_FALSE)
-                    {
-                        rt_thread_delay(RT_TICK_PER_SECOND / 10);
-                    }
-                    else
-                    {
-                        rt_thread_delay(RT_TICK_PER_SECOND / 20);
-                        /* touch motion event */
-                        type = RTGUI_TOUCH_MOTION;
-                    }
-
-                    /* check it again */
-                    if (IS_TOUCH_UP()) continue;
-
-                    /* calculation */
-                    //rtgui_touch_post(type, touch->x, touch->y);
-
-                    touch_down = RT_TRUE;
-                } /* touch down or move */
-            } /* read touch */
-        } /* event recv */
-    } /* thread while(1) */
-}
-
 extern void hw_lradc_reinit(int enable_ground_ref, unsigned freq);
 int touch_init(void)
 {
-    struct rt_thread *touch_thread;
     struct mxs_ts_info *info = &mx28_ts_info;
     
     hw_lradc_reinit(0, LRADC_CLOCK_6MHZ);
@@ -331,16 +273,10 @@ int touch_init(void)
 		     info->base + HW_LRADC_CTRL1_SET);  //ch5 irq enable
 	writel(BM_LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,//touch detect irq enbale
 		     info->base + HW_LRADC_CTRL1_SET);
-    
-    rt_event_init(&touch_event, "touch", RT_IPC_FLAG_FIFO);
-    touch_thread = rt_thread_create("touch",
-                                    touch_thread_entry, RT_NULL,
-                                    1024, 20, 10);
-    if (touch_thread != RT_NULL) rt_thread_startup(touch_thread);
-    
+        
     rt_hw_interrupt_install(IRQ_LRADC_TOUCH, rt_hw_touch_handler, info, "Touch");
     rt_hw_interrupt_umask(IRQ_LRADC_TOUCH);
-    rt_hw_interrupt_install(IRQ_LRADC_CH5, rt_hw_touch_handler, info, "ADC5");
+    rt_hw_interrupt_install(IRQ_LRADC_CH5, rt_hw_touch_handler, info, "Move");
     rt_hw_interrupt_umask(IRQ_LRADC_CH5);
 
     return RT_EOK;
