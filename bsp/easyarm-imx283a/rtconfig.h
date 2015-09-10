@@ -129,6 +129,7 @@
 /* SECTION: sqlite, sql */
 //#define RT_USING_SQLITE
 #define rttTempFileDir "/tmp"
+#define rttCfgFileDir "/mnt/config"
 extern int rttGetTempname(int nBuf, char *zBuf);
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
@@ -210,6 +211,8 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 /* #define RTGUI_USING_MOUSE_CURSOR */
 /* default font size in RTGUI */
 #define RTGUI_DEFAULT_FONT_SIZE	16
+/* touch calibration */
+#define RTGUI_USING_CALI
 
 /* image support */
 #define RTGUI_IMAGE_XPM

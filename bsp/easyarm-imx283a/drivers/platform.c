@@ -28,6 +28,8 @@ void inittmppath(void)
 		}
 		closedir(pDir);
 	}
+    
+    mkdir(rttCfgFileDir, 666);
 #endif
 }
 

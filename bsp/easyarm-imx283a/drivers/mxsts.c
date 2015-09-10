@@ -4,6 +4,7 @@
 #include <rtgui/rtgui.h>
 #include <rtgui/event.h>
 #include <rtgui/touch.h>
+#include <rtgui/calibration.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -11,6 +12,8 @@
 #include <lradc.h>
 
 struct mxs_ts_info {
+    struct rt_device parent;
+
 	unsigned int base;
 	u8 x_plus_chan;
 	u8 x_minus_chan;
@@ -146,14 +149,21 @@ static int touch_data[4];
 void input_report_abs(int type, int data) { touch_data[type] = data; }
 void input_sync()
 {
-    if (touch_data[2] != touch_data[3])
+    int x,y;
+    //计算坐标位置
+    x = touch_data[ABS_X];
+    y = touch_data[ABS_Y];
+    //按压状态发生了变化，只在变化后发送，
+    if (touch_data[ABS_PRESSURE] != touch_data[ABS_PRESSURE+1])
     {
-        rtgui_touch_post((touch_data[2]?RTGUI_TOUCH_DOWN:RTGUI_TOUCH_UP), (3800-touch_data[0])/10, (touch_data[1]-600)/10);
-        rt_kprintf("click %d %d %d\n",(3800-touch_data[0])/10,(touch_data[1]-600)/10,touch_data[2]);
-       touch_data[3] = touch_data[2];
+        rtgui_touch_post((touch_data[ABS_PRESSURE]?RTGUI_TOUCH_DOWN:RTGUI_TOUCH_UP), x, y);
+        touch_data[ABS_PRESSURE+1] = touch_data[ABS_PRESSURE];
     }
-    rtgui_touch_post(RTGUI_TOUCH_MOTION, (3800-touch_data[0])/10, (touch_data[1]-600)/10);
-    rt_kprintf("                              touch %d %d %d\n",(3800-touch_data[0])/10,(touch_data[1]-600)/10,touch_data[2]);
+    //按压状态才发送移动消息，不是鼠标
+    if (touch_data[ABS_PRESSURE])
+    {
+        rtgui_touch_post(RTGUI_TOUCH_MOTION, x, y);
+    }
 }
 
 static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
@@ -203,8 +213,11 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 		break;
 
 	case TS_STATE_TOUCH_VERIFY:
-		input_report_abs(ABS_Y, info->x); //info->x 反应y方向的变化
-		input_report_abs(ABS_X, info->y);
+        //手指离开的时候不进行计算，这时候数据已经不准
+        if (pressure) {
+            input_report_abs(ABS_Y, info->x); //info->x 反应y方向的变化
+            input_report_abs(ABS_X, info->y);
+        }
 		input_report_abs(ABS_PRESSURE, pressure);
 		input_sync();
 	case TS_STATE_TOUCH_DETECT:
@@ -250,6 +263,25 @@ static void rt_hw_touch_handler(int irq, void *param)
 	process_lradc(info, x_plus, y_plus, pressure);//y_plus is x zuobiao , x_plus is y zuobiao
 }
 
+static rt_err_t touch_device_init(rt_device_t dev)
+{
+    return RT_EOK;
+}
+static rt_bool_t calibration_after(calculate_data_t*cal)
+{
+    char buf[100];
+    FILE *file;
+    sprintf(buf,"%s/pointercal",rttCfgFileDir);
+    if ((file = fopen(buf, "w")) != NULL)
+    { 
+        fprintf(file,"%d %d %d %d %d %d %d",cal->x_coord[0],cal->x_coord[1],cal->x_coord[2],
+                cal->y_coord[0],cal->y_coord[1],cal->y_coord[2],cal->scaling);
+        fclose(file);
+        return RT_TRUE;
+    }
+    return RT_FALSE;
+}
+
 extern void hw_lradc_reinit(int enable_ground_ref, unsigned freq);
 int touch_init(void)
 {
@@ -290,6 +322,33 @@ int touch_init(void)
 	writel(BM_LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,//touch detect irq enbale
 		     info->base + HW_LRADC_CTRL1_SET);
         
+    info->parent.type = RT_Device_Class_Miscellaneous;
+    info->parent.init = touch_device_init;
+    info->parent.control = RT_NULL;
+    info->parent.user_data = RT_NULL;
+
+    /* register touch device to RT-Thread */
+    rt_device_register(&(info->parent), "touch", RT_DEVICE_FLAG_RDWR);
+    rtgui_touch_init(calibration_get_ops());
+    calibration_set_after(calibration_after);
+    //读取校验数据
+    {
+        char buf[100];
+        FILE *file;
+        sprintf(buf,"%s/pointercal",rttCfgFileDir);
+        if ((file = fopen(buf, "r")) != NULL)
+        {
+            calculate_data_t data;
+            if (fscanf(file,"%d %d %d %d %d %d %d",&data.x_coord[0],&data.x_coord[1],&data.x_coord[2],
+                &data.y_coord[0],&data.y_coord[1],&data.y_coord[2],&data.scaling) == 7)
+            {
+                calibration_set_data(&data);
+                rt_kprintf("Load pointercal ok!\n");
+            }
+            fclose(file);
+        }
+    }
+
     rt_hw_interrupt_install(IRQ_LRADC_TOUCH, rt_hw_touch_handler, info, "Touch");
     rt_hw_interrupt_umask(IRQ_LRADC_TOUCH);
     rt_hw_interrupt_install(IRQ_LRADC_CH5, rt_hw_touch_handler, info, "Move");

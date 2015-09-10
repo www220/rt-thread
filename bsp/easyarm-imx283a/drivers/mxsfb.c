@@ -496,10 +496,10 @@ int lcd_init(void)
     fb_entry.run_panel();
     fb_entry.blank_panel(0);
     //延时一下让图片加载完成
-    for (i=0; i<100; i+=20)
+    for (i=0; i<100; i+=2)
     {
         bl_data.set_bl_intensity(&bl_data,i);
-        rt_thread_delay(100);
+        rt_thread_delay(10);
     }
     bl_data.set_bl_intensity(&bl_data,bl_data.bl_max_intensity);
     
@@ -511,7 +511,7 @@ int lcd_init(void)
     _device.parent.write = RT_NULL;
     _device.parent.control = sdlfb_control;
 
-    rt_device_register(RT_DEVICE(&_device), "sdl", RT_DEVICE_FLAG_RDWR);
+    rt_device_register(RT_DEVICE(&_device), "lcd", RT_DEVICE_FLAG_RDWR);
     rtgui_graphic_set_device(RT_DEVICE(&_device));
     return 0;
     
