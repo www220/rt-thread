@@ -30,6 +30,7 @@ void inittmppath(void)
 	}
     
     mkdir(rttCfgFileDir, 666);
+    mkdir(rttResFileDir, 666);
 #endif
 }
 

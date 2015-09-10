@@ -16767,7 +16767,7 @@ struct rtgui_hz_file_font hz16 =
     16,                     /* font size        */
     32,                     /* font data size   */
     -1,                     /* fd               */
-    "/resource/hzk16.fnt"   /* font_fn          */
+	rttResFileDir "/hzk16.fnt"   /* font_fn          */
 };
 
 struct rtgui_font rtgui_font_hz16 =

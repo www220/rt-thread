@@ -10,9 +10,9 @@
 
 #define strtok_r strtok_s
 
-//´Ó¡°type1¡±×ª»»µ½¡°type2¡±¿ÉÄÜ¶ªÊ§Êı¾İ
+//ä»â€œtype1â€è½¬æ¢åˆ°â€œtype2â€å¯èƒ½ä¸¢å¤±æ•°æ®
 #pragma warning(disable:4244)
-//ÓĞ·ûºÅ/ÎŞ·ûºÅ²»Æ¥Åä
+//æœ‰ç¬¦å·/æ— ç¬¦å·ä¸åŒ¹é…
 #pragma warning(disable:4018)
 #endif
 
@@ -130,6 +130,7 @@
 //#define RT_USING_SQLITE
 #define rttTempFileDir "/tmp"
 #define rttCfgFileDir "/mnt/config"
+#define rttResFileDir "/mnt/resource"
 extern int rttGetTempname(int nBuf, char *zBuf);
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
@@ -202,7 +203,7 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 /* use DFS as file interface */
 #define RTGUI_USING_DFS_FILERW
 /* use font file as Chinese font */
-/* #define RTGUI_USING_HZ_FILE */
+#define RTGUI_USING_HZ_FILE
 /* use Chinese bitmap font */
 #define RTGUI_USING_HZ_BMP
 /* use small size in RTGUI */

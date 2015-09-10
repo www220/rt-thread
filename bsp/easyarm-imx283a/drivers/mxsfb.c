@@ -450,7 +450,7 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
     case RTGRAPHIC_CTRL_RECT_UPDATE: {
         struct rt_device_rect_info *rect;
         rect = (struct rt_device_rect_info *)args;
-        //²»Í£µÄ½»ÌæÁ½¸ö»º´æ
+        //ä¸åœçš„äº¤æ›¿ä¸¤ä¸ªç¼“å­˜
         if (++_frame_flg >= 2)
             _frame_flg = 0;
         rt_memcpy(device->phys[_frame_flg],device->phys[2],device->memsize);
@@ -461,7 +461,9 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
     return RT_EOK;
 }
 
+#ifndef RTGUI_USING_HZ_FILE
 #include "im.h"
+#endif
 extern rt_err_t rtgui_graphic_set_device(rt_device_t device);
 int lcd_init(void)
 {
@@ -483,9 +485,24 @@ int lcd_init(void)
     _device.phys[0] = memalign_max(32, _device.memsize);
     _device.phys[1] = memalign_max(32, _device.memsize);
     _device.phys[2] = memalign_max(32, _device.memsize);
-    //³õÊ¼»¯Æô¶¯Ê¹ÓÃµÚÒ»¸ö»º´æÇø
+    //åˆå§‹åŒ–å¯åŠ¨ä½¿ç”¨ç¬¬ä¸€ä¸ªç¼“å­˜åŒº
     _frame_flg = 0;
+#ifndef RTGUI_USING_HZ_FILE
     rt_memcpy((void *)_device.phys[0],gImage_im,_device.memsize);
+#else
+{
+    FILE *file;
+    if ((file = fopen(rttResFileDir "/logo.bin", "rb")) != NULL)
+    {
+        fread((void *)_device.phys[0], _device.memsize, 1, file);
+        fclose(file);
+    }
+    else
+    {
+        rt_memset((void *)_device.phys[0],0x00,_device.memsize);
+    }
+}
+#endif
     ret = fb_entry.init_panel(RT_DEVICE(&_device),(dma_addr_t)_device.phys[0],_device.memsize,&fb_entry);
     if (ret != 0)
     {
@@ -495,7 +512,7 @@ int lcd_init(void)
     init_timings();
     fb_entry.run_panel();
     fb_entry.blank_panel(0);
-    //ÑÓÊ±Ò»ÏÂÈÃÍ¼Æ¬¼ÓÔØÍê³É
+    //å»¶æ—¶ä¸€ä¸‹è®©å›¾ç‰‡åŠ è½½å®Œæˆ
     for (i=0; i<100; i+=2)
     {
         bl_data.set_bl_intensity(&bl_data,i);

@@ -269,10 +269,8 @@ static rt_err_t touch_device_init(rt_device_t dev)
 }
 static rt_bool_t calibration_after(calculate_data_t*cal)
 {
-    char buf[100];
     FILE *file;
-    sprintf(buf,"%s/pointercal",rttCfgFileDir);
-    if ((file = fopen(buf, "w")) != NULL)
+    if ((file = fopen(rttCfgFileDir "/pointercal", "w")) != NULL)
     { 
         fprintf(file,"%d %d %d %d %d %d %d",cal->x_coord[0],cal->x_coord[1],cal->x_coord[2],
                 cal->y_coord[0],cal->y_coord[1],cal->y_coord[2],cal->scaling);
@@ -333,10 +331,8 @@ int touch_init(void)
     calibration_set_after(calibration_after);
     //读取校验数据
     {
-        char buf[100];
         FILE *file;
-        sprintf(buf,"%s/pointercal",rttCfgFileDir);
-        if ((file = fopen(buf, "r")) != NULL)
+        if ((file = fopen(rttCfgFileDir "/pointercal", "r")) != NULL)
         {
             calculate_data_t data;
             if (fscanf(file,"%d %d %d %d %d %d %d",&data.x_coord[0],&data.x_coord[1],&data.x_coord[2],
