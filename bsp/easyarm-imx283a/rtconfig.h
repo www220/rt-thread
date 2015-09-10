@@ -206,7 +206,7 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 /* use Chinese bitmap font */
 #define RTGUI_USING_HZ_BMP
 /* use small size in RTGUI */
-#define RTGUI_USING_SMALL_SIZE
+/* #define RTGUI_USING_SMALL_SIZE */
 /* use mouse cursor */
 /* #define RTGUI_USING_MOUSE_CURSOR */
 /* default font size in RTGUI */
@@ -222,12 +222,11 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 #define RTGUI_IMAGE_TJPGD
 #define RTGUI_IMAGE_LODEPNG
 #define RTGUI_IMAGE_CONTAINER
+
 #define RTGUI_USING_WINMOVE
 #define RTGUI_USING_NOTEBOOK_IMAGE
 #define RTGUI_USING_DIALOG
 #define RTGUI_USING_APP_SHELL
-
 #define RTGUI_USING_ID_CHECK
-#define RT_USING_TTF
 
 #endif

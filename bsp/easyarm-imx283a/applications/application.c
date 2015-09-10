@@ -255,9 +255,9 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
 #ifdef RT_USING_RTGUI
-    rtgui_system_server_init();
     lcd_init();
     touch_init();
+    rtgui_system_server_init();
     rt_kprintf("RtGUI initialized!\n");
 #endif
 

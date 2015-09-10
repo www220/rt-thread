@@ -343,9 +343,17 @@ int touch_init(void)
                 &data.y_coord[0],&data.y_coord[1],&data.y_coord[2],&data.scaling) == 7)
             {
                 calibration_set_data(&data);
-                rt_kprintf("Load pointercal ok!\n");
+                rt_kprintf("Load pointercal Ok\n");
+            }
+            else
+            {
+                rt_kprintf("Load pointercal Fail\n");
             }
             fclose(file);
+        }
+        else
+        {
+            rt_kprintf("Can't Open pointercal\n");
         }
     }
 
