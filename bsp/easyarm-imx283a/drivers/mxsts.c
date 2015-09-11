@@ -150,16 +150,16 @@ void input_report_abs(int type, int data) { touch_data[type] = data; }
 void input_sync()
 {
     int x,y;
-    //è®¡ç®—åæ ‡ä½ç½®
+    //¼ÆËã×ø±êÎ»ÖÃ
     x = touch_data[ABS_X];
     y = touch_data[ABS_Y];
-    //æŒ‰å‹çŠ¶æ€å‘ç”Ÿäº†å˜åŒ–ï¼Œåªåœ¨å˜åŒ–åå‘é€ï¼Œ
+    //°´Ñ¹×´Ì¬·¢ÉúÁË±ä»¯£¬Ö»ÔÚ±ä»¯ºó·¢ËÍ£¬
     if (touch_data[ABS_PRESSURE] != touch_data[ABS_PRESSURE+1])
     {
         rtgui_touch_post((touch_data[ABS_PRESSURE]?RTGUI_TOUCH_DOWN:RTGUI_TOUCH_UP), x, y);
         touch_data[ABS_PRESSURE+1] = touch_data[ABS_PRESSURE];
     }
-    //æŒ‰å‹çŠ¶æ€æ‰å‘é€ç§»åŠ¨æ¶ˆæ¯ï¼Œä¸æ˜¯é¼ æ ‡
+    //°´Ñ¹×´Ì¬²Å·¢ËÍÒÆ¶¯ÏûÏ¢£¬²»ÊÇÊó±ê
     if (touch_data[ABS_PRESSURE])
     {
         rtgui_touch_post(RTGUI_TOUCH_MOTION, x, y);
@@ -213,9 +213,9 @@ static void process_lradc(struct mxs_ts_info *info, u16 x, u16 y,
 		break;
 
 	case TS_STATE_TOUCH_VERIFY:
-        //æ‰‹æŒ‡ç¦»å¼€çš„æ—¶å€™ä¸è¿›è¡Œè®¡ç®—ï¼Œè¿™æ—¶å€™æ•°æ®å·²ç»ä¸å‡†
+        //ÊÖÖ¸Àë¿ªµÄÊ±ºò²»½øĞĞ¼ÆËã£¬ÕâÊ±ºòÊı¾İÒÑ¾­²»×¼
         if (pressure) {
-            input_report_abs(ABS_Y, info->x); //info->x ååº”yæ–¹å‘çš„å˜åŒ–
+            input_report_abs(ABS_Y, info->x); //info->x ·´Ó¦y·½ÏòµÄ±ä»¯
             input_report_abs(ABS_X, info->y);
         }
 		input_report_abs(ABS_PRESSURE, pressure);
@@ -329,7 +329,7 @@ int touch_init(void)
     rt_device_register(&(info->parent), "touch", RT_DEVICE_FLAG_RDWR);
     rtgui_touch_init(calibration_get_ops());
     calibration_set_after(calibration_after);
-    //è¯»å–æ ¡éªŒæ•°æ®
+    //¶ÁÈ¡Ğ£ÑéÊı¾İ
     {
         FILE *file;
         if ((file = fopen(rttCfgFileDir "/pointercal", "r")) != NULL)

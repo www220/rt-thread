@@ -1409,5 +1409,6 @@ void nand_eraseall()
     }
 }
 FINSH_FUNCTION_EXPORT(nand_eraseall, erase all of block in the nand flash);
+FINSH_FUNCTION_EXPORT_ALIAS(nand_eraseall, __cmd_nand_eraseall,  erase all of block in the nand flash)
 
 #endif //RT_USING_FINSH

@@ -10,9 +10,9 @@
 
 #define strtok_r strtok_s
 
-//ä»â€œtype1â€è½¬æ¢åˆ°â€œtype2â€å¯èƒ½ä¸¢å¤±æ•°æ®
+//´Ó¡°type1¡±×ª»»µ½¡°type2¡±¿ÉÄÜ¶ªÊ§Êı¾İ
 #pragma warning(disable:4244)
-//æœ‰ç¬¦å·/æ— ç¬¦å·ä¸åŒ¹é…
+//ÓĞ·ûºÅ/ÎŞ·ûºÅ²»Æ¥Åä
 #pragma warning(disable:4018)
 #endif
 
@@ -96,6 +96,7 @@
 /* SECTION: finsh, a C-Express shell */
 #define RT_USING_FINSH
 #define FINSH_USING_MSH
+#define FINSH_USING_MSH_DEFAULT
 //#define FINSH_USING_MSH_ONLY
 
 /* Using symbol table */

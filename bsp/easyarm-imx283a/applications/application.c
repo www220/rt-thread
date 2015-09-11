@@ -90,6 +90,10 @@ extern int lcd_init(void);
 extern int touch_init(void);
 #endif
 
+#ifdef FINSH_USING_MSH
+extern int cmd_sh(int argc, char** argv);
+#endif
+
 volatile int eth_wtdog = 0;
 volatile int eth_linkstatus = 0;
 volatile int wtdog_count = 0;
@@ -270,6 +274,13 @@ static void rt_thread_entry_main(void* parameter)
 #ifdef RT_USING_FINSH
     finsh_system_init();
     finsh_set_device(FINSH_DEVICE_NAME);
+#endif
+
+#if defined(FINSH_USING_MSH)
+    {
+    	char * cmd[] = {"sh", rttCfgFileDir "/auto.sh"};
+    	cmd_sh(2, cmd);
+    }
 #endif
 
     while (1)

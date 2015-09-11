@@ -80,13 +80,13 @@ static void bg_gc_func(void *parameter)
 		if (next_urgent)
 			rt_thread_delay(1000);
 		else
-			rt_thread_delay(5000);
+			rt_thread_delay(2000);
 	}
 }
 
 void yaffsfs_LockInit(void)
 {
-    //å·²ç»åˆå§‹åŒ–è¿‡äº†ï¼Œä¸ç”¨é‡å¤åˆå§‹åŒ–
+    //ÒÑ¾­³õÊ¼»¯¹ıÁË£¬²»ÓÃÖØ¸´³õÊ¼»¯
     if (mutex != NULL)
         return;
     
@@ -98,7 +98,7 @@ void yaffsfs_LockInit(void)
     }
 
     rt_thread_init(&thread_gc_func,
-                   "gc_func",
+                   "gc_yfs",
                    bg_gc_func,
                    RT_NULL,
                    &bg_gc_func_stack[0],
