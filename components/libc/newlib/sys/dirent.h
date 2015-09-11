@@ -14,9 +14,9 @@
 #define FT_DIRECTORY	2	/* directory    */
 #define FT_USER			3	/* user defined */
 
-#define DT_UNKNOWN		0x00
-#define DT_REG			0x01
-#define DT_DIR			0x02
+#define DT_UNKNOWN		0
+#define DT_REG			8
+#define DT_DIR			4
 
 #ifdef __cplusplus
 extern "C" {

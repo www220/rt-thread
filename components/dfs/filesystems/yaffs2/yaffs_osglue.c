@@ -97,6 +97,7 @@ void yaffsfs_LockInit(void)
 			"**>> yaffs error :yaffs_LockInit can't get a mutex!");
     }
 
+#if 1
     rt_thread_init(&thread_gc_func,
                    "gc_yfs",
                    bg_gc_func,
@@ -104,6 +105,7 @@ void yaffsfs_LockInit(void)
                    &bg_gc_func_stack[0],
                    sizeof(bg_gc_func_stack),RT_THREAD_PRIORITY_MAX - 2,20);
     rt_thread_startup(&thread_gc_func);
+#endif
 }
 
 u32 yaffsfs_CurrentTime(void)

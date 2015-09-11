@@ -1519,6 +1519,7 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
 		}
 	}
 
+#if 1
     //show scan_chuck
     if (dev->alloc_block > 0) {
         bi = yaffs_get_block_info(dev, dev->alloc_block);
@@ -1534,6 +1535,9 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
             }
         }
     }
+#else
+	yaffs_skip_rest_of_block(dev);
+#endif
 
 	if (alt_block_index)
 		vfree(block_index);

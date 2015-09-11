@@ -37,18 +37,13 @@ typedef unsigned loff_t;
 #ifdef CONFIG_YAFFS_PROVIDE_DEFS
 /* File types */
 
-#ifndef DT_UNKNOWN
+
 #define DT_UNKNOWN	0
-#endif
 #define DT_FIFO		1
 #define DT_CHR		2
-#ifndef DT_DIR
 #define DT_DIR		4
-#endif
 #define DT_BLK		6
-#ifndef DT_REG
 #define DT_REG		8
-#endif
 #define DT_LNK		10
 #define DT_SOCK		12
 #define DT_WHT		14
