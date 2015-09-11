@@ -16,6 +16,7 @@
 //#define ETH_DEBUG
 //#define ETH_RX_DUMP
 //#define ETH_TX_DUMP
+#define STM32_LINK_PRINTF         rt_kprintf
 
 #ifdef ETH_DEBUG
 #define STM32_ETH_PRINTF          rt_kprintf
@@ -676,16 +677,16 @@ static void phy_monitor_thread_entry(void *parameter)
 
     if(phy_addr == 0xFF)
     {
-        STM32_ETH_PRINTF("phy not probe!\r\n");
+        STM32_LINK_PRINTF("phy not probe!\r\n");
         return;
     }
     else
     {
-        STM32_ETH_PRINTF("found a phy, address:0x%02X\r\n", phy_addr);
+        STM32_LINK_PRINTF("found a phy, address:0x%02X\r\n", phy_addr);
     }
 
     /* RESET PHY */
-    STM32_ETH_PRINTF("RESET PHY!\r\n");
+    STM32_LINK_PRINTF("RESET PHY!\r\n");
     ETH_WritePHYRegister(phy_addr, PHY_BCR, PHY_Reset);
     rt_thread_delay(RT_TICK_PER_SECOND * 2);
     ETH_WritePHYRegister(phy_addr, PHY_BCR, PHY_AutoNegotiation);
@@ -729,27 +730,27 @@ static void phy_monitor_thread_entry(void *parameter)
         {
             if(phy_speed_new & PHY_LINK_MASK)
             {
-                STM32_ETH_PRINTF("link up ");
+                STM32_LINK_PRINTF("link up ");
 
                 if(phy_speed_new & PHY_100M_MASK)
                 {
-                    STM32_ETH_PRINTF("100Mbps");
+                    STM32_LINK_PRINTF("100Mbps");
                     stm32_eth_device.ETH_Speed = ETH_Speed_100M;
                 }
                 else
                 {
                     stm32_eth_device.ETH_Speed = ETH_Speed_10M;
-                    STM32_ETH_PRINTF("10Mbps");
+                    STM32_LINK_PRINTF("10Mbps");
                 }
 
                 if(phy_speed_new & PHY_DUPLEX_MASK)
                 {
-                    STM32_ETH_PRINTF(" full-duplex\r\n");
+                    STM32_LINK_PRINTF(" full-duplex\r\n");
                     stm32_eth_device.ETH_Mode = ETH_Mode_FullDuplex;
                 }
                 else
                 {
-                    STM32_ETH_PRINTF(" half-duplex\r\n");
+                    STM32_LINK_PRINTF(" half-duplex\r\n");
                     stm32_eth_device.ETH_Mode = ETH_Mode_HalfDuplex;
                 }
 
@@ -761,7 +762,7 @@ static void phy_monitor_thread_entry(void *parameter)
            } /* link up. */
             else
             {
-                STM32_ETH_PRINTF("link down\r\n");
+                STM32_LINK_PRINTF("link down\r\n");
                 /* send link down. */
                 eth_device_linkchange(&stm32_eth_device.parent, RT_FALSE);
 				/* wtdog eth status */
