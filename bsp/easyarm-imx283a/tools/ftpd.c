@@ -626,7 +626,7 @@ err1:
 				closesocket(session->pasv_sockfd);
 				rt_sprintf(sbuf, "226 Finished.\r\n");
 				send(session->sockfd, sbuf, strlen(sbuf), 0);
-				break;
+				return 0;
 			}
 			else if(numbytes==-1)
 			{
@@ -636,7 +636,10 @@ err1:
 				return -1;
 			}
 		}
+		close(fd);
 		closesocket(session->pasv_sockfd);
+		rt_free(sbuf);
+		return -1;
 	}
 	else if(str_begin_with(buf, "SIZE")==0)
 	{
