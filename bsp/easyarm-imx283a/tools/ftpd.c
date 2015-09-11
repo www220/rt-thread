@@ -469,8 +469,12 @@ int ftp_process_request(struct ftp_session* session, char *buf)
 		int dig1, dig2;
 		int sockfd;
 		int optval = 1;
+		static int pasv_port = 10000;
 
-		session->pasv_port = 10000;
+		//使用一定范围内的端口
+		session->pasv_port = pasv_port;
+		if (++pasv_port > 10100)
+			pasv_port = 10000;
 		session->pasv_active = 1;
 		local.sin_port=htons(session->pasv_port);
 		local.sin_addr.s_addr=INADDR_ANY;
