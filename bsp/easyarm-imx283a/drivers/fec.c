@@ -664,6 +664,11 @@ static void phy_monitor_thread_entry(void *parameter)
         rt_uint32_t i;
         rt_uint16_t temp;
 
+    	pin_gpio_set(PINID_LCD_D16, 0);
+    	rt_thread_delay(100);
+    	pin_gpio_set(PINID_LCD_D16, 1);
+    	rt_thread_delay(100);
+
         for(i=0; i<=0x1F; i++)
         {
             temp = ETH_ReadPHYRegister(i, 0x02);
