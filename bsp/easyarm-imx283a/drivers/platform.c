@@ -191,7 +191,26 @@ int cmd_reboot(int argc, char** argv)
 	return 0;
 }
 
+int cmd_beep(int argc, char** argv)
+{
+	int beep = 100,i;
+	if (argc > 1)
+		beep = atol(argv[1]);
+    for (i=0;i<beep;i++)
+    {
+    	pin_gpio_set(PINID_LCD_D21, 1);
+    	udelay(250);
+    	pin_gpio_set(PINID_LCD_D21, 0);
+    	if (((i%100) == 0) && (i != 0))
+			rt_thread_delay(50);
+		else
+    		udelay(250);
+    }
+	return 0;
+}
+
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_sh, __cmd_sh, Shell the FILEs.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_msleep, __cmd_msleep, Sleep ms.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_reboot, __cmd_reboot, Reboot With WDT.)
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_beep, __cmd_beep, Beep.)
 #endif //FINSH_USING_MSH
