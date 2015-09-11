@@ -192,7 +192,7 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 #define CHECKSUM_GEN_UDP                1
 
 /* SECTION: RT-Thread/GUI */
-#define RT_USING_RTGUI
+//#define RT_USING_RTGUI
 
 /* name length of RTGUI object */
 #define RTGUI_NAME_MAX		12

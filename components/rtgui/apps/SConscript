@@ -6,7 +6,7 @@ import os
 cwd = GetCurrentDir()
 src = Glob('*.c')
 
-group = DefineGroup('RTGUI', src, depend = ['RTGUI_USING_CALI'])
+group = DefineGroup('RTGUI', src, depend = ['RT_USING_RTGUI','RTGUI_USING_CALI'])
 
 for d in os.listdir(cwd):
     path = os.path.join(cwd, d)

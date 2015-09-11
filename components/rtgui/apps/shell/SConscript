@@ -3,6 +3,6 @@ from building import *
 
 src = Glob('*.c')
 
-group = DefineGroup('RTGUI', src, depend = ['RTGUI_USING_APP_SHELL'], CPPPATH=[GetCurrentDir()])
+group = DefineGroup('RTGUI', src, depend = ['RT_USING_RTGUI','RTGUI_USING_APP_SHELL'], CPPPATH=[GetCurrentDir()])
 
 Return('group')
