@@ -30,6 +30,7 @@
 #include "regs-digctl.h"
 #include "regs-timrot.h"
 #include "regs-uartdbg.h"
+#include "regs-uartapp.h"
 #include "regs-clkctrl.h"
 #include "regs-ocotp.h"
 #include "regs-enet.h"
