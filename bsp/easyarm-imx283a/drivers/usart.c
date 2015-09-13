@@ -40,8 +40,8 @@ struct at91_uart {
 
 #if defined(RT_USING_UART1)
 static struct pin_desc uart1_pins_desc[] = {
-	{ PINID_AUART0_RX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 },
-	{ PINID_AUART0_TX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 }
+	{ PINID_AUART0_RX, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_AUART0_TX, PIN_FUN1, PAD_4MA, PAD_3V3, 0 }
 };
 static struct pin_group uart1_pins = {
 	.pins		= uart1_pins_desc,
@@ -51,12 +51,45 @@ static struct pin_group uart1_pins = {
 
 #if defined(RT_USING_UART2)
 static struct pin_desc uart2_pins_desc[] = {
-	{ PINID_AUART1_RX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 },
-	{ PINID_AUART1_TX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 }
+	{ PINID_AUART1_RX, PIN_FUN1, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_AUART1_TX, PIN_FUN1, PAD_4MA, PAD_3V3, 0 }
 };
 static struct pin_group uart2_pins = {
 	.pins		= uart2_pins_desc,
 	.nr_pins	= ARRAY_SIZE(uart2_pins_desc)
+};
+#endif
+
+#if defined(RT_USING_UART3)
+static struct pin_desc uart3_pins_desc[] = {
+	{ PINID_SSP2_SCK, PIN_FUN2, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_SSP2_MOSI, PIN_FUN2, PAD_4MA, PAD_3V3, 0 }
+};
+static struct pin_group uart3_pins = {
+	.pins		= uart3_pins_desc,
+	.nr_pins	= ARRAY_SIZE(uart3_pins_desc)
+};
+#endif
+
+#if defined(RT_USING_UART4)
+static struct pin_desc uart4_pins_desc[] = {
+	{ PINID_SSP2_MISO, PIN_FUN2, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_SSP2_SS0, PIN_FUN2, PAD_4MA, PAD_3V3, 0 }
+};
+static struct pin_group uart4_pins = {
+	.pins		= uart4_pins_desc,
+	.nr_pins	= ARRAY_SIZE(uart4_pins_desc)
+};
+#endif
+
+#if defined(RT_USING_UART5)
+static struct pin_desc uart5_pins_desc[] = {
+	{ PINID_SAIF0_BITCLK, PIN_FUN3, PAD_4MA, PAD_3V3, 0 },
+	{ PINID_SAIF0_SDATA0, PIN_FUN3, PAD_4MA, PAD_3V3, 0 }
+};
+static struct pin_group uart5_pins = {
+	.pins		= uart5_pins_desc,
+	.nr_pins	= ARRAY_SIZE(uart5_pins_desc)
 };
 #endif
 
@@ -93,6 +126,39 @@ struct at91_uart uart2 = {
 };
 #endif
 
+#if defined(RT_USING_UART3)
+static struct rt_serial_device serial_uart3;
+struct at91_uart uart3 = {
+	REGS_UARTAPP2_BASE,
+	IRQ_AUART2,
+	"Uart3",
+	&uart3_pins,
+	&serial_uart3
+};
+#endif
+
+#if defined(RT_USING_UART4)
+static struct rt_serial_device serial_uart4;
+struct at91_uart uart4 = {
+	REGS_UARTAPP3_BASE,
+	IRQ_AUART3,
+	"Uart4",
+	&uart4_pins,
+	&serial_uart4
+};
+#endif
+
+#if defined(RT_USING_UART5)
+static struct rt_serial_device serial_uart5;
+struct at91_uart uart5 = {
+	REGS_UARTAPP4_BASE,
+	IRQ_AUART4,
+	"Uart5",
+	&uart5_pins,
+	&serial_uart5
+};
+#endif
+
 /**
  * This function will handle serial
  */
@@ -114,10 +180,10 @@ void rt_at91_usart_handler(int vector, void *param)
 #endif
     {
     	register rt_uint32_t ir = readl(uart->membase + HW_UARTAPP_INTR);
-    	if (ir & BM_UARTAPP_INTR_TXIS)
+    	if (ir & BM_UARTAPP_INTR_RXIS)
     	{
     		rt_hw_serial_isr((struct rt_serial_device *)uart->dev, RT_SERIAL_EVENT_RX_IND);
-    		writel(BM_UARTAPP_INTR_TXIS, uart->membase + HW_UARTAPP_INTR_CLR);
+    		writel(BM_UARTAPP_INTR_RXIS, uart->membase + HW_UARTAPP_INTR_CLR);
     	}
     }
 }
@@ -160,7 +226,7 @@ static rt_err_t at91_usart_configure(struct rt_serial_device *serial,
     {
     	u32 bm, ctrl, ctrl2, div;
 
-    	ctrl = BM_UARTAPP_LINECTRL_FEN;
+    	ctrl = 0;
     	ctrl2 = readl(uart->membase + HW_UARTAPP_CTRL2);
 
 		div = CONFIG_UART_CLK * 32 / cfg->baud_rate;
@@ -269,7 +335,7 @@ static int at91_usart_putc(struct rt_serial_device *serial, char c)
     	/* Wait for room in TX FIFO */
     	while (readl(uart->membase + HW_UARTAPP_STAT) & BM_UARTAPP_STAT_TXFF) ;
     	/* Write the data byte */
-		writel(c, uart->membase + BP_UARTAPP_DATA_DATA);
+		writel(c, uart->membase + HW_UARTAPP_DATA);
     }
 
     return 1;
@@ -294,8 +360,8 @@ static int at91_usart_getc(struct rt_serial_device *serial)
 #endif
     {
     	/* Read data byte */
-    	if ((readl(uart->membase + HW_UARTAPP_STAT) & BM_UARTAPP_STAT_TXFE) == 0)
-    		result = readl(uart->membase + BP_UARTAPP_DATA_DATA) & 0xff;
+    	if ((readl(uart->membase + HW_UARTAPP_STAT) & BM_UARTAPP_STAT_RXFE) == 0)
+    		result = readl(uart->membase + HW_UARTAPP_DATA) & 0xff;
     }
 
     return result;
@@ -400,5 +466,41 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_uart2, "uart2", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart2);
+#endif
+
+#if defined(RT_USING_UART3)
+    GPIO_Configuration(&uart3);
+
+    serial_uart3.ops = &at91_usart_ops;
+    serial_uart3.config = config;
+
+    NVIC_Configuration(&uart3);
+
+    /* register vcom device */
+    rt_hw_serial_register(&serial_uart3, "uart3", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart3);
+#endif
+
+#if defined(RT_USING_UART4)
+    GPIO_Configuration(&uart4);
+
+    serial_uart4.ops = &at91_usart_ops;
+    serial_uart4.config = config;
+
+    NVIC_Configuration(&uart4);
+
+    /* register vcom device */
+    rt_hw_serial_register(&serial_uart4, "uart4", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart4);
+#endif
+
+#if defined(RT_USING_UART5)
+    GPIO_Configuration(&uart5);
+
+    serial_uart5.ops = &at91_usart_ops;
+    serial_uart5.config = config;
+
+    NVIC_Configuration(&uart5);
+
+    /* register vcom device */
+    rt_hw_serial_register(&serial_uart5, "uart5", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart5);
 #endif
 }
