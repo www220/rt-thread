@@ -74,6 +74,7 @@
 //#define RT_USING_SMALL_MEM
 /* Using SLAB Allocator */
 #define RT_USING_SLAB
+#define RT_SERIAL_RB_BUFSZ 4096
 
 /* Using Libc */
 #define RT_USING_LIBC

@@ -29,14 +29,36 @@
 #include <stdint.h>
 #include "board.h"
 
+#define CONFIG_UART_CLK		24000000
 struct at91_uart {
 	u32 membase;
 	int irq;
 	char* name;
+	struct pin_group* pin;
 	struct rt_serial_device* dev;
 };
 
-#define CONFIG_UART_CLK		24000000
+#if defined(RT_USING_UART1)
+static struct pin_desc uart1_pins_desc[] = {
+	{ PINID_AUART0_RX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 },
+	{ PINID_AUART0_TX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 }
+};
+static struct pin_group uart1_pins = {
+	.pins		= uart1_pins_desc,
+	.nr_pins	= ARRAY_SIZE(uart1_pins_desc)
+};
+#endif
+
+#if defined(RT_USING_UART2)
+static struct pin_desc uart2_pins_desc[] = {
+	{ PINID_AUART1_RX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 },
+	{ PINID_AUART1_TX, PIN_FUN1, PAD_4MA, PAD_3V3, 1 }
+};
+static struct pin_group uart2_pins = {
+	.pins		= uart2_pins_desc,
+	.nr_pins	= ARRAY_SIZE(uart2_pins_desc)
+};
+#endif
 
 #if defined(RT_USING_DBGU)
 static struct rt_serial_device serial_dbgu;
@@ -44,7 +66,30 @@ struct at91_uart dbgu = {
 	REGS_UARTDBG_BASE,
 	IRQ_DUART,
 	"DbgU",
+	0,
 	&serial_dbgu
+};
+#endif
+
+#if defined(RT_USING_UART1)
+static struct rt_serial_device serial_uart1;
+struct at91_uart uart1 = {
+	REGS_UARTAPP0_BASE,
+	IRQ_AUART0,
+	"Uart1",
+	&uart1_pins,
+	&serial_uart1
+};
+#endif
+
+#if defined(RT_USING_UART2)
+static struct rt_serial_device serial_uart2;
+struct at91_uart uart2 = {
+	REGS_UARTAPP1_BASE,
+	IRQ_AUART1,
+	"Uart2",
+	&uart2_pins,
+	&serial_uart2
 };
 #endif
 
@@ -157,7 +202,7 @@ static rt_err_t at91_usart_configure(struct rt_serial_device *serial,
     	writel(ctrl2, uart->membase + HW_UARTAPP_CTRL2);
 
         /* Enable UART */
-    	writel(BM_UARTAPP_CTRL2_UARTEN | BM_UARTAPP_CTRL2_TXE,
+    	writel(BM_UARTAPP_CTRL2_UARTEN | BM_UARTAPP_CTRL2_TXE | BM_UARTAPP_CTRL2_RXE,
     			     uart->membase + HW_UARTAPP_CTRL2_SET);
     	/* Enable UART Irq */
 		writel(BM_UARTAPP_INTR_RXIEN, uart->membase + HW_UARTAPP_INTR_SET);
@@ -221,7 +266,10 @@ static int at91_usart_putc(struct rt_serial_device *serial, char c)
     else
 #endif
     {
-
+    	/* Wait for room in TX FIFO */
+    	while (readl(uart->membase + HW_UARTAPP_STAT) & BM_UARTAPP_STAT_TXFF) ;
+    	/* Write the data byte */
+		writel(c, uart->membase + BP_UARTAPP_DATA_DATA);
     }
 
     return 1;
@@ -245,7 +293,9 @@ static int at91_usart_getc(struct rt_serial_device *serial)
     else
 #endif
     {
-
+    	/* Read data byte */
+    	if ((readl(uart->membase + HW_UARTAPP_STAT) & BM_UARTAPP_STAT_TXFE) == 0)
+    		result = readl(uart->membase + BP_UARTAPP_DATA_DATA) & 0xff;
     }
 
     return result;
@@ -291,6 +341,9 @@ static void GPIO_Configuration(struct at91_uart *uart)
 	else
 #endif
 	{
+	    /* Set up UART pins */
+		pin_set_group(uart->pin);
+		/* Reset HLK */
 		mxs_auart_reset(uart);
 		/* Disable UART */
 		writel(BM_UARTAPP_CTRL2_UARTEN, uart->membase + HW_UARTAPP_CTRL2_SET);
@@ -323,5 +376,29 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_dbgu, "dbgu", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &dbgu);
+#endif
+
+#if defined(RT_USING_UART1)
+    GPIO_Configuration(&uart1);
+
+	serial_uart1.ops = &at91_usart_ops;
+	serial_uart1.config = config;
+
+    NVIC_Configuration(&uart1);
+
+    /* register vcom device */
+    rt_hw_serial_register(&serial_uart1, "uart1", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart1);
+#endif
+
+#if defined(RT_USING_UART2)
+    GPIO_Configuration(&uart2);
+
+    serial_uart2.ops = &at91_usart_ops;
+    serial_uart2.config = config;
+
+    NVIC_Configuration(&uart2);
+
+    /* register vcom device */
+    rt_hw_serial_register(&serial_uart2, "uart2", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart2);
 #endif
 }
