@@ -45,7 +45,11 @@
 #define HEAP_END          0x43F00000
 
 #define RT_USING_DBGU
-//#deiine RT_USING_UART1
+#define RT_USING_UART1
+#define RT_USING_UART2
+//#define RT_USING_UART3
+//#define RT_USING_UART4
+//#define RT_USING_UART5
 
 #define CONSOLE_DEVICE "dbgu"
 #define FINSH_DEVICE_NAME "dbgu"
