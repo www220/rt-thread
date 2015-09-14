@@ -129,7 +129,7 @@
 #define DFS_FD_MAX					20
 
 /* SECTION: sqlite, sql */
-//#define RT_USING_SQLITE
+#define RT_USING_SQLITE3
 #define rttTempFileDir "/tmp"
 #define rttCfgFileDir "/mnt/config"
 #define rttResFileDir "/mnt/resource"

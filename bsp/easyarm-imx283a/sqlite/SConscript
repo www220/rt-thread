@@ -1,0 +1,22 @@
+#
+# File      : SConscript
+# This file is part of RT-Thread RTOS/WebNet Server
+# COPYRIGHT (C) 2011, Shanghai Real-Thread Technology Co., Ltd
+#
+# All rights reserved.
+#
+# Change Logs:
+# Date           Author       Notes
+# 2011-08-02     Bernard      the first version
+#
+
+Import('RTT_ROOT')
+from building import *
+
+cmd = os.path.join(GetCurrentDir(), 'src')
+src	= Glob('src/*.c')
+
+CPPPATH = [cmd]
+group = DefineGroup('Sqlite', src, depend = ['RT_USING_SQLITE3'], CPPPATH = CPPPATH)
+
+Return('group')
