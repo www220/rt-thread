@@ -280,9 +280,6 @@ static int dfs_yaffs_getdents(struct dfs_fd* file,
 		yaffs_d = yaffs_readdir(dir);
 		if (yaffs_d == RT_NULL)
 		{
-			if (yaffsfs_GetLastError() == EBADF)
-				return -DFS_STATUS_EBADF;
-
 			rt_free(file_path);
 			return -1; /* a general error */
 		}

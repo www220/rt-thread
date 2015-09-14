@@ -84,6 +84,10 @@ extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
 #endif
 
+#ifdef RT_USING_SQLITE3
+#include <sqlite3.h>
+#endif
+
 #ifdef RT_USING_RTGUI
 extern int rtgui_system_server_init(void);
 extern int lcd_init(void);
@@ -254,7 +258,7 @@ static void rt_thread_entry_main(void* parameter)
 
     inittmppath();
     rt_thread_idle_sethook(cpu_usage_idle_hook);
-#ifdef RT_USING_SQLITE
+#ifdef RT_USING_SQLITE3
     sqlite3_initialize();
     rt_kprintf("Sqlite3 initialized!\n");
 #endif
