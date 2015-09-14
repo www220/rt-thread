@@ -92,6 +92,7 @@ extern int touch_init(void);
 
 #ifdef FINSH_USING_MSH
 extern int cmd_sh(int argc, char** argv);
+extern int cmd_beep(int argc, char** argv);
 #endif
 
 volatile int eth_wtdog = 0;
@@ -279,7 +280,10 @@ static void rt_thread_entry_main(void* parameter)
 #if defined(FINSH_USING_MSH)
     {
     	char * cmd[] = {"sh", rttCfgFileDir "/auto.sh"};
+    	char * beep[] = {"beep", "200"};
+    	cmd_beep(0,NULL);
     	cmd_sh(2, cmd);
+    	cmd_beep(2,beep);
     }
 #endif
 

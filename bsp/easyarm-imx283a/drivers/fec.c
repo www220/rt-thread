@@ -137,6 +137,7 @@ static void mxc_fec_mii_init(volatile fec_t *fecp)
 {
 	u32 clk = mx28_get_hclk() * 1000000;
 	fecp->mscr = (fecp->mscr & (~0x7E)) | (((clk + 499999) / 5000000) << 1);
+	fecp->mscr <<= 2;
 }
 
 static void fec_reset(struct rt_stm32_eth *dev)
@@ -662,6 +663,11 @@ static void phy_monitor_thread_entry(void *parameter)
     {
         rt_uint32_t i;
         rt_uint16_t temp;
+
+    	pin_gpio_set(PINID_LCD_D16, 0);
+    	rt_thread_delay(100);
+    	pin_gpio_set(PINID_LCD_D16, 1);
+    	rt_thread_delay(100);
 
         for(i=0; i<=0x1F; i++)
         {
