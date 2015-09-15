@@ -14,4 +14,17 @@
 #define O_TEXT          0x0020000
 #define O_DIRECTORY     0x0200000
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <dfs_posix.h>
+
+#define	F_DUPFD		0	/* Duplicate fildes */
+#define	F_GETFD		1	/* Get fildes flags (close on exec) */
+#define	F_SETFD		2	/* Set fildes flags (close on exec) */
+#define	F_GETFL		3	/* Get file flags */
+#define	F_SETFL		4	/* Set file flags */
+
+static inline int fcntl (int fd, int cmd, ...) { return 0; }
+
 #endif
