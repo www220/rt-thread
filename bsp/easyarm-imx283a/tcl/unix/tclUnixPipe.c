@@ -47,8 +47,9 @@ typedef struct PipeState {
 /*
  * Declarations for local functions defined in this file:
  */
-
+#ifndef _RTT
 static int		PipeBlockModeProc(ClientData instanceData, int mode);
+#endif
 static int		PipeClose2Proc(ClientData instanceData,
 			    Tcl_Interp *interp, int flags);
 static int		PipeGetHandleProc(ClientData instanceData,
@@ -78,7 +79,11 @@ static const Tcl_ChannelType pipeChannelType = {
     PipeWatchProc,		/* Initialize notifier. */
     PipeGetHandleProc,		/* Get OS handles out of channel. */
     PipeClose2Proc,		/* close2proc. */
+#ifndef _RTT
     PipeBlockModeProc,		/* Set blocking or non-blocking mode.*/
+#else
+	NULL,
+#endif
     NULL,			/* flush proc. */
     NULL,			/* handler proc. */
     NULL,			/* wide seek proc */
@@ -295,7 +300,7 @@ TclpTempFileNameForLibrary(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 int
 TclpCreatePipe(
     TclFile *readPipe,		/* Location to store file handle for read side
@@ -316,6 +321,7 @@ TclpCreatePipe(
     *writePipe = MakeFile(pipeIds[1]);
     return 1;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -373,7 +379,7 @@ TclpCloseFile(
  *
  *---------------------------------------------------------------------------
  */
-
+#ifndef _RTT
     /* ARGSUSED */
 int
 TclpCreateProcess(
@@ -559,6 +565,7 @@ TclpCreateProcess(
     }
     return TCL_ERROR;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -804,7 +811,7 @@ TclpCreateCommandChannel(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 int
 Tcl_CreatePipe(
     Tcl_Interp *interp,		/* Errors returned in result. */
@@ -830,6 +837,7 @@ Tcl_CreatePipe(
 
     return TCL_OK;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -899,7 +907,7 @@ TclGetAndDetachPids(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 	/* ARGSUSED */
 static int
 PipeBlockModeProc(
@@ -923,6 +931,7 @@ PipeBlockModeProc(
 
     return 0;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------

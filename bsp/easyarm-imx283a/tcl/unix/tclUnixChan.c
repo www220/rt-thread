@@ -95,8 +95,9 @@ typedef struct TtyAttrs {
 /*
  * Static routines for this file:
  */
-
+#ifndef _RTT
 static int		FileBlockModeProc(ClientData instanceData, int mode);
+#endif
 static int		FileCloseProc(ClientData instanceData,
 			    Tcl_Interp *interp);
 static int		FileGetHandleProc(ClientData instanceData,
@@ -145,7 +146,11 @@ static const Tcl_ChannelType fileChannelType = {
     FileWatchProc,		/* Initialize notifier. */
     FileGetHandleProc,		/* Get OS handles out of channel. */
     NULL,			/* close2proc. */
+#ifndef _RTT
     FileBlockModeProc,		/* Set blocking or non-blocking mode.*/
+#else
+    NULL,
+#endif
     NULL,			/* flush proc. */
     NULL,			/* handler proc. */
     FileWideSeekProc,		/* wide seek proc. */
@@ -196,7 +201,7 @@ static const Tcl_ChannelType ttyChannelType = {
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 	/* ARGSUSED */
 static int
 FileBlockModeProc(
@@ -212,6 +217,7 @@ FileBlockModeProc(
 
     return 0;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------

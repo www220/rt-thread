@@ -25,6 +25,7 @@
 #define _RTT
 #define HAVE_UNISTD_H
 #define NO_UNAME
+#define USE_FIONBIO
 #define CFG_RUNTIME_LIBDIR    "."
 #define CFG_RUNTIME_BINDIR    "."
 #define CFG_RUNTIME_SCRDIR    "."
@@ -46,9 +47,12 @@ static inline int chmod(const char *__path, mode_t __mode) { return 0; }
 static inline int chown(const char *__path, uid_t __owner, gid_t __group) { return 0; }
 static inline int mkfifo(const char *__path, mode_t __mode) { return 0; }
 static inline int symlink(const char *__name1, const char *__name2) { return 0; }
-static inline ssize_t readlink(const char *__restrict __path, char *__restrict __buf, size_t __buflen) { return -1; }
+static inline ssize_t readlink(const char *__path, char *__buf, size_t __buflen) { return -1; }
 static inline uid_t getuid(void ) { return 0; }
 #define mknod(x,y,z) 0
+static inline int ftruncate(int fd, off_t off) { return -1; }
+struct hostent *gethostbyaddr(const char *addr, int len, int type);
+int fcntl (int fd, int mode, ...);
 
 /*
  *---------------------------------------------------------------------------

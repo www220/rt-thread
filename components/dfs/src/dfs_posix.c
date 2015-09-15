@@ -841,4 +841,25 @@ char *realpath(const char *path, char *rpath)
 	return rpath;
 }
 RTM_EXPORT(realpath);
+
+int fstatfs(int fildes, struct statfs *buf)
+{
+    struct dfs_fd *d;
+    int ret = -1;
+
+    /* get the fd */
+    d = fd_get(fildes);
+    if (d == RT_NULL)
+    {
+        rt_set_errno(-DFS_STATUS_EBADF);
+        return -1;
+    }
+
+    if (d->fs->ops->statfs != RT_NULL)
+        ret = d->fs->ops->statfs(d->fs, buf);
+
+    fd_put(d);
+    return ret;
+}
+RTM_EXPORT(fstatfs);
 /* @} */

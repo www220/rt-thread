@@ -16,7 +16,21 @@ struct passwd* getpwnam (const char *name) { return NULL; }
 struct group* getgrnam (const char *name) { return NULL; }
 struct passwd* getpwuid (uid_t id) { return NULL; }
 struct group* getgrgid (gid_t id) { return NULL; }
-struct hostent *gethostbyaddr(const char *addr, int len, int type) { return NULL; }
+struct hostent *gethostbyaddr(const char *addr, int len, int type)
+{
+	static struct hostent host;
+	static char hostname[40];
+	struct sockaddr_in addrin;
+	memcpy(&addrin,addr,sizeof(struct sockaddr_in));
+	inet_ntoa_r(addrin,hostname,40);
+
+	host.h_name = hostname;
+	host.h_aliases = NULL;
+	host.h_addrtype = type;
+	host.h_length = len;
+	host.h_addr_list =NULL;
+	return &host;
+}
 int gethostname(char *name, int namelen) { strncpy(name,"rtt",namelen); return 0; }
 int getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host,
 		size_t hostlen, char *serv, size_t servlen, int flags)
@@ -26,11 +40,18 @@ int getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host,
 		memcpy(&addr,sa,salen);
 	else
 		return -1;
+
 	if (host && hostlen>0)
 		inet_ntoa_r(addr,host,hostlen);
 	if (serv && servlen>0)
 		snprintf(serv,servlen,"%d",ntohs(addr.sin_port));
 	return 0;
+}
+int fcntl (int fd, int mode, ...)
+{
+	if (mode == F_SETFD || mode == F_GETFD)
+		return 0;
+	return -1;
 }
 
 /*
