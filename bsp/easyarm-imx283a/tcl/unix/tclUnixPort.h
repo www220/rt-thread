@@ -34,7 +34,9 @@
 #define CFG_INSTALL_SCRDIR    "."
 #define CFG_INSTALL_INCDIR    "."
 #define CFG_INSTALL_DOCDIR    "."
-#define TCL_CFGVAL_ENCODING "cp2123"
+#define TCL_CFGVAL_ENCODING "iso8859-1"
+#define TCL_LIBRARY    "."
+#define TCL_PACKAGE_PATH    "."
 
 
 /*

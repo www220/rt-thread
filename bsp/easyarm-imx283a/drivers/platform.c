@@ -209,8 +209,39 @@ int cmd_beep(int argc, char** argv)
 	return 0;
 }
 
+#include "tcl.h"
+int cmd_tcl(int argc, char** argv)
+{
+    Tcl_Interp *interp;
+    
+    if (argc < 2)
+    {
+        rt_kprintf("Usage: tcl tcl file name\n");
+        return -1;
+    }
+    
+    Tcl_FindExecutable(argv[0]);
+    Tcl_SetSystemEncoding(NULL, "utf-8");
+    
+    interp = Tcl_CreateInterp();
+    Tcl_SetVar(interp,"argc", "0", TCL_GLOBAL_ONLY);
+    Tcl_SetVar(interp,"argv0",argv[1],TCL_GLOBAL_ONLY);
+    Tcl_SetVar(interp,"argv", "", TCL_GLOBAL_ONLY);
+    
+    if (Tcl_EvalFile(interp, argv[1])!=TCL_OK)
+    {
+        const char *zInfo = Tcl_GetVar(interp, "errorInfo", TCL_GLOBAL_ONLY);
+        if( zInfo==0 ) 
+            zInfo = Tcl_GetStringResult(interp);
+        rt_kprintf("%s: %s\n", *argv, zInfo);
+        return 1;
+    }
+    return 0;
+}
+
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_sh, __cmd_sh, Shell the FILEs.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_msleep, __cmd_msleep, Sleep ms.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_reboot, __cmd_reboot, Reboot With WDT.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_beep, __cmd_beep, Beep.)
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_tcl, __cmd_tcl, TCL.)
 #endif //FINSH_USING_MSH

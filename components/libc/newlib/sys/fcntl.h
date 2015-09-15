@@ -25,6 +25,11 @@
 #define	F_GETFL		3	/* Get file flags */
 #define	F_SETFL		4	/* Set file flags */
 
-static inline int fcntl (int fd, int cmd, ...) { return 0; }
+static inline int fcntl (int fd, int cmd, ...)
+{
+	if ((cmd == F_GETFD) || (cmd == F_SETFD))
+		return 0;
+	return -1;
+}
 
 #endif
