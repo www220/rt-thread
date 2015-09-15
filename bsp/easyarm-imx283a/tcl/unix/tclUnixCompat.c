@@ -156,8 +156,11 @@ TclUnixSetBlockingMode(
     return fcntl(fd, F_SETFL, flags);
 #else /* USE_FIONBIO */
     int state = (mode == TCL_MODE_NONBLOCKING);
-
+#ifndef _RTT
     return ioctl(fd, FIONBIO, &state);
+#else
+    return lwip_ioctl(fd, FIONBIO, &state);
+#endif
 #endif /* !USE_FIONBIO */
 }
 

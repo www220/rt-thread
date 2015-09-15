@@ -885,7 +885,7 @@ Tcl_EofObjCmd(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 	/* ARGSUSED */
 int
 Tcl_ExecObjCmd(
@@ -1035,6 +1035,7 @@ Tcl_ExecObjCmd(
 
     return result;
 }
+#endif
 
 /*
  *---------------------------------------------------------------------------
@@ -1100,7 +1101,7 @@ Tcl_FblockedObjCmd(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 	/* ARGSUSED */
 int
 Tcl_OpenObjCmd(
@@ -1203,6 +1204,7 @@ Tcl_OpenObjCmd(
     Tcl_SetObjResult(interp, Tcl_NewStringObj(Tcl_GetChannelName(chan), -1));
     return TCL_OK;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -1879,7 +1881,7 @@ ChanTruncateObjCmd(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 static int
 ChanPipeObjCmd(
     ClientData dummy,		/* Not used. */
@@ -1912,6 +1914,7 @@ ChanPipeObjCmd(
 
     return TCL_OK;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -1985,7 +1988,9 @@ TclInitChanCmd(
 	{"gets",	Tcl_GetsObjCmd,		TclCompileBasic1Or2ArgCmd, NULL, NULL, 0},
 	{"names",	TclChannelNamesCmd,	TclCompileBasic0Or1ArgCmd, NULL, NULL, 0},
 	{"pending",	ChanPendingObjCmd,	TclCompileBasic2ArgCmd, NULL, NULL, 0},		/* TIP #287 */
+#ifndef _RTT
 	{"pipe",	ChanPipeObjCmd,		TclCompileBasic0ArgCmd, NULL, NULL, 0},		/* TIP #304 */
+#endif
 	{"pop",		TclChanPopObjCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},		/* TIP #230 */
 	{"postevent",	TclChanPostEventObjCmd,	TclCompileBasic2ArgCmd, NULL, NULL, 0},	/* TIP #219 */
 	{"push",	TclChanPushObjCmd,	TclCompileBasic2ArgCmd, NULL, NULL, 0},		/* TIP #230 */

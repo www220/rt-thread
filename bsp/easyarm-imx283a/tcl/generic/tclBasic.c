@@ -270,7 +270,9 @@ static const CmdInfo builtInCmds[] = {
     {"close",		Tcl_CloseObjCmd,	NULL,			NULL,	CMD_IS_SAFE},
     {"eof",		Tcl_EofObjCmd,		NULL,			NULL,	CMD_IS_SAFE},
     {"encoding",	Tcl_EncodingObjCmd,	NULL,			NULL,	0},
+#ifndef _RTT
     {"exec",		Tcl_ExecObjCmd,		NULL,			NULL,	0},
+#endif
     {"exit",		Tcl_ExitObjCmd,		NULL,			NULL,	0},
     {"fblocked",	Tcl_FblockedObjCmd,	NULL,			NULL,	CMD_IS_SAFE},
     {"fconfigure",	Tcl_FconfigureObjCmd,	NULL,			NULL,	0},
@@ -280,8 +282,10 @@ static const CmdInfo builtInCmds[] = {
     {"gets",		Tcl_GetsObjCmd,		NULL,			NULL,	CMD_IS_SAFE},
     {"glob",		Tcl_GlobObjCmd,		NULL,			NULL,	0},
     {"load",		Tcl_LoadObjCmd,		NULL,			NULL,	0},
+#ifndef _RTT
     {"open",		Tcl_OpenObjCmd,		NULL,			NULL,	0},
     {"pid",		Tcl_PidObjCmd,		NULL,			NULL,	CMD_IS_SAFE},
+#endif
     {"puts",		Tcl_PutsObjCmd,		NULL,			NULL,	CMD_IS_SAFE},
     {"pwd",		Tcl_PwdObjCmd,		NULL,			NULL,	0},
     {"read",		Tcl_ReadObjCmd,		NULL,			NULL,	CMD_IS_SAFE},

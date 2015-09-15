@@ -313,11 +313,19 @@ static const TclIntStubs tclIntStubs = {
     0, /* 2 */
     TclAllocateFreeObjects, /* 3 */
     0, /* 4 */
+#ifndef _RTT
     TclCleanupChildren, /* 5 */
+#else
+    0,
+#endif
     TclCleanupCommand, /* 6 */
     TclCopyAndCollapse, /* 7 */
     TclCopyChannelOld, /* 8 */
+#ifndef _RTT
     TclCreatePipeline, /* 9 */
+#else
+    0,
+#endif
     TclCreateProc, /* 10 */
     TclDeleteCompiledLocalVars, /* 11 */
     TclDeleteVars, /* 12 */
@@ -566,11 +574,20 @@ static const TclIntPlatStubs tclIntPlatStubs = {
     TCL_STUB_MAGIC,
     0,
 #if !defined(_WIN32) && !defined(__CYGWIN__) && !defined(MAC_OSX_TCL) /* UNIX */
+#ifndef _RTT
     TclGetAndDetachPids, /* 0 */
+#else
+    0,
+#endif
     TclpCloseFile, /* 1 */
     TclpCreateCommandChannel, /* 2 */
+#ifndef _RTT
     TclpCreatePipe, /* 3 */
     TclpCreateProcess, /* 4 */
+#else
+    0,
+    0,
+#endif
     0, /* 5 */
     TclpMakeFile, /* 6 */
     TclpOpenFile, /* 7 */
@@ -884,7 +901,11 @@ const TclStubs tclStubs = {
     Tcl_DeleteHashEntry, /* 108 */
     Tcl_DeleteHashTable, /* 109 */
     Tcl_DeleteInterp, /* 110 */
+#ifndef _RTT
     Tcl_DetachPids, /* 111 */
+#else
+    0,
+#endif
     Tcl_DeleteTimerHandler, /* 112 */
     Tcl_DeleteTrace, /* 113 */
     Tcl_DontCallWhenDeleted, /* 114 */
@@ -978,7 +999,11 @@ const TclStubs tclStubs = {
     Tcl_NotifyChannel, /* 194 */
     Tcl_ObjGetVar2, /* 195 */
     Tcl_ObjSetVar2, /* 196 */
+#ifndef _RTT
     Tcl_OpenCommandChannel, /* 197 */
+#else
+    0,
+#endif
     Tcl_OpenFileChannel, /* 198 */
     Tcl_OpenTcpClient, /* 199 */
     Tcl_OpenTcpServer, /* 200 */
@@ -988,7 +1013,11 @@ const TclStubs tclStubs = {
     Tcl_PosixError, /* 204 */
     Tcl_QueueEvent, /* 205 */
     Tcl_Read, /* 206 */
+#ifndef _RTT
     Tcl_ReapDetachedProcs, /* 207 */
+#else
+    0,
+#endif
     Tcl_RecordAndEval, /* 208 */
     Tcl_RecordAndEvalObj, /* 209 */
     Tcl_RegisterChannel, /* 210 */
@@ -1058,7 +1087,11 @@ const TclStubs tclStubs = {
     Tcl_PkgRequire, /* 274 */
     Tcl_SetErrorCodeVA, /* 275 */
     Tcl_VarEvalVA, /* 276 */
+#ifndef _RTT
     Tcl_WaitPid, /* 277 */
+#else
+    0,
+#endif
     Tcl_PanicVA, /* 278 */
     Tcl_GetVersion, /* 279 */
     Tcl_InitMemory, /* 280 */
@@ -1363,7 +1396,11 @@ const TclStubs tclStubs = {
     Tcl_AppendPrintfToObj, /* 579 */
     Tcl_CancelEval, /* 580 */
     Tcl_Canceled, /* 581 */
+#ifndef _RTT
     Tcl_CreatePipe, /* 582 */
+#else
+    0,
+#endif
     Tcl_NRCreateCommand, /* 583 */
     Tcl_NREvalObj, /* 584 */
     Tcl_NREvalObjv, /* 585 */

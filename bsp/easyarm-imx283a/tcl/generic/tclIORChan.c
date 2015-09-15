@@ -753,7 +753,7 @@ typedef struct ReflectEvent {
     ReflectedChannel *rcPtr;
     int events;
 } ReflectEvent;
-
+#ifdef TCL_THREADS
 static int
 ReflectEventRun(
     Tcl_Event *ev,
@@ -791,7 +791,7 @@ ReflectEventDelete(
     }
     return 1;
 }
-
+#endif
 int
 TclChanPostEventObjCmd(
     ClientData clientData,

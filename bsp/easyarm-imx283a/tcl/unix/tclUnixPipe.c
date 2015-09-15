@@ -49,9 +49,9 @@ typedef struct PipeState {
  */
 #ifndef _RTT
 static int		PipeBlockModeProc(ClientData instanceData, int mode);
-#endif
 static int		PipeClose2Proc(ClientData instanceData,
 			    Tcl_Interp *interp, int flags);
+#endif
 static int		PipeGetHandleProc(ClientData instanceData,
 			    int direction, ClientData *handlePtr);
 static int		PipeInputProc(ClientData instanceData, char *buf,
@@ -59,9 +59,10 @@ static int		PipeInputProc(ClientData instanceData, char *buf,
 static int		PipeOutputProc(ClientData instanceData,
 			    const char *buf, int toWrite, int *errorCode);
 static void		PipeWatchProc(ClientData instanceData, int mask);
+#ifndef _RTT
 static void		RestoreSignals(void);
 static int		SetupStdFile(TclFile file, int type);
-
+#endif
 /*
  * This structure describes the channel type structure for command pipe based
  * I/O:
@@ -78,8 +79,8 @@ static const Tcl_ChannelType pipeChannelType = {
     NULL,			/* Get option proc. */
     PipeWatchProc,		/* Initialize notifier. */
     PipeGetHandleProc,		/* Get OS handles out of channel. */
-    PipeClose2Proc,		/* close2proc. */
 #ifndef _RTT
+    PipeClose2Proc,		/* close2proc. */
     PipeBlockModeProc,		/* Set blocking or non-blocking mode.*/
 #else
 	NULL,
@@ -584,7 +585,7 @@ TclpCreateProcess(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 static void
 RestoreSignals(void)
 {
@@ -719,6 +720,7 @@ SetupStdFile(
     }
     return 1;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -857,7 +859,7 @@ Tcl_CreatePipe(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 void
 TclGetAndDetachPids(
     Tcl_Interp *interp,		/* Interpreter to append the PIDs to. */
@@ -890,6 +892,7 @@ TclGetAndDetachPids(
 	pipePtr->numPids = 0;
     }
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -949,7 +952,7 @@ PipeBlockModeProc(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 static int
 PipeClose2Proc(
     ClientData instanceData,	/* The pipe to close. */
@@ -1026,6 +1029,7 @@ PipeClose2Proc(
     }
     return errorCode;
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -1223,7 +1227,7 @@ PipeGetHandleProc(
  *
  *----------------------------------------------------------------------
  */
-
+#ifndef _RTT
 Tcl_Pid
 Tcl_WaitPid(
     Tcl_Pid pid,
@@ -1240,6 +1244,7 @@ Tcl_WaitPid(
 	}
     }
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
