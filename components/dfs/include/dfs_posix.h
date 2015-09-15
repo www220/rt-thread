@@ -126,6 +126,7 @@ int rename(const char *from, const char *to);
 int unlink(const char *pathname);
 int stat(const char *file, struct stat *buf);
 int fstat(int fildes, struct stat *buf);
+int lstat(const char *path, struct stat *buf);
 int statfs(const char *path, struct statfs *buf);
 
 /* directory api*/

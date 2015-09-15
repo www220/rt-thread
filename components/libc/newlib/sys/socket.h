@@ -38,16 +38,28 @@ struct  servent {
         char    * s_proto;          /* protocol to use */
 };
 
-struct in_addr6 {
-  u32_t s6_addr[4];
+struct in6_addr {
+    union {
+		uint8_t	__u6_addr8[16];
+		uint16_t __u6_addr16[8];
+		uint32_t __u6_addr32[4];
+    } __in6_u;
+#define s6_addr			__in6_u.__u6_addr8
+# define s6_addr16		__in6_u.__u6_addr16
+# define s6_addr32		__in6_u.__u6_addr32
 };
+
+extern const struct in6_addr in6addr_any;        /* :: */
+extern const struct in6_addr in6addr_loopback;   /* ::1 */
+#define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
+#define IN6ADDR_LOOPBACK_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 
 struct sockaddr_in6 {
   u8_t sin_len;
   u8_t sin_family;
   u16_t sin6_port;
   u32_t sin6_flowinfo;
-  struct in_addr6 sin6_addr;
+  struct in6_addr sin6_addr;
   u32_t sin6_scope_id;
 };
 
@@ -56,6 +68,45 @@ struct sockaddr_storage {
   u8_t sin_family;
   u8_t padding[128];
 };
+
+#define IN6_IS_ADDR_UNSPECIFIED(a) \
+	(((__const uint32_t *) (a))[0] == 0				      \
+	 && ((__const uint32_t *) (a))[1] == 0				      \
+	 && ((__const uint32_t *) (a))[2] == 0				      \
+	 && ((__const uint32_t *) (a))[3] == 0)
+
+#define IN6_IS_ADDR_LOOPBACK(a) \
+	(((__const uint32_t *) (a))[0] == 0				      \
+	 && ((__const uint32_t *) (a))[1] == 0				      \
+	 && ((__const uint32_t *) (a))[2] == 0				      \
+	 && ((__const uint32_t *) (a))[3] == htonl (1))
+
+#define IN6_IS_ADDR_MULTICAST(a) (((__const uint8_t *) (a))[0] == 0xff)
+
+#define IN6_IS_ADDR_LINKLOCAL(a) \
+	((((__const uint32_t *) (a))[0] & htonl (0xffc00000))		      \
+	 == htonl (0xfe800000))
+
+#define IN6_IS_ADDR_SITELOCAL(a) \
+	((((__const uint32_t *) (a))[0] & htonl (0xffc00000))		      \
+	 == htonl (0xfec00000))
+
+#define IN6_IS_ADDR_V4MAPPED(a) \
+	((((__const uint32_t *) (a))[0] == 0)				      \
+	 && (((__const uint32_t *) (a))[1] == 0)			      \
+	 && (((__const uint32_t *) (a))[2] == htonl (0xffff)))
+
+#define IN6_IS_ADDR_V4COMPAT(a) \
+	((((__const uint32_t *) (a))[0] == 0)				      \
+	 && (((__const uint32_t *) (a))[1] == 0)			      \
+	 && (((__const uint32_t *) (a))[2] == 0)			      \
+	 && (ntohl (((__const uint32_t *) (a))[3]) > 1))
+
+#define IN6_ARE_ADDR_EQUAL(a,b) \
+	((((__const uint32_t *) (a))[0] == ((__const uint32_t *) (b))[0])     \
+	 && (((__const uint32_t *) (a))[1] == ((__const uint32_t *) (b))[1])  \
+	 && (((__const uint32_t *) (a))[2] == ((__const uint32_t *) (b))[2])  \
+	 && (((__const uint32_t *) (a))[3] == ((__const uint32_t *) (b))[3]))
 
 #define AI_PASSIVE                  0x00000001  // Socket address will be used in bind() call
 #define AI_CANONNAME                0x00000002  // Return canonical name in first ai_canonname

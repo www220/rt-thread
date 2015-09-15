@@ -1,6 +1,7 @@
 #include <reent.h>
 #include <sys/errno.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <rtthread.h>
 
 #ifdef RT_USING_DFS
@@ -452,4 +453,46 @@ int*
 __errno(void)
 {
 	return _rt_errno();
+}
+
+uid_t
+geteuid(void)
+{
+	return 0;
+}
+
+int chown(const char *__path, uid_t __owner, gid_t __group)
+{
+	return 0;
+}
+
+int chmod(const char *__path, mode_t __mode)
+{
+	return 0;
+}
+
+#include <pwd.h>
+struct passwd *
+getpwnam(const char *name)
+{
+	return 0;
+}
+
+struct passwd *
+getpwuid(uid_t id)
+{
+	return 0;
+}
+
+#include <grp.h>
+struct group*
+getgrgid(gid_t id)
+{
+	return 0;
+}
+
+struct group *
+getgrnam(const char *name)
+{
+	return 0;
 }

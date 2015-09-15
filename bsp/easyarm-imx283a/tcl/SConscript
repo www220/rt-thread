@@ -22,6 +22,16 @@ src = generic
 src += libtommath
 src += unix
 
+src_rm = Split("""
+generic/regc_color.c
+generic/regc_cvec.c
+generic/regc_lex.c
+generic/regc_locale.c
+generic/regc_nfa.c
+generic/rege_dfa.c
+""")
+SrcRemove(src, src_rm)
+
 CPPPATH = [cmd+'/generic', cmd+'/libtommath', cmd+'/unix']
 group = DefineGroup('Sqlite', src, depend = ['RT_USING_SQLITE3'], CPPPATH = CPPPATH)
 

@@ -31,6 +31,15 @@ extern "C" {
 
 #include <lwip/netdb.h>
 
+#  define NI_MAXHOST      1025
+#  define NI_MAXSERV      32
+
+# define NI_NUMERICHOST	1	/* Don't try to look up hostname.  */
+# define NI_NUMERICSERV 2	/* Don't convert port number to name.  */
+# define NI_NOFQDN	4	/* Only return nodename portion.  */
+# define NI_NAMEREQD	8	/* Don't return numeric addresses.  */
+# define NI_DGRAM	16	/* Look up UDP service rather than TCP.  */
+
 static inline const char *gai_strerror(int ecode) { return "errno"; }
 
 #ifdef __cplusplus

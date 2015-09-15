@@ -816,4 +816,26 @@ char *getcwd(char *buf, size_t size)
 }
 RTM_EXPORT(getcwd);
 
+/**
+ * this function is a POSIX compliant version, which will return the
+ * information about a mounted file system.
+ *
+ * @param path the path which mounted file system.
+ * @param buf the buffer to save the returned information.
+ *
+ * @return 0 on successful, others on failed.
+ */
+int lstat(const char *path, struct stat *buf)
+{
+    int result,fd;
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0)
+    	return -1;
+    result = fstat(fd,buf);
+    close(result);
+
+    return result;
+}
+RTM_EXPORT(lstat);
 /* @} */
