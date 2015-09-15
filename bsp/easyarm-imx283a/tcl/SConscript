@@ -23,12 +23,13 @@ src += libtommath
 src += unix
 
 src_rm = Split("""
-generic/regc_color.c
-generic/regc_cvec.c
-generic/regc_lex.c
-generic/regc_locale.c
-generic/regc_nfa.c
-generic/rege_dfa.c
+regc_color.c
+regc_cvec.c
+regc_lex.c
+regc_locale.c
+regc_nfa.c
+rege_dfa.c
+regfronts.c
 """)
 SrcRemove(src, src_rm)
 

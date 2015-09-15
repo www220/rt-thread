@@ -22,6 +22,7 @@
 #ifndef _TCLUNIXPORT
 #define _TCLUNIXPORT
 
+#define _RTT
 #define HAVE_UNISTD_H
 #define NO_UNAME
 #define CFG_RUNTIME_LIBDIR    "."

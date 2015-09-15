@@ -611,7 +611,7 @@ TclpGetHostByName(
  *
  *---------------------------------------------------------------------------
  */
-
+#ifndef _RTT
 struct hostent *
 TclpGetHostByAddr(
     const char *addr,
@@ -657,6 +657,7 @@ TclpGetHostByAddr(
     return NULL;		/* Not reached. */
 #endif /* TCL_THREADS */
 }
+#endif
 
 /*
  *---------------------------------------------------------------------------
