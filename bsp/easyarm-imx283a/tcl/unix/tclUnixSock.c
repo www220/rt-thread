@@ -12,6 +12,26 @@
 #include "tclInt.h"
 const struct in6_addr in6addr_any=IN6ADDR_ANY_INIT;
 const struct in6_addr in6addr_loopback=IN6ADDR_LOOPBACK_INIT;
+struct passwd* getpwnam (const char *name) { return NULL; }
+struct group* getgrnam (const char *name) { return NULL; }
+struct passwd* getpwuid (uid_t id) { return NULL; }
+struct group* getgrgid (gid_t id) { return NULL; }
+struct hostent *gethostbyaddr(const char *addr, int len, int type) { return NULL; }
+int gethostname(char *name, int namelen) { strncpy(name,"rtt",namelen); return 0; }
+int getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host,
+		size_t hostlen, char *serv, size_t servlen, int flags)
+{
+	struct sockaddr_in addr;
+	if (salen == sizeof(struct sockaddr_in))
+		memcpy(&addr,sa,salen);
+	else
+		return -1;
+	if (host && hostlen>0)
+		inet_ntoa_r(addr,host,hostlen);
+	if (serv && servlen>0)
+		snprintf(serv,servlen,"%d",ntohs(addr.sin_port));
+	return 0;
+}
 
 /*
  * Helper macros to make parts of this file clearer. The macros do exactly

@@ -39,6 +39,16 @@
 #define TCL_LIBRARY    "."
 #define TCL_PACKAGE_PATH    "."
 
+#include <sys/types.h>
+#define utime(x,y) 0
+static inline mode_t umask(mode_t __mask) { return 0; }
+static inline int chmod(const char *__path, mode_t __mode) { return 0; }
+static inline int chown(const char *__path, uid_t __owner, gid_t __group) { return 0; }
+static inline int mkfifo(const char *__path, mode_t __mode) { return 0; }
+static inline int symlink(const char *__name1, const char *__name2) { return 0; }
+static inline ssize_t readlink(const char *__restrict __path, char *__restrict __buf, size_t __buflen) { return -1; }
+static inline uid_t getuid(void ) { return 0; }
+#define mknod(x,y,z) 0
 
 /*
  *---------------------------------------------------------------------------

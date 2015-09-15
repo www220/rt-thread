@@ -489,7 +489,7 @@ DoCopyFile(
     }
 
     switch ((int) (statBufPtr->st_mode & S_IFMT)) {
-#ifndef _RTT
+#ifndef DJGPP
     case S_IFLNK: {
 	char linkBuf[MAXPATHLEN+1];
 	int length;
@@ -508,6 +508,7 @@ DoCopyFile(
 #endif
 	break;
     }
+#endif /* !DJGPP */
     case S_IFBLK:
     case S_IFCHR:
 	if (mknod(dst, statBufPtr->st_mode,		/* INTL: Native. */
@@ -520,7 +521,6 @@ DoCopyFile(
 	    return TCL_ERROR;
 	}
 	return CopyFileAtts(src, dst, statBufPtr);
-#endif /* !_RTT */
     default:
 	return TclUnixCopyFile(src, dst, statBufPtr, 0);
     }

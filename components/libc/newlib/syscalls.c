@@ -72,9 +72,7 @@ _isatty_r(struct _reent *ptr, int fd)
 {
 	if (fd >=0 && fd < 3) return 1;
 
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
+	return 0;
 }
 
 int
@@ -455,3 +453,10 @@ __errno(void)
 	return _rt_errno();
 }
 
+int
+_isatty(int fd)
+{
+	if (fd >=0 && fd < 3) return 1;
+
+	return 0;
+}
