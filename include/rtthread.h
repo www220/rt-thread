@@ -492,7 +492,6 @@ rt_device_t rt_console_get_device(void);
 rt_err_t rt_get_errno(void);
 void rt_set_errno(rt_err_t no);
 int *_rt_errno(void);
-int *_rt_errno2(void);
 #ifndef RT_USING_NEWLIB
 #ifndef errno
 #define errno    *_rt_errno()

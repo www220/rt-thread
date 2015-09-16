@@ -450,7 +450,8 @@ _system(const char *s)
 int*
 __errno(void)
 {
-	return _rt_errno2();
+	static volatile int gun_errno;
+	return (int *)&gun_errno;
 }
 
 int
