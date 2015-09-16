@@ -209,6 +209,7 @@ int cmd_beep(int argc, char** argv)
 	return 0;
 }
 
+#ifdef RT_USING_TCLSHELL
 #include "tcl.h"
 int cmd_tcl(int argc, char** argv)
 {
@@ -241,10 +242,11 @@ int cmd_tcl(int argc, char** argv)
     Tcl_DeleteInterp(interp);
     return ret;
 }
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_tcl, __cmd_tcl, TCL.)
+#endif
 
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_sh, __cmd_sh, Shell the FILEs.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_msleep, __cmd_msleep, Sleep ms.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_reboot, __cmd_reboot, Reboot With WDT.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_beep, __cmd_beep, Beep.)
-FINSH_FUNCTION_EXPORT_ALIAS(cmd_tcl, __cmd_tcl, TCL.)
 #endif //FINSH_USING_MSH

@@ -35,6 +35,6 @@ tclPipe.c
 SrcRemove(src, src_rm)
 
 CPPPATH = [cmd+'/generic', cmd+'/libtommath', cmd+'/unix']
-group = DefineGroup('Sqlite', src, depend = ['RT_USING_SQLITE3'], CPPPATH = CPPPATH)
+group = DefineGroup('TclShell', src, depend = ['RT_USING_TCLSHELL'], CPPPATH = CPPPATH)
 
 Return('group')

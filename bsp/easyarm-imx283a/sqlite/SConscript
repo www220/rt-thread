@@ -16,6 +16,13 @@ from building import *
 cmd = os.path.join(GetCurrentDir(), 'src')
 src	= Glob('src/*.c')
 
+src_rm = Split("""
+tcltest.c
+""")
+
+if GetDepend('RT_USING_TCLSHELL') == False:
+    SrcRemove(src, src_rm)
+
 CPPPATH = [cmd]
 group = DefineGroup('Sqlite', src, depend = ['RT_USING_SQLITE3'], CPPPATH = CPPPATH)
 
