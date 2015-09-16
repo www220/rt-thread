@@ -30,6 +30,7 @@ regc_locale.c
 regc_nfa.c
 rege_dfa.c
 regfronts.c
+tclPipe.c
 """)
 SrcRemove(src, src_rm)
 

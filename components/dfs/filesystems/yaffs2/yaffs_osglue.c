@@ -65,12 +65,15 @@ static void bg_gc_func(void *parameter)
 		next_urgent = 0;
 
 		while ((dev = (struct yaffs_dev*)yaffs_next_dev()) != NULL) {
+			unsigned int gc_count;
             yaffsfs_Lock();
-			result = yaffs_bg_gc(dev, urgent);
+            gc_count = dev->bg_gcs;
+			yaffs_bg_gc(dev, urgent);
             erased_chunks = dev->n_erased_blocks * dev->param.chunks_per_block;
             free_chunks = dev->n_free_chunks;
+            result = (gc_count != dev->bg_gcs);
             yaffsfs_Unlock();
-			if (result <= 0)
+			if (result)
 				next_urgent = 1;
             yaffs_trace(YAFFS_TRACE_GC, "GC erased %d free %d next %d", 
                         erased_chunks, free_chunks, next_urgent);
@@ -80,7 +83,7 @@ static void bg_gc_func(void *parameter)
 		if (next_urgent)
 			rt_thread_delay(1000);
 		else
-			rt_thread_delay(2000);
+			rt_thread_delay(60000);
 	}
 }
 

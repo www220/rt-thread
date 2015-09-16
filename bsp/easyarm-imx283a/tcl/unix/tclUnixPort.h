@@ -53,7 +53,7 @@ static inline uid_t getuid(void ) { return 0; }
 static inline int ftruncate(int fd, off_t off) { return -1; }
 struct hostent *gethostbyaddr(const char *addr, int len, int type);
 int fcntl (int fd, int mode, ...);
-
+
 /*
  *---------------------------------------------------------------------------
  * The following sets of #includes and #ifdefs are required to get Tcl to

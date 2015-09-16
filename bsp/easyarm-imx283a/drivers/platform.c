@@ -196,7 +196,7 @@ int cmd_beep(int argc, char** argv)
 	int beep = 100,i;
 	if (argc > 1)
 		beep = atol(argv[1]);
-    for (i=0;i<beep;i++)
+    for (i=0;i<beep && 0;i++)
     {
     	pin_gpio_set(PINID_LCD_D21, 1);
     	udelay(250);

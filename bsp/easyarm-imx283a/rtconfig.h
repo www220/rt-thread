@@ -17,7 +17,7 @@
 #endif
 
 /* RT_NAME_MAX*/
-#define RT_NAME_MAX	   8
+#define RT_NAME_MAX	   16
 
 /* RT_ALIGN_SIZE*/
 #define RT_ALIGN_SIZE	4
@@ -92,7 +92,7 @@
 /* SECTION: Console options */
 #define RT_USING_CONSOLE
 /* the buffer size of console*/
-#define RT_CONSOLEBUF_SIZE	256
+#define RT_CONSOLEBUF_SIZE	4096
 
 /* SECTION: finsh, a C-Express shell */
 #define RT_USING_FINSH
@@ -103,7 +103,7 @@
 /* Using symbol table */
 #define FINSH_USING_SYMTAB
 #define FINSH_USING_DESCRIPTION
-#define FINSH_THREAD_STACK_SIZE	4096
+#define FINSH_THREAD_STACK_SIZE	65532
 
 /* SECTION: device filesystem */
 #define RT_USING_DFS
