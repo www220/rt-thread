@@ -822,7 +822,11 @@ int lstat(const char *path, struct stat *buf)
 
     fd = open(path, O_RDONLY);
     if (fd < 0)
+    {
+        rt_set_errno(-DFS_STATUS_ENOENT);
+
     	return -1;
+    }
     result = fstat(fd,buf);
     close(result);
 
@@ -834,7 +838,11 @@ char *realpath(const char *path, char *rpath)
 {
 	char *fullpath = dfs_normalize_path(RT_NULL, path);
 	if (fullpath == RT_NULL)
+	{
+        rt_set_errno(-DFS_STATUS_EBADF);
+
 		return RT_NULL;
+	}
 
 	rt_memcpy(rpath,fullpath,rt_strlen(fullpath)+1);
 	rt_free(fullpath);
@@ -852,11 +860,15 @@ int fstatfs(int fildes, struct statfs *buf)
     if (d == RT_NULL)
     {
         rt_set_errno(-DFS_STATUS_EBADF);
+
         return -1;
     }
 
-    if (d->fs->ops->statfs != RT_NULL)
+    if (d->fs->ops->statfs != RT_NULL) {
         ret = d->fs->ops->statfs(d->fs, buf);
+        if (ret < 0)
+        	rt_set_errno(ret);
+    }
 
     fd_put(d);
     return ret;

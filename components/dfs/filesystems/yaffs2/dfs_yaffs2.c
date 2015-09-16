@@ -281,7 +281,7 @@ static int dfs_yaffs_getdents(struct dfs_fd* file,
 		if (yaffs_d == RT_NULL)
 		{
 			rt_free(file_path);
-			return -1; /* a general error */
+			return yaffsfs_GetLastError();
 		}
 		
 		rt_snprintf(file_path, YAFFS_FILE_PATH_MAX, "%s/%s", file->path, yaffs_d->d_name);

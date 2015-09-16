@@ -132,7 +132,7 @@
 #define RT_USING_SQLITE3
 #define RT_USING_TCLSHELL
 
-#define rttTempFileDir "/tmp"
+#define rttTempFileDir "/mnt/tmp"
 #define rttCfgFileDir "/mnt/config"
 #define rttResFileDir "/mnt/resource"
 extern int rttGetTempname(int nBuf, char *zBuf);

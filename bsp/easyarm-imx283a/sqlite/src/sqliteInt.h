@@ -19,6 +19,7 @@
 #include <dfs_posix.h>
 #define SQLITE_OS_OTHER 1
 #define SQLITE_OS_RTT 1
+#define SQLITE_TEST 1
 
 #ifdef _MSC_VER
 #define HAVE_GMTIME_S 1
@@ -3686,11 +3687,10 @@ void sqlite3Parser(void*, int, Token, Parse*);
   int sqlite3ParserStackPeak(void*);
 #endif
 
+void sqlite3AutoLoadExtensions(sqlite3*);
 #ifndef SQLITE_OMIT_LOAD_EXTENSION
-  void sqlite3AutoLoadExtensions(sqlite3*);
   void sqlite3CloseExtensions(sqlite3*);
 #else
-# define sqlite3AutoLoadExtensions(X)
 # define sqlite3CloseExtensions(X)
 #endif
 
