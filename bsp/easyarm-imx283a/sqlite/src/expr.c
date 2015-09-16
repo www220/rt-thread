@@ -1523,7 +1523,6 @@ int sqlite3CodeOnce(Parse *pParse){
   return sqlite3VdbeAddOp1(v, OP_Once, pParse->nOnce++);
 }
 
-#ifndef SQLITE_OMIT_SUBQUERY
 /*
 ** Generate code that checks the left-most column of index table iCur to see if
 ** it contains any NULL entries.  Cause the register at regHasNull to be set
@@ -1541,6 +1540,7 @@ static void sqlite3SetHasNullFlag(Vdbe *v, int iCur, int regHasNull){
 }
 
 
+#ifndef SQLITE_OMIT_SUBQUERY
 /*
 ** The argument is an IN operator with a list (not a subquery) on the 
 ** right-hand side.  Return TRUE if that list is constant.

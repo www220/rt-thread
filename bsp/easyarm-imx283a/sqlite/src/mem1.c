@@ -71,15 +71,9 @@ static malloc_zone_t* _sqliteZone_;
 ** Use standard C library malloc and free on non-Apple systems.  
 ** Also used by Apple systems if SQLITE_WITHOUT_ZONEMALLOC is defined.
 */
-#ifdef SQLITE_OS_OTHER
-#define SQLITE_MALLOC(x)    rt_malloc((rt_size_t)x)
-#define SQLITE_FREE(x)      rt_free(x)
-#define SQLITE_REALLOC(x,y) rt_realloc((x),(rt_size_t)(y))
-#else
 #define SQLITE_MALLOC(x)             malloc(x)
 #define SQLITE_FREE(x)               free(x)
 #define SQLITE_REALLOC(x,y)          realloc((x),(y))
-#endif
 
 /*
 ** The malloc.h header file is needed for malloc_usable_size() function

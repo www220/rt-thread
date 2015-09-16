@@ -2384,7 +2384,7 @@ int sqlite3VdbeHalt(Vdbe *p){
 
     /* Check for immediate foreign key violations. */
     if( p->rc==SQLITE_OK ){
-      rc = sqlite3VdbeCheckFk(p, 0);
+      sqlite3VdbeCheckFk(p, 0);
     }
   
     /* If the auto-commit flag is set and this is the only active writer 

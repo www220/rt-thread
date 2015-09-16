@@ -329,7 +329,7 @@ void sqlite3AutoincrementEnd(Parse *pParse){
 # define autoIncStep(A,B,C)
 #endif /* SQLITE_OMIT_AUTOINCREMENT */
 
-#ifndef SQLITE_OMIT_XFER_OPT
+
 /* Forward declaration */
 static int xferOptimization(
   Parse *pParse,        /* Parser context */
@@ -338,7 +338,6 @@ static int xferOptimization(
   int onError,          /* How to handle constraint errors */
   int iDbDest           /* The database of pDest */
 );
-#endif
 
 /*
 ** This routine is called to handle SQL of the following forms:
@@ -998,9 +997,8 @@ void sqlite3Insert(
       sqlite3VdbeAddOp1(v, OP_Close, idx+iIdxCur);
     }
   }
-#ifndef SQLITE_OMIT_XFER_OPT
+
 insert_end:
-#endif
   /* Update the sqlite_sequence table by storing the content of the
   ** maximum rowid counter values recorded while inserting into
   ** autoincrement tables.

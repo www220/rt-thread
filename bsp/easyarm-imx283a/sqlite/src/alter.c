@@ -246,7 +246,6 @@ void sqlite3AlterFunctions(void){
   }
 }
 
-#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
 /*
 ** This function is used to create the text of expressions of the form:
 **
@@ -274,6 +273,7 @@ static char *whereOrName(sqlite3 *db, char *zWhere, char *zConstant){
   return zNew;
 }
 
+#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
 /*
 ** Generate the text of a WHERE expression which can be used to select all
 ** tables that have foreign key constraints that refer to table pTab (i.e.
@@ -290,7 +290,6 @@ static char *whereForeignKeys(Parse *pParse, Table *pTab){
 }
 #endif
 
-#ifndef SQLITE_OMIT_TRIGGER
 /*
 ** Generate the text of a WHERE expression which can be used to select all
 ** temporary triggers on table pTab from the sqlite_temp_master table. If
@@ -322,7 +321,6 @@ static char *whereTempTriggers(Parse *pParse, Table *pTab){
   }
   return zWhere;
 }
-#endif
 
 /*
 ** Generate code to drop and reload the internal representation of table

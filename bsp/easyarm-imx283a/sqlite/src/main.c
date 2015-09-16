@@ -284,9 +284,7 @@ int sqlite3_shutdown(void){
     SQLITE_EXTRA_SHUTDOWN();
 #endif
     sqlite3_os_end();
-#ifndef SQLITE_OMIT_LOAD_EXTENSION
     sqlite3_reset_auto_extension();
-#endif
     sqlite3GlobalConfig.isInit = 0;
   }
   if( sqlite3GlobalConfig.isPCacheInit ){
@@ -622,7 +620,6 @@ int sqlite3_config(int op, ...){
 ** the lookaside memory.
 */
 static int setupLookaside(sqlite3 *db, void *pBuf, int sz, int cnt){
-#ifndef SQLITE_OMIT_LOOKASIDE
   void *pStart;
   if( db->lookaside.nOut ){
     return SQLITE_BUSY;
@@ -673,12 +670,6 @@ static int setupLookaside(sqlite3 *db, void *pBuf, int sz, int cnt){
     db->lookaside.bEnabled = 0;
     db->lookaside.bMalloced = 0;
   }
-#else
-  db->lookaside.pStart = 0;
-  db->lookaside.pEnd = 0;
-  db->lookaside.bEnabled = 0;
-  db->lookaside.bMalloced = 0;
-#endif
   return SQLITE_OK;
 }
 

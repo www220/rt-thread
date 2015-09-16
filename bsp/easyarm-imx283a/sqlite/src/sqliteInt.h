@@ -34,7 +34,7 @@
 #define SQLITE_UNLINK_AFTER_CLOSE 1
 
 #define SQLITE_DEFAULT_AUTOMATIC_INDEX 0
-#define SQLITE_DEFAULT_CACHE_SIZE 500
+//#define SQLITE_DEFAULT_CACHE_SIZE 500
 #define SQLITE_MAX_WORKER_THREADS 0
 #define SQLITE_MAX_MMAP_SIZE 0
 #define SQLITE_POWERSAFE_OVERWRITE 1
@@ -42,54 +42,54 @@
 #define SQLITE_DISABLE_LFS 1
 #define SQLITE_DISABLE_DIRSYNC 1
 
-#define SQLITE_OMIT_ANALYZE 1
-#define SQLITE_OMIT_ATTACH 1
-#define SQLITE_OMIT_AUTHORIZATION 1
+//#define SQLITE_OMIT_ANALYZE 1
+//#define SQLITE_OMIT_ATTACH 1
+//#define SQLITE_OMIT_AUTHORIZATION 1
 #define SQLITE_OMIT_AUTOINIT 1
-#define SQLITE_OMIT_AUTOMATIC_INDEX 1
-#define SQLITE_OMIT_AUTOVACUUM 1
-#define SQLITE_OMIT_BETWEEN_OPTIMIZATION 1
-#define SQLITE_OMIT_BLOB_LITERAL 1
-#define SQLITE_OMIT_BUILTIN_TEST 1
-#define SQLITE_OMIT_CAST 1
-#define SQLITE_OMIT_CHECK 1
-#define SQLITE_OMIT_COMPILEOPTION_DIAGS 1
-#define SQLITE_OMIT_COMPLETE 1
-#define SQLITE_OMIT_COMPOUND_SELECT 1
-#define SQLITE_OMIT_CTE 1
-#define SQLITE_OMIT_DATETIME_FUNCS 1
-#define SQLITE_OMIT_DECLTYPE 1
-#define SQLITE_OMIT_DEPRECATED 1
-#define SQLITE_OMIT_EXPLAIN 1
-#define SQLITE_OMIT_FLAG_PRAGMAS 1
-#define SQLITE_OMIT_FOREIGN_KEY 1
-#define SQLITE_OMIT_GET_TABLE 1
-#define SQLITE_OMIT_LIKE_OPTIMIZATION 1
+//#define SQLITE_OMIT_AUTOMATIC_INDEX 1
+//#define SQLITE_OMIT_AUTOVACUUM 1
+//#define SQLITE_OMIT_BETWEEN_OPTIMIZATION 1
+//#define SQLITE_OMIT_BLOB_LITERAL 1
+//#define SQLITE_OMIT_BUILTIN_TEST 1
+//#define SQLITE_OMIT_CAST 1
+//#define SQLITE_OMIT_CHECK 1
+//#define SQLITE_OMIT_COMPILEOPTION_DIAGS 1
+//#define SQLITE_OMIT_COMPLETE 1
+//#define SQLITE_OMIT_COMPOUND_SELECT 1
+//#define SQLITE_OMIT_CTE 1
+//#define SQLITE_OMIT_DATETIME_FUNCS 1
+//#define SQLITE_OMIT_DECLTYPE 1
+//#define SQLITE_OMIT_DEPRECATED 1
+//#define SQLITE_OMIT_EXPLAIN 1
+//#define SQLITE_OMIT_FLAG_PRAGMAS 1
+//#define SQLITE_OMIT_FOREIGN_KEY 1
+//#define SQLITE_OMIT_GET_TABLE 1
+//#define SQLITE_OMIT_LIKE_OPTIMIZATION 1
 #define SQLITE_OMIT_LOAD_EXTENSION 1
-#define SQLITE_OMIT_LOCALTIME 1
-#define SQLITE_OMIT_LOOKASIDE 1
-#define SQLITE_OMIT_MEMORYDB 1
-#define SQLITE_OMIT_OR_OPTIMIZATION 1
-#define SQLITE_OMIT_PAGER_PRAGMAS 1
-#define SQLITE_OMIT_PRAGMA 1
-#define SQLITE_OMIT_PROGRESS_CALLBACK 1
-#define SQLITE_OMIT_QUICKBALANCE 1
-#define SQLITE_OMIT_REINDEX 1
-#define SQLITE_OMIT_SCHEMA_PRAGMAS 1
-#define SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS 1
-#define SQLITE_OMIT_SHARED_CACHE 1
-#define SQLITE_OMIT_SUBQUERY 1
-#define SQLITE_OMIT_TCL_VARIABLE 1
-#define SQLITE_OMIT_TEMPDB 1
-#define SQLITE_OMIT_TRACE 1
-#define SQLITE_OMIT_TRIGGER 1
-#define SQLITE_OMIT_TRUNCATE_OPTIMIZATION 1
-#define SQLITE_OMIT_UTF16 1
-#define SQLITE_OMIT_VACUUM 1
-#define SQLITE_OMIT_VIEW 1
-#define SQLITE_OMIT_VIRTUALTABLE 1
+//#define SQLITE_OMIT_LOCALTIME 1
+//#define SQLITE_OMIT_LOOKASIDE 1
+//#define SQLITE_OMIT_MEMORYDB 1
+//#define SQLITE_OMIT_OR_OPTIMIZATION 1
+//#define SQLITE_OMIT_PAGER_PRAGMAS 1
+//#define SQLITE_OMIT_PRAGMA 1
+//#define SQLITE_OMIT_PROGRESS_CALLBACK 1
+//#define SQLITE_OMIT_QUICKBALANCE 1
+//#define SQLITE_OMIT_REINDEX 1
+//#define SQLITE_OMIT_SCHEMA_PRAGMAS 1
+//#define SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS 1
+//#define SQLITE_OMIT_SHARED_CACHE 1
+//#define SQLITE_OMIT_SUBQUERY 1
+//#define SQLITE_OMIT_TCL_VARIABLE 1
+//#define SQLITE_OMIT_TEMPDB 1
+//#define SQLITE_OMIT_TRACE 1
+//#define SQLITE_OMIT_TRIGGER 1
+//#define SQLITE_OMIT_TRUNCATE_OPTIMIZATION 1
+//#define SQLITE_OMIT_UTF16 1
+//#define SQLITE_OMIT_VACUUM 1
+//#define SQLITE_OMIT_VIEW 1
+//#define SQLITE_OMIT_VIRTUALTABLE 1
 #define SQLITE_OMIT_WAL 1
-#define SQLITE_OMIT_XFER_OPT 1
+//#define SQLITE_OMIT_XFER_OPT 1
 
 
 /*
@@ -3227,11 +3227,7 @@ void sqlite3ExprListSetSpan(Parse*,ExprList*,ExprSpan*);
 void sqlite3ExprListDelete(sqlite3*, ExprList*);
 int sqlite3Init(sqlite3*, char**);
 int sqlite3InitCallback(void*, int, char**, char**);
-#ifdef SQLITE_OMIT_PRAGMA
-# define sqlite3Pragma(A,B,C,D,E);
-#else
 void sqlite3Pragma(Parse*,Token*,Token*,Token*,int);
-#endif
 void sqlite3ResetAllSchemasOfConnection(sqlite3*);
 void sqlite3ResetOneSchema(sqlite3*,int);
 void sqlite3CollapseDatabaseArray(sqlite3*);
@@ -3275,11 +3271,7 @@ void sqlite3RowSetInsert(RowSet*, i64);
 int sqlite3RowSetTest(RowSet*, int iBatch, i64);
 int sqlite3RowSetNext(RowSet*, i64*);
 
-#ifdef SQLITE_OMIT_VIEW
-# define sqlite3CreateView(A,B,C,D,E,F,G)
-#else
 void sqlite3CreateView(Parse*,Token*,Token*,Token*,Select*,int,int);
-#endif
 
 #if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_VIRTUALTABLE)
   int sqlite3ViewGetColumnNames(Parse*,Table*);
@@ -3365,11 +3357,7 @@ Table *sqlite3LocateTableItem(Parse*,int isView,struct SrcList_item *);
 Index *sqlite3FindIndex(sqlite3*,const char*, const char*);
 void sqlite3UnlinkAndDeleteTable(sqlite3*,int,const char*);
 void sqlite3UnlinkAndDeleteIndex(sqlite3*,int,const char*);
-#ifdef SQLITE_OMIT_VACUUM
-# define sqlite3Vacuum(X)
-#else
 void sqlite3Vacuum(Parse*);
-#endif
 int sqlite3RunVacuum(char**, sqlite3*);
 char *sqlite3NameFromToken(sqlite3*, Token*);
 int sqlite3ExprCompare(Expr*, Expr*, int);
@@ -3425,11 +3413,7 @@ void sqlite3SelectSetName(Select*,const char*);
 void sqlite3FuncDefInsert(FuncDefHash*, FuncDef*);
 FuncDef *sqlite3FindFunction(sqlite3*,const char*,int,int,u8,u8);
 void sqlite3RegisterBuiltinFunctions(sqlite3*);
-#ifndef SQLITE_OMIT_DATETIME_FUNCS
 void sqlite3RegisterDateTimeFunctions(void);
-#else
-# define sqlite3RegisterDateTimeFunctions()
-#endif
 void sqlite3RegisterGlobalFunctions(void);
 int sqlite3SafetyCheckOk(sqlite3*);
 int sqlite3SafetyCheckSickOrOk(sqlite3*);
@@ -3462,9 +3446,6 @@ void sqlite3MaterializeView(Parse*, Table*, Expr*, int);
   u32 sqlite3TriggerColmask(Parse*,Trigger*,ExprList*,int,int,Table*,int);
 # define sqlite3ParseToplevel(p) ((p)->pToplevel ? (p)->pToplevel : (p))
 #else
-# define sqlite3BeginTrigger(A,B,C,D,E,F,G,H,I,J)
-# define sqlite3FinishTrigger(A,B,C)
-# define sqlite3DropTrigger(A,B,C)
 # define sqlite3TriggersExist(B,C,D,E,F) 0
 # define sqlite3DeleteTrigger(A,B)
 # define sqlite3DropTriggerPtr(A,B)
@@ -3472,11 +3453,6 @@ void sqlite3MaterializeView(Parse*, Table*, Expr*, int);
 # define sqlite3CodeRowTrigger(A,B,C,D,E,F,G,H,I)
 # define sqlite3CodeRowTriggerDirect(A,B,C,D,E,F)
 # define sqlite3TriggerList(X, Y) 0
-# define sqlite3DeleteTriggerStep(A,B)
-# define sqlite3TriggerSelectStep(A,B) 0
-# define sqlite3TriggerInsertStep(A,B,C,D,E) 0
-# define sqlite3TriggerUpdateStep(A,B,C,D,E) 0
-# define sqlite3TriggerDeleteStep(A,B,C) 0
 # define sqlite3ParseToplevel(p) p
 # define sqlite3TriggerColmask(A,B,C,D,E,F,G) 0
 #endif
@@ -3496,13 +3472,8 @@ void sqlite3DeferForeignKey(Parse*, int);
 # define sqlite3AuthContextPush(a,b,c)
 # define sqlite3AuthContextPop(a)  ((void)(a))
 #endif
-#ifdef SQLITE_OMIT_ATTACH
-# define sqlite3Attach(A,B,C,D)
-# define sqlite3Detach(A,B)
-#else
 void sqlite3Attach(Parse*, Expr*, Expr*, Expr*);
 void sqlite3Detach(Parse*, Expr*);
-#endif
 void sqlite3FixInit(DbFixer*, Parse*, int, const char*, const Token*);
 int sqlite3FixSrcList(DbFixer*, SrcList*);
 int sqlite3FixSelect(DbFixer*, Select*);
@@ -3607,11 +3578,7 @@ extern int sqlite3PendingByte;
 #endif
 #endif
 void sqlite3RootPageMoved(sqlite3*, int, int, int);
-#ifdef SQLITE_OMIT_REINDEX
-# define sqlite3Reindex(A,B,C)
-#else
 void sqlite3Reindex(Parse*, Token*, Token*);
-#endif
 void sqlite3AlterFunctions(void);
 void sqlite3AlterRenameTable(Parse*, SrcList*, Token*);
 int sqlite3GetToken(const unsigned char *, int *);
@@ -3715,10 +3682,6 @@ void sqlite3AutoLoadExtensions(sqlite3*);
 #  define sqlite3VtabUnlockList(X)
 #  define sqlite3VtabSavepoint(X, Y, Z) SQLITE_OK
 #  define sqlite3GetVTable(X,Y)  ((VTable*)0)
-#  define sqlite3VtabArgInit(X)
-#  define sqlite3VtabArgExtend(X,Y)
-#  define sqlite3VtabBeginParse(X,Y,Z,A,B)
-#  define sqlite3VtabFinishParse(X,Y)
 #else
    void sqlite3VtabClear(sqlite3 *db, Table*);
    void sqlite3VtabDisconnect(sqlite3 *db, Table *p);
@@ -3732,12 +3695,12 @@ void sqlite3AutoLoadExtensions(sqlite3*);
    void sqlite3VtabImportErrmsg(Vdbe*, sqlite3_vtab*);
    VTable *sqlite3GetVTable(sqlite3*, Table*);
 #  define sqlite3VtabInSync(db) ((db)->nVTrans>0 && (db)->aVTrans==0)
-   void sqlite3VtabArgInit(Parse*);
-   void sqlite3VtabArgExtend(Parse*, Token*);
-   void sqlite3VtabBeginParse(Parse*, Token*, Token*, Token*, int);
-   void sqlite3VtabFinishParse(Parse*, Token*);
 #endif
 void sqlite3VtabMakeWritable(Parse*,Table*);
+void sqlite3VtabBeginParse(Parse*, Token*, Token*, Token*, int);
+void sqlite3VtabFinishParse(Parse*, Token*);
+void sqlite3VtabArgInit(Parse*);
+void sqlite3VtabArgExtend(Parse*, Token*);
 int sqlite3VtabCallCreate(sqlite3*, int, const char *, char **);
 int sqlite3VtabCallConnect(Parse*, Table*);
 int sqlite3VtabCallDestroy(sqlite3*, int, const char *);
@@ -3762,7 +3725,6 @@ const char *sqlite3JournalModename(int);
   void sqlite3WithDelete(sqlite3*,With*);
   void sqlite3WithPush(Parse*, With*, u8);
 #else
-#define sqlite3WithAdd(a,b,c,d,e) 0
 #define sqlite3WithPush(x,y,z)
 #define sqlite3WithDelete(x,y)
 #endif

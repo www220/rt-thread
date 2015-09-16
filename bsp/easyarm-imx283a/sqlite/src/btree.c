@@ -452,7 +452,6 @@ static int cursorHoldsMutex(BtCursor *p){
 */
 #define invalidateOverflowCache(pCur) (pCur->curFlags &= ~BTCF_ValidOvfl)
 
-#ifndef SQLITE_OMIT_AUTOVACUUM
 /*
 ** Invalidate the overflow page-list cache for all cursors opened
 ** on the shared btree structure pBt.
@@ -464,7 +463,6 @@ static void invalidateAllOverflowCache(BtShared *pBt){
     invalidateOverflowCache(p);
   }
 }
-#endif
 
 #ifndef SQLITE_OMIT_INCRBLOB
 /*
@@ -2854,9 +2852,7 @@ int sqlite3BtreeNewDb(Btree *p){
 ** proceed.
 */
 int sqlite3BtreeBeginTrans(Btree *p, int wrflag){
-#ifndef SQLITE_OMIT_SHARED_CACHE
   sqlite3 *pBlock = 0;
-#endif
   BtShared *pBt = p->pBt;
   int rc = SQLITE_OK;
 
@@ -7261,7 +7257,6 @@ static int balance_nonroot(
     );
     copyNodeContent(apNew[0], pParent, &rc);
     freePage(apNew[0], &rc);
-#ifndef SQLITE_OMIT_AUTOVACUUM
   }else if( ISAUTOVACUUM && !leafCorrection ){
     /* Fix the pointer map entries associated with the right-child of each
     ** sibling page. All other pointer map entries have already been taken
@@ -7270,7 +7265,6 @@ static int balance_nonroot(
       u32 key = get4byte(&apNew[i]->aData[8]);
       ptrmapPut(pBt, key, PTRMAP_BTREE, apNew[i]->pgno, &rc);
     }
-#endif
   }
 
   assert( pParent->isInit );
@@ -7392,9 +7386,7 @@ static int balance_deeper(MemPage *pRoot, MemPage **ppChild){
 static int balance(BtCursor *pCur){
   int rc = SQLITE_OK;
   const int nMin = pCur->pBt->usableSize * 2 / 3;
-#ifndef SQLITE_OMIT_QUICKBALANCE
   u8 aBalanceQuickSpace[13];
-#endif
   u8 *pFree = 0;
 
   TESTONLY( int balance_quick_called = 0 );

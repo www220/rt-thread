@@ -163,7 +163,6 @@ void sqlite3SelectDelete(sqlite3 *db, Select *p){
   clearSelect(db, p, 1);
 }
 
-#ifndef SQLITE_OMIT_COMPOUND_SELECT
 /*
 ** Return a pointer to the right-most SELECT statement in a compound.
 */
@@ -171,7 +170,6 @@ static Select *findRightmost(Select *p){
   while( p->pNext ) p = p->pNext;
   return p;
 }
-#endif
 
 /*
 ** Given 1 to 3 identifiers preceding the JOIN keyword, determine the
@@ -2528,7 +2526,6 @@ multi_select_end:
 }
 #endif /* SQLITE_OMIT_COMPOUND_SELECT */
 
-#ifndef SQLITE_OMIT_COMPOUND_SELECT
 /*
 ** Code an output subroutine for a coroutine implementation of a
 ** SELECT statment.
@@ -2684,7 +2681,6 @@ static int generateOutputSubroutine(
 
   return addr;
 }
-#endif
 
 /*
 ** Alternative compound select code generator for cases when there

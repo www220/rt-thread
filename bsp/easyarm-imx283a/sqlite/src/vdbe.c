@@ -4391,10 +4391,8 @@ case OP_RowData: {
 case OP_Rowid: {                 /* out2-prerelease */
   VdbeCursor *pC;
   i64 v;
-#ifndef SQLITE_OMIT_VIRTUALTABLE
   sqlite3_vtab *pVtab;
   const sqlite3_module *pModule;
-#endif
 
   assert( pOp->p1>=0 && pOp->p1<p->nCursor );
   pC = p->apCsr[pOp->p1];
@@ -4915,9 +4913,7 @@ case OP_IdxGE:  {       /* jump */
 case OP_Destroy: {     /* out2-prerelease */
   int iMoved;
   int iCnt;
-#ifndef SQLITE_OMIT_VIRTUALTABLE
   Vdbe *pVdbe;
-#endif
   int iDb;
 
   assert( p->readOnly==0 );
@@ -6343,10 +6339,8 @@ case OP_MaxPgcnt: {            /* out2-prerelease */
 ** If P2 is not zero, jump to instruction P2.
 */
 case OP_Init: {          /* jump */
-#ifndef SQLITE_OMIT_TRACE
   char *zTrace;
   char *z;
-#endif
 
   if( pOp->p2 ){
     pc = pOp->p2 - 1;
@@ -6499,4 +6493,3 @@ abort_due_to_interrupt:
   sqlite3SetString(&p->zErrMsg, db, "%s", sqlite3ErrStr(rc));
   goto vdbe_error_halt;
 }
-

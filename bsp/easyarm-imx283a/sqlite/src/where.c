@@ -746,7 +746,6 @@ static int isMatchOfColumn(
 }
 #endif /* SQLITE_OMIT_VIRTUALTABLE */
 
-#ifndef SQLITE_OMIT_BETWEEN_OPTIMIZATION
 /*
 ** If the pBase expression originated in the ON or USING clause of
 ** a join, then transfer the appropriate markings over to derived.
@@ -757,7 +756,6 @@ static void transferJoinMarkings(Expr *pDerived, Expr *pBase){
     pDerived->iRightJoinTable = pBase->iRightJoinTable;
   }
 }
-#endif
 
 /*
 ** Mark term iChild as being a child of term iParent
@@ -1105,11 +1103,9 @@ static void exprAnalyze(
   Bitmask prereqLeft;              /* Prerequesites of the pExpr->pLeft */
   Bitmask prereqAll;               /* Prerequesites of pExpr */
   Bitmask extraRight = 0;          /* Extra dependencies on LEFT JOIN */
-#ifndef SQLITE_OMIT_LIKE_OPTIMIZATION
   Expr *pStr1 = 0;                 /* RHS of LIKE/GLOB operator */
   int isComplete = 0;              /* RHS of LIKE/GLOB ends with wildcard */
   int noCase = 0;                  /* LIKE/GLOB distinguishes case */
-#endif
   int op;                          /* Top-level operator.  pExpr->op */
   Parse *pParse = pWInfo->pParse;  /* Parsing context */
   sqlite3 *db = pParse->db;        /* Database connection */
@@ -2547,7 +2543,7 @@ static int codeEqualityTerm(
 ){
   Expr *pX = pTerm->pExpr;
   Vdbe *v = pParse->pVdbe;
-  int iReg = iTarget;                  /* Register holding results */
+  int iReg;                  /* Register holding results */
 
   assert( iTarget>0 );
   if( pX->op==TK_EQ ){
@@ -5256,12 +5252,9 @@ static int whereLoopAddAll(WhereLoopBuilder *pBuilder){
       mExtra = mPrior;
     }
     priorJoinType = pItem->jointype;
-#ifndef SQLITE_OMIT_VIRTUALTABLE
     if( IsVirtual(pItem->pTab) ){
       rc = whereLoopAddVirtual(pBuilder, mExtra);
-    }else
-#endif
-    {
+    }else{
       rc = whereLoopAddBtree(pBuilder, mExtra);
     }
     if( rc==SQLITE_OK ){
