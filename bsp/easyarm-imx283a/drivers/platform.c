@@ -212,6 +212,7 @@ int cmd_beep(int argc, char** argv)
 #include "tcl.h"
 int cmd_tcl(int argc, char** argv)
 {
+	int ret = 0;
     Tcl_Interp *interp;
     
     if (argc < 2)
@@ -228,15 +229,17 @@ int cmd_tcl(int argc, char** argv)
     Tcl_SetVar(interp,"argv0",argv[1],TCL_GLOBAL_ONLY);
     Tcl_SetVar(interp,"argv", "", TCL_GLOBAL_ONLY);
     
-    if (Tcl_EvalFile(interp, argv[1])!=TCL_OK)
+    ret = Tcl_EvalFile(interp, argv[1]);
+    if (ret !=TCL_OK)
     {
         const char *zInfo = Tcl_GetVar(interp, "errorInfo", TCL_GLOBAL_ONLY);
         if( zInfo==0 ) 
             zInfo = Tcl_GetStringResult(interp);
         rt_kprintf("%s: %s\n", *argv, zInfo);
-        return 1;
     }
-    return 0;
+
+    Tcl_DeleteInterp(interp);
+    return ret;
 }
 
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_sh, __cmd_sh, Shell the FILEs.)

@@ -67,11 +67,11 @@ static void bg_gc_func(void *parameter)
 		while ((dev = (struct yaffs_dev*)yaffs_next_dev()) != NULL) {
 			unsigned int gc_count;
             yaffsfs_Lock();
-            gc_count = dev->bg_gcs;
+            gc_count = dev->all_gcs;
 			yaffs_bg_gc(dev, urgent);
             erased_chunks = dev->n_erased_blocks * dev->param.chunks_per_block;
             free_chunks = dev->n_free_chunks;
-            result = (gc_count != dev->bg_gcs);
+            result = (gc_count != dev->all_gcs);
             yaffsfs_Unlock();
 			if (result)
 				next_urgent = 1;
