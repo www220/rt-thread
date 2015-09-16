@@ -84,6 +84,7 @@ static const Tcl_ChannelType pipeChannelType = {
     PipeBlockModeProc,		/* Set blocking or non-blocking mode.*/
 #else
 	NULL,
+	NULL,
 #endif
     NULL,			/* flush proc. */
     NULL,			/* handler proc. */

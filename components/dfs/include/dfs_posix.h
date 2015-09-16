@@ -128,8 +128,8 @@ int stat(const char *file, struct stat *buf);
 int fstat(int fildes, struct stat *buf);
 int lstat(const char *path, struct stat *buf);
 int statfs(const char *path, struct statfs *buf);
-char *realpath(const char *path, char *rpath);
 int fstatfs(int fildes, struct statfs *buf);
+char *realpath(const char *path, char *rpath);
 
 /* directory api*/
 int rmdir(const char *path);

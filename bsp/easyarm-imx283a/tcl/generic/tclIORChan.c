@@ -747,13 +747,13 @@ TclChanCreateObjCmd(
  *
  *----------------------------------------------------------------------
  */
-
+#ifdef TCL_THREADS
 typedef struct ReflectEvent {
     Tcl_Event header;
     ReflectedChannel *rcPtr;
     int events;
 } ReflectEvent;
-#ifdef TCL_THREADS
+
 static int
 ReflectEventRun(
     Tcl_Event *ev,
