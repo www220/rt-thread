@@ -450,7 +450,7 @@ _system(const char *s)
 int*
 __errno(void)
 {
-	return _rt_errno();
+	return _rt_errno2();
 }
 
 int

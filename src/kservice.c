@@ -47,6 +47,7 @@
 
 /* global errno in RT-Thread */
 static volatile int _errno;
+static volatile int _errno2;
 
 #if defined(RT_USING_DEVICE) && defined(RT_USING_CONSOLE)
 static rt_device_t _console_device = RT_NULL;
@@ -88,6 +89,7 @@ void rt_set_errno(rt_err_t error)
     {
         /* it's in interrupt context */
         _errno = error;
+        _errno2 = -error;
 
         return;
     }
@@ -96,11 +98,13 @@ void rt_set_errno(rt_err_t error)
     if (tid == RT_NULL)
     {
         _errno = error;
+        _errno2 = -error;
 
         return;
     }
 
     tid->error = error;
+    tid->error2 = -error;
 }
 RTM_EXPORT(rt_set_errno);
 
@@ -123,6 +127,20 @@ int *_rt_errno(void)
     return (int *)&_errno;
 }
 RTM_EXPORT(_rt_errno);
+int *_rt_errno2(void)
+{
+    rt_thread_t tid;
+
+    if (rt_interrupt_get_nest() != 0)
+        return (int *)&_errno2;
+
+    tid = rt_thread_self();
+    if (tid != RT_NULL)
+        return (int *)&(tid->error2);
+
+    return (int *)&_errno2;
+}
+RTM_EXPORT(_rt_errno2);
 
 /**
  * This function will set the content of memory to specified value

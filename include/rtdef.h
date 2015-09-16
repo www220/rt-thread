@@ -500,6 +500,7 @@ struct rt_thread
 
     /* error code */
     rt_err_t    error;                                  /**< error code */
+    rt_err_t    error2;                                 /**< error code */
 
     rt_uint8_t  stat;                                   /**< thread stat */
 
