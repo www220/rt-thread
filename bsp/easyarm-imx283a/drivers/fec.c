@@ -664,9 +664,9 @@ static void phy_monitor_thread_entry(void *parameter)
         rt_uint32_t i;
         rt_uint16_t temp;
 
-    	pin_gpio_set(PINID_LCD_D16, 0);
+    	pin_gpio_set(PIN_NET0, 0);
     	rt_thread_delay(100);
-    	pin_gpio_set(PINID_LCD_D16, 1);
+    	pin_gpio_set(PIN_NET0, 1);
     	rt_thread_delay(100);
 
         for(i=0; i<=0x1F; i++)
@@ -835,10 +835,10 @@ void rt_hw_eth_init(void)
 		REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_ENET) |
 		BM_CLKCTRL_ENET_CLK_OUT_EN);    /* Enable pad output */
     
-	pin_gpio_direction(PINID_LCD_D16, 1);
-	pin_gpio_set(PINID_LCD_D16, 0);
+	pin_gpio_direction(PIN_NET0, 1);
+	pin_gpio_set(PIN_NET0, 0);
 	udelay(200);
-	pin_gpio_set(PINID_LCD_D16, 1);
+	pin_gpio_set(PIN_NET0, 1);
 
     fec_info[0].rxbd =
         (cbd_t *)memalign(CONFIG_SYS_CACHELINE_SIZE,

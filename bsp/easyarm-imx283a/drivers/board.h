@@ -51,6 +51,19 @@
 //#define RT_USING_UART4
 //#define RT_USING_UART5
 
+#define PIN_WDT		PINID_GPMI_RDY1
+#if 0
+#define PIN_BEEP		PINID_LCD_D21
+#define PIN_RUN		PINID_LCD_D22
+#define PIN_ERR		PINID_LCD_D23
+#define PIN_NET0	PINID_LCD_D16
+#else
+#define PIN_BEEP		PINID_SSP0_DATA6
+#define PIN_RUN		PINID_SSP0_DATA7
+#define PIN_ERR		PINID_SAIF0_MCLK
+#define PIN_NET0	PINID_LCD_RS
+#endif
+
 #define CONSOLE_DEVICE "dbgu"
 #define FINSH_DEVICE_NAME "dbgu"
 

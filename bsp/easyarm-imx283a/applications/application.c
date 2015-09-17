@@ -30,12 +30,12 @@
 #include <board.h>
 #include <rtthread.h>
 
-#define LED_ERR_PORT	PINID_LCD_D23
+#define LED_ERR_PORT		PIN_ERR
 #define LED_ERR_PIN		
-#define LED_RUN_PORT	PINID_LCD_D22
+#define LED_RUN_PORT	PIN_RUN
 #define LED_RUN_PIN		
 
-#define WDT_PORT		PINID_GPMI_RDY1
+#define WDT_PORT		PIN_WDT
 #define WDT_PIN			
 
 #ifdef RT_USING_DFS

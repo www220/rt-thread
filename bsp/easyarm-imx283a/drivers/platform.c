@@ -196,11 +196,11 @@ int cmd_beep(int argc, char** argv)
 	int beep = 100,i;
 	if (argc > 1)
 		beep = atol(argv[1]);
-    for (i=0;i<beep && 0;i++)
+    for (i=0;i<beep;i++)
     {
-    	pin_gpio_set(PINID_LCD_D21, 1);
+    	pin_gpio_set(PIN_BEEP, 1);
     	udelay(250);
-    	pin_gpio_set(PINID_LCD_D21, 0);
+    	pin_gpio_set(PIN_BEEP, 0);
     	if (((i%100) == 0) && (i != 0))
 			rt_thread_delay(50);
 		else

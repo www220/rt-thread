@@ -80,11 +80,11 @@ unsigned char * dma_align_mem = (unsigned char *)0x00000100;
 unsigned char * dma_align_max = (unsigned char *)HEAP_END;
 
 static struct pin_desc led_pins_desc[] = {
-	{ PINID_GPMI_RDY1, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
-	{ PINID_LCD_D16, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
-	{ PINID_LCD_D21, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
-	{ PINID_LCD_D22, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
-	{ PINID_LCD_D23, PIN_GPIO, PAD_8MA, PAD_3V3, 1 }
+	{ PIN_WDT, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PIN_NET0, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PIN_BEEP, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PIN_RUN, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },
+	{ PIN_ERR, PIN_GPIO, PAD_8MA, PAD_3V3, 1 }
 };
 static struct pin_group led_pins = {
 	.pins		= led_pins_desc,
@@ -99,11 +99,11 @@ void rt_hw_board_init()
     /* Set up LED pins */
 	pin_set_group(&led_pins);
     
-	pin_gpio_direction(PINID_GPMI_RDY1, 1);
-	pin_gpio_direction(PINID_LCD_D21, 1);
-	pin_gpio_direction(PINID_LCD_D22, 1);
-	pin_gpio_direction(PINID_LCD_D23, 1);
-    pin_gpio_set(PINID_GPMI_RDY1, 0);
+	pin_gpio_direction(PIN_WDT, 1);
+	pin_gpio_direction(PIN_BEEP, 1);
+	pin_gpio_direction(PIN_RUN, 1);
+	pin_gpio_direction(PIN_ERR, 1);
+    pin_gpio_set(PIN_WDT, 0);
 
     /* initialize mmu */
     rt_hw_mmu_init(hw_mem_desc, sizeof(hw_mem_desc)/sizeof(hw_mem_desc[0]));
@@ -111,7 +111,7 @@ void rt_hw_board_init()
     /* init udelay */
     calibrate_delay();
     init[2] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
-    pin_gpio_set(PINID_GPMI_RDY1, 1);
+    pin_gpio_set(PIN_WDT, 1);
     /* initialize hardware interrupt */
     rt_hw_interrupt_init();
     init[3] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
@@ -122,7 +122,7 @@ void rt_hw_board_init()
     rt_console_set_device(CONSOLE_DEVICE);
 #endif
     init[4] = REG_RD(REGS_DIGCTL_BASE, HW_DIGCTL_MICROSECONDS);
-    pin_gpio_set(PINID_GPMI_RDY1, 0);
+    pin_gpio_set(PIN_WDT, 0);
 
     /* initialize timer0 */
     rt_hw_timer_init();
@@ -133,7 +133,7 @@ void rt_hw_board_init()
     rt_hw_mtd_nand_init();
 #endif
 
-    pin_gpio_set(PINID_GPMI_RDY1, 1);
+    pin_gpio_set(PIN_WDT, 1);
     rt_kprintf("loops %d, init %d, all %d\n",loops_per_jiffy,init[2]-init[1],init[5]-init[0]);
 }
 
