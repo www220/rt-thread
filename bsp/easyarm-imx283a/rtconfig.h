@@ -130,6 +130,7 @@
 
 /* SECTION: sqlite, sql */
 #define RT_USING_SQLITE3
+//#define SQLITE_TEST 1
 #define RT_USING_TCLSHELL
 
 #define rttTempFileDir "/mnt/tmp"
