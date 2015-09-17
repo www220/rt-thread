@@ -6331,7 +6331,20 @@ static int tclLoadStaticExtensionCmd(
     const char *zExtName;
     int (*pInit)(sqlite3*,char**,const sqlite3_api_routines*);
   } aExtension[] = {
-
+#if 0
+    { "amatch",                sqlite3_amatch_init               },
+    { "closure",               sqlite3_closure_init              },
+    { "eval",                  sqlite3_eval_init                 },
+    { "fileio",                sqlite3_fileio_init               },
+    { "fuzzer",                sqlite3_fuzzer_init               },
+    { "ieee754",               sqlite3_ieee_init                 },
+    { "nextchar",              sqlite3_nextchar_init             },
+    { "percentile",            sqlite3_percentile_init           },
+    { "regexp",                sqlite3_regexp_init               },
+    { "spellfix",              sqlite3_spellfix_init             },
+    { "totype",                sqlite3_totype_init               },
+    { "wholenumber",           sqlite3_wholenumber_init          },
+#endif
   };
   sqlite3 *db;
   const char *zName;

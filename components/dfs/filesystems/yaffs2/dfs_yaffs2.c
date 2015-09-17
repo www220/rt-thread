@@ -197,6 +197,8 @@ static int dfs_yaffs_read(struct dfs_fd* file, void* buf, rt_size_t len)
 	
 	/* update position */
 	file->pos = yaffs_lseek(fd, 0, SEEK_CUR);
+	if (file->size < file->pos)
+		file->size = file->pos;
 	return char_read;
 }
 
@@ -215,6 +217,8 @@ static int dfs_yaffs_write(struct dfs_fd* file,
 	
 	/* update position */
 	file->pos = yaffs_lseek(fd, 0, SEEK_CUR);
+	if (file->size < file->pos)
+		file->size = file->pos;
 	return char_write;
 }
 
@@ -243,6 +247,9 @@ static int dfs_yaffs_lseek(struct dfs_fd* file,
 	result = yaffs_lseek(fd, offset, SEEK_SET);
 	if (result < 0)
 		return yaffsfs_GetLastError();
+	file->pos = result;
+	if (file->size < file->pos)
+		file->size = file->pos;
 	return result;
 }
 

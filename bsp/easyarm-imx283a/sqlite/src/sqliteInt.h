@@ -19,7 +19,6 @@
 #include <dfs_posix.h>
 #define SQLITE_OS_OTHER 1
 #define SQLITE_OS_RTT 1
-#define SQLITE_TEST 1
 
 #ifdef _MSC_VER
 #define HAVE_GMTIME_S 1
@@ -33,7 +32,7 @@
 #define SQLITE_WITHOUT_MSIZE 1
 #define SQLITE_UNLINK_AFTER_CLOSE 1
 
-#define SQLITE_DEFAULT_AUTOMATIC_INDEX 0
+//#define SQLITE_DEFAULT_AUTOMATIC_INDEX 0
 //#define SQLITE_DEFAULT_CACHE_SIZE 500
 #define SQLITE_MAX_WORKER_THREADS 0
 #define SQLITE_MAX_MMAP_SIZE 0
@@ -45,7 +44,7 @@
 //#define SQLITE_OMIT_ANALYZE 1
 //#define SQLITE_OMIT_ATTACH 1
 //#define SQLITE_OMIT_AUTHORIZATION 1
-#define SQLITE_OMIT_AUTOINIT 1
+//#define SQLITE_OMIT_AUTOINIT 1
 //#define SQLITE_OMIT_AUTOMATIC_INDEX 1
 //#define SQLITE_OMIT_AUTOVACUUM 1
 //#define SQLITE_OMIT_BETWEEN_OPTIMIZATION 1
@@ -3147,11 +3146,7 @@ const sqlite3_mem_methods *sqlite3MemGetMemsys5(void);
 
 #ifndef SQLITE_MUTEX_OMIT
   sqlite3_mutex_methods const *sqlite3DefaultMutex(void);
-#ifdef SQLITE_OS_OTHER
-# define sqlite3NoopMutex() 0
-#else
   sqlite3_mutex_methods const *sqlite3NoopMutex(void);
-#endif
   sqlite3_mutex *sqlite3MutexAlloc(int);
   int sqlite3MutexInit(void);
   int sqlite3MutexEnd(void);

@@ -829,7 +829,7 @@ int lstat(const char *path, struct stat *buf)
     	return -1;
     }
     result = fstat(fd,buf);
-    close(result);
+    close(fd);
 
     return result;
 }
