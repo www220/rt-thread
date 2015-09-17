@@ -129,9 +129,9 @@
 #define DFS_FD_MAX					20
 
 /* SECTION: sqlite, sql */
-#define RT_USING_SQLITE3
-#define SQLITE_TEST 1
-#define RT_USING_TCLSHELL
+//#define RT_USING_SQLITE3
+//#define SQLITE_TEST 1
+//#define RT_USING_TCLSHELL
 
 #define rttTempFileDir "/mnt/tmp"
 #define rttCfgFileDir "/mnt/config"
@@ -155,7 +155,7 @@ extern int rttGetTempname(int nBuf, char *zBuf);
 #define SO_REUSE 1
 #define LWIP_TCP_KEEPALIVE 1
 
-#define RT_LWIP_DHCP
+//#define RT_LWIP_DHCP
 
 /* ip address of target*/
 #define RT_LWIP_IPADDR0	192

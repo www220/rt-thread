@@ -52,7 +52,7 @@
 //#define RT_USING_UART5
 
 #define PIN_WDT		PINID_GPMI_RDY1
-#if 0
+#ifndef MXS280A
 #define PIN_BEEP		PINID_LCD_D21
 #define PIN_RUN		PINID_LCD_D22
 #define PIN_ERR		PINID_LCD_D23
