@@ -397,7 +397,7 @@ void rt_hw_usart_init()
     uart1.uart_dcb.StopBits= 0;
 
     /* register uart1 */
-    rt_hw_serial_register_vs(&uart1_device, "uart1",
+    rt_hw_serial_register_vs(&uart1_device, "dbgu",
         RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_STREAM | RT_DEVICE_FLAG_INT_RX,
         &uart1);
 #endif

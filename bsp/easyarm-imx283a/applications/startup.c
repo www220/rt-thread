@@ -32,6 +32,14 @@ extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
 #endif
 
+#ifdef _MSC_VER
+#undef  HEAP_BEGIN
+#undef  HEAP_END
+static rt_int8_t g_sysmembuf[0x3B00000];
+#define HEAP_BEGIN    (&g_sysmembuf)
+#define HEAP_END      (&g_sysmembuf[0x3B00000])
+#endif
+
 /*******************************************************************************
 * Function Name  : assert_failed
 * Description    : Reports the name of the source file and the source line number
