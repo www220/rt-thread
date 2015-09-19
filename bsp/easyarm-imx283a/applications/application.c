@@ -107,8 +107,13 @@ volatile int sys_stauts = -1;
 unsigned char NET_MAC[6] = {0};
 extern void cpu_usage_idle_hook(void);
 
+#ifdef _MSC_VER
+#define GPIO_ResetBits(x,y)
+#define GPIO_SetBits(x,y)
+#else
 #define GPIO_ResetBits(x,y) pin_gpio_set(x,0)
 #define GPIO_SetBits(x,y) pin_gpio_set(x,1)
+#endif
 
 ALIGN(RT_ALIGN_SIZE)
 static char thread_wtdog_stack[2048];

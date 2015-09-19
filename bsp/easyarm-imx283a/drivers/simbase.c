@@ -18,6 +18,7 @@
 #include "board.h"
 #include <stdio.h>
 #include <dfs_posix.h>
+#pragma comment (lib, "./drivers/vslib/LIBCMTD.lib")
 
 /**
  * This function will initial STM32 board.
@@ -72,23 +73,6 @@ errno_t _tsopen_s (
     return -1;
 }
 
-#include <finsh.h>
-struct finsh_syscall* finsh_syscall_next(struct finsh_syscall* call)
-{
-    unsigned int *ptr_begin = (unsigned int*)call;
-    ptr_begin += (sizeof(struct finsh_syscall)/sizeof(unsigned int));
-    while (*ptr_begin == 0) ptr_begin ++;
-    return (struct finsh_syscall*) ptr_begin;
-}
-
-struct finsh_sysvar* finsh_sysvar_next(struct finsh_sysvar* call)
-{
-    unsigned int *ptr_begin = (unsigned int*)call;
-    ptr_begin += (sizeof(struct finsh_sysvar)/sizeof(unsigned int));
-    while (*ptr_begin == 0) ptr_begin ++;
-    return (struct finsh_sysvar*) ptr_begin;
-}
-
 extern void *rt_interrupt_main_thread;
 void cpu_usage_idle_hook(void)
 {
@@ -96,6 +80,11 @@ void cpu_usage_idle_hook(void)
     if (status && rt_interrupt_main_thread)
         SwitchToFiber(rt_interrupt_main_thread);
     status = !status;
+}
+
+int cmd_beep(int argc, char** argv)
+{
+    return 0;
 }
 
 /*@}*/

@@ -179,36 +179,7 @@ int cmd_msleep(int argc, char** argv)
 	rt_thread_delay(sleep);
 	return 0;
 }
-#ifndef _MSC_VER
-int cmd_reboot(int argc, char** argv)
-{
-	wtdog_count = 100;
 
-	//使用内部的看门狗来达到重启的目的
-	writel(1, REGS_RTC_BASE + HW_RTC_WATCHDOG);
-	writel(0x80000000, REGS_RTC_BASE + HW_RTC_PERSISTENT1_SET);
-	writel(BM_RTC_CTRL_WATCHDOGEN, REGS_RTC_BASE + HW_RTC_CTRL_SET);
-	return 0;
-}
-
-int cmd_beep(int argc, char** argv)
-{
-	int beep = 100,i;
-	if (argc > 1)
-		beep = atol(argv[1]);
-    for (i=0;i<beep;i++)
-    {
-    	pin_gpio_set(PIN_BEEP, 1);
-    	udelay(250);
-    	pin_gpio_set(PIN_BEEP, 0);
-    	if (((i%100) == 0) && (i != 0))
-			rt_thread_delay(50);
-		else
-    		udelay(250);
-    }
-	return 0;
-}
-#endif
 #ifdef RT_USING_TCLSHELL
 #include "tcl.h"
 int cmd_tcl(int argc, char** argv)
@@ -247,8 +218,4 @@ FINSH_FUNCTION_EXPORT_ALIAS(cmd_tcl, __cmd_tcl, TCL.)
 
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_sh, __cmd_sh, Shell the FILEs.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_msleep, __cmd_msleep, Sleep ms.)
-#ifndef _MSC_VER
-FINSH_FUNCTION_EXPORT_ALIAS(cmd_reboot, __cmd_reboot, Reboot With WDT.)
-FINSH_FUNCTION_EXPORT_ALIAS(cmd_beep, __cmd_beep, Beep.)
-#endif
 #endif //FINSH_USING_MSH

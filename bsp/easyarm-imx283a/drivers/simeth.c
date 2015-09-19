@@ -215,7 +215,7 @@ static rt_int32_t eth_interrupt(void)
     return 0; 
 }
 
-void rt_hw_stm32_eth_init(void)
+void rt_hw_eth_init(void)
 {
     enum link_adapter_event status = LINKEVENT_UNCHANGED;
     stm32_eth_device.bufoffset = 0;

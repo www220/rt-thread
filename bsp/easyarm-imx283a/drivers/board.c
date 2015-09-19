@@ -137,4 +137,39 @@ void rt_hw_board_init()
     rt_kprintf("loops %d, init %d, all %d\n",loops_per_jiffy,init[2]-init[1],init[5]-init[0]);
 }
 
+#if defined(FINSH_USING_MSH)
+#include <finsh.h>
+#include <msh.h>
+int cmd_reboot(int argc, char** argv)
+{
+	wtdog_count = 100;
+
+	//使用内部的看门狗来达到重启的目的
+	writel(1, REGS_RTC_BASE + HW_RTC_WATCHDOG);
+	writel(0x80000000, REGS_RTC_BASE + HW_RTC_PERSISTENT1_SET);
+	writel(BM_RTC_CTRL_WATCHDOGEN, REGS_RTC_BASE + HW_RTC_CTRL_SET);
+	return 0;
+}
+
+int cmd_beep(int argc, char** argv)
+{
+	int beep = 100,i;
+	if (argc > 1)
+		beep = atol(argv[1]);
+    for (i=0;i<beep;i++)
+    {
+    	pin_gpio_set(PIN_BEEP, 1);
+    	udelay(250);
+    	pin_gpio_set(PIN_BEEP, 0);
+    	if (((i%100) == 0) && (i != 0))
+			rt_thread_delay(50);
+		else
+    		udelay(250);
+    }
+	return 0;
+}
+
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_reboot, __cmd_reboot, Reboot With WDT.)
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_beep, __cmd_beep, Beep.)
+#endif //FINSH_USING_MSH
 /*@}*/

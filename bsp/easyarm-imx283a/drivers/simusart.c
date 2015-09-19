@@ -268,7 +268,7 @@ static rt_err_t rt_serial_control (rt_device_t dev, rt_uint8_t cmd, void *args)
     return RT_EOK;
 }
 
-rt_err_t rt_hw_serial_register(rt_device_t device, const char* name, rt_uint32_t flag, struct stm32_serial_device *serial)
+rt_err_t rt_hw_serial_register_vs(rt_device_t device, const char* name, rt_uint32_t flag, struct stm32_serial_device *serial)
 {
     RT_ASSERT(device != RT_NULL);
 
@@ -397,7 +397,7 @@ void rt_hw_usart_init()
     uart1.uart_dcb.StopBits= 0;
 
     /* register uart1 */
-    rt_hw_serial_register(&uart1_device, "uart1",
+    rt_hw_serial_register_vs(&uart1_device, "uart1",
         RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_STREAM | RT_DEVICE_FLAG_INT_RX,
         &uart1);
 #endif

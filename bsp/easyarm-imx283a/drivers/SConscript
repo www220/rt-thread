@@ -42,6 +42,10 @@ nand.c
 apbh_dma.c
 """)
 
+nandsim_src = Split("""
+simnand.c
+""")
+
 lcddev_src = Split("""
 lcdif.c
 mxsfb.c
@@ -70,6 +74,9 @@ else:
 if rtconfig.PLATFORM != 'cl':
     if GetDepend(['RT_USING_MTD_NAND']):
         src += nanddev_src
+else:
+    if GetDepend(['RT_USING_MTD_NAND']):
+        src += nandsim_src
         
 if rtconfig.PLATFORM != 'cl':
     if GetDepend(['RT_USING_RTGUI']):
