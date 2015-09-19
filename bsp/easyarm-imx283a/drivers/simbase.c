@@ -29,6 +29,9 @@ void rt_hw_board_init()
 #ifdef RT_USING_CONSOLE
     rt_console_set_device(CONSOLE_DEVICE);
 #endif
+#ifdef RT_USING_MTD_NAND
+    rt_hw_mtd_nand_init();
+#endif
 }
 
 void libc_system_init()
