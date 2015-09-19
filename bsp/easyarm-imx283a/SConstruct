@@ -19,6 +19,40 @@ env = Environment(tools = ['mingw'],
 	LINK = rtconfig.LINK, LINKFLAGS = rtconfig.LFLAGS)
 env.PrependENVPath('PATH', rtconfig.EXEC_PATH)
 
+if rtconfig.PLATFORM == 'cl':
+    libs = Split('''
+    winmm
+    gdi32
+    winspool
+    comdlg32
+    advapi32
+    shell32
+    ole32
+    oleaut32
+    uuid
+    odbc32
+    odbccp32
+    ''')
+    definitions = Split('''
+    WIN32
+    _DEBUG
+    _CONSOLE
+    MSVC
+    _CRT_ERRNO_DEFINED
+    _CRT_DIRECTORY_DEFINED
+    _CRT_ALLOCATION_DEFINED
+    _CRT_SECURE_NO_WARNINGS
+    _CRT_NONSTDC_NO_WARNINGS
+    _USE_32BIT_TIME_T
+    NORESOURCE
+    STATIC_BUILD
+    BUILD_tcl
+    ''')
+    env.Append(CCFLAGS = rtconfig.CFLAGS)
+    env.Append(LINKFLAGS = rtconfig.LFLAGS)
+    env['LIBS'] = libs
+    env['CPPDEFINES'] = definitions
+
 Export('RTT_ROOT')
 Export('rtconfig')
 

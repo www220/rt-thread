@@ -96,6 +96,8 @@ static MMRESULT     OSTick_TimerID;
  */
 rt_uint32_t rt_interrupt_from_thread, rt_interrupt_to_thread;
 rt_uint32_t rt_thread_switch_interrupt_flag;
+rt_uint32_t rt_thread_switch_main_flag;
+void *rt_interrupt_main_thread;
 
 /*
 *********************************************************************************************************
@@ -172,18 +174,9 @@ rt_uint8_t* rt_hw_stack_init(void *pEntry,void *pParam,rt_uint8_t *pStackAddr,vo
     pWinThread->ThreadID = 0;
 
     /* Create the winthread */
-    pWinThread->ThreadHandle = CreateThread(NULL,
-                                            0,
-                                            (LPTHREAD_START_ROUTINE) thread_run,
-                                            pWinThread,
-                                            CREATE_SUSPENDED,
-                                            &(pWinThread->ThreadID));
-    SetThreadAffinityMask(pWinThread->ThreadHandle,
-                          0x01);
-    SetThreadPriorityBoost(pWinThread->ThreadHandle,
-                           TRUE);
-    SetThreadPriority(pWinThread->ThreadHandle,
-                      THREAD_PRIORITY_IDLE);
+    pWinThread->ThreadHandle = CreateFiber(0,
+                                           (LPTHREAD_START_ROUTINE) pEntry,
+                                           pParam);
 
     return (rt_uint8_t*)pWinThread;
 } /*** rt_hw_stack_init ***/
@@ -226,6 +219,11 @@ void rt_hw_interrupt_enable(rt_base_t level)
     if (hInterruptEventMutex != NULL)
     {
         ReleaseMutex(hInterruptEventMutex);
+        if (rt_thread_switch_main_flag && rt_interrupt_main_thread)
+        {
+            rt_thread_switch_main_flag = 0;
+            SwitchToFiber(rt_interrupt_main_thread);
+        }
     }
 
 } /*** rt_hw_interrupt_enable ***/
@@ -276,7 +274,7 @@ void rt_hw_context_switch(rt_uint32_t from,
 
     //trigger YIELD exception(cause contex switch)
     TriggerSimulateInterrupt(CPU_INTERRUPT_YIELD);
-
+    rt_thread_switch_main_flag = 1;
 } /*** rt_hw_context_switch ***/
 
 /*
@@ -532,6 +530,12 @@ void RegisterSimulateInterrupt(rt_uint32_t IntIndex,rt_uint32_t (*IntHandler)(vo
     hInterruptObjectList[0] = hInterruptEventHandle;
     hInterruptObjectList[1] = hInterruptEventMutex;
 
+    rt_thread_switch_main_flag = 0;
+    rt_interrupt_main_thread = ConvertThreadToFiber(0);
+    if (rt_interrupt_main_thread == NULL)
+    {
+        return;
+    }
 
     while (1)
     {
@@ -553,38 +557,32 @@ void RegisterSimulateInterrupt(rt_uint32_t IntIndex,rt_uint32_t (*IntHandler)(vo
         for (i = 0; i < MAX_INTERRUPT_NUM; ++i)
         {
             /* is the simulated interrupt pending ? */
-            if (CpuPendingInterrupts & (1UL << i))
+            if (CpuPendingInterrupts & (1UL << (MAX_INTERRUPT_NUM-1-i)))
             {
                 /* Is a handler installed ?*/
-                if (CpuIsrHandler[i] != NULL)
+                if (CpuIsrHandler[MAX_INTERRUPT_NUM-1-i] != NULL)
                 {
                     /* Run the actual handler */
-                    if (CpuIsrHandler[i]() != 0)
+                    if (CpuIsrHandler[MAX_INTERRUPT_NUM-1-i]() != 0)
                     {
-                        SwitchRequiredMask |= (1UL << i);
+                        SwitchRequiredMask |= (1UL << (MAX_INTERRUPT_NUM-1-i));
                     }
                 }
 
                 /* Clear the interrupt pending bit */
-                CpuPendingInterrupts &= ~(1UL << i);
+                CpuPendingInterrupts &= ~(1UL << (MAX_INTERRUPT_NUM-1-i));
             }
         }
+        ReleaseMutex(hInterruptEventMutex);
 
         if(SwitchRequiredMask != 0)
         {
             WinThreadFrom = (win_thread_t *)rt_interrupt_from_thread;
             WinThreadTo = (win_thread_t *)rt_interrupt_to_thread;
 
-            if ((WinThreadFrom != NULL) && (WinThreadFrom->ThreadHandle != NULL))
-            {
-                SuspendThread(WinThreadFrom->ThreadHandle);
-            }
-
-            ResumeThread(WinThreadTo->ThreadHandle);
-
+            SwitchToFiber(WinThreadTo->ThreadHandle);
         }
 
-        ReleaseMutex(hInterruptEventMutex);
     }
 } /*** WinThreadScheduler ***/
 

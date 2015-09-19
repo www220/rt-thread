@@ -3,6 +3,10 @@ ARCH     = 'arm'
 CPU      = 'arm926'
 CROSS_TOOL = 'gcc'
 
+ARCH     = 'sim'
+CPU      = 'win32'
+CROSS_TOOL = 'msvc'
+
 #------- toolchains path -------------------------------------------------------
 if os.getenv('RTT_CC'):
 	CROSS_TOOL = os.getenv('RTT_CC')
@@ -10,6 +14,9 @@ if os.getenv('RTT_CC'):
 if  CROSS_TOOL == 'gcc':
 	PLATFORM 	= 'gcc'
 	EXEC_PATH 	= r'C:/Program Files (x86)/GNU Tools ARM Embedded/4.9 2015q2/bin'
+elif CROSS_TOOL == 'msvc':
+	PLATFORM 	= 'cl'
+	EXEC_PATH 	= r''
 
 if os.getenv('RTT_EXEC_PATH'):
 	EXEC_PATH = os.getenv('RTT_EXEC_PATH')
@@ -52,3 +59,29 @@ if PLATFORM == 'gcc':
 
     POST_ACTION = OBJCPY + ' -O binary $TARGET ' + TARGET_NAME + '\n' 
     POST_ACTION += SIZE + ' $TARGET\n'
+
+elif PLATFORM == 'cl':
+    PREFIX = ''
+    TARGET_EXT = 'exe'
+    AS = PREFIX + 'cl'
+    CC = PREFIX + 'cl'
+    AR = PREFIX + 'cl'
+    LINK = PREFIX + 'cl'
+    AFLAGS = ''
+    CFLAGS = ''
+    LFLAGS = ''
+
+    if BUILD == 'debug':
+        CFLAGS += ' /MTd'
+        LFLAGS += ' /DEBUG'
+    else:
+        CFLAGS += ' /MT'
+        LFLAGS += ''
+
+    CFLAGS += ' /ZI /Od /W 3 /WL '
+    LFLAGS += ' /SUBSYSTEM:CONSOLE /MACHINE:X86 '
+
+    CPATH = ''
+    LPATH = ''
+
+    POST_ACTION = ''
