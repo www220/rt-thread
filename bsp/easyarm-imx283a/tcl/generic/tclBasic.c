@@ -490,7 +490,7 @@ Tcl_CreateInterp(void)
 	Tcl_Panic("Tcl_CallFrame must not be smaller than CallFrame");
     }
 
-#if defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32_R) && !defined(_WIN64)
     if (sizeof(time_t) != 4) {
 	/*NOTREACHED*/
 	Tcl_Panic("<time.h> is not compatible with MSVC");

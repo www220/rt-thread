@@ -512,7 +512,7 @@ TclFSGetPathType(
 
     if (PATHFLAGS(pathPtr) == 0) {
 	/* The path is not absolute... */
-#ifdef _WIN32
+#ifdef _WIN32_R
 	/* ... on Windows we must make another call to determine whether
 	 * it's relative or volumerelative [Bug 2571597]. */
 	return TclGetPathType(pathPtr, filesystemPtrPtr, driveNameLengthPtr,
@@ -1956,7 +1956,7 @@ Tcl_FSGetNormalizedPath(
 		/*
 		 * We have a refCount on the cwd.
 		 */
-#ifdef _WIN32
+#ifdef _WIN32_R
 	    } else if (type == TCL_PATH_VOLUME_RELATIVE) {
 		/*
 		 * Only Windows has volume-relative paths.
@@ -1969,7 +1969,7 @@ Tcl_FSGetNormalizedPath(
 		    return NULL;
 		}
 		pureNormalized = 0;
-#endif /* _WIN32 */
+#endif /* _WIN32_R */
 	    }
 	}
 

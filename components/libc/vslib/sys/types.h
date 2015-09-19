@@ -7,6 +7,8 @@ typedef int gid_t;
 typedef int uid_t;
 typedef int ssize_t;
 typedef unsigned int size_t;
+typedef unsigned short ino_t;
+typedef unsigned int dev_t;
 
 typedef	unsigned char	u_char;
 typedef	unsigned short	u_short;

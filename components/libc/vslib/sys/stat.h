@@ -10,8 +10,16 @@ struct stat
     rt_device_t st_dev;
     rt_uint16_t st_mode;
     rt_uint32_t st_size;
+    rt_time_t   st_atime;
     rt_time_t   st_mtime;
+    rt_time_t   st_ctime;
     rt_uint32_t st_blksize;
+    rt_uint32_t st_blocks;
+    ino_t       st_ino;
+    short       st_nlink;
+    short       st_uid;
+    short       st_gid;
+    rt_uint32_t	st_rdev;
 };
 
 #define	_IFMT		0170000	/* type of file */
@@ -31,6 +39,10 @@ struct stat
 #define	S_IFLNK		_IFLNK
 #define	S_IFSOCK	_IFSOCK
 #define	S_IFIFO		_IFIFO
+
+#define	S_ISUID		0004000	/* set user id on execution */
+#define	S_ISGID		0002000	/* set group id on execution */
+#define	S_ISVTX		0001000	/* save swapped text even after use */
 
 #define	S_IRWXU 	(S_IRUSR | S_IWUSR | S_IXUSR)
 #define		S_IRUSR	0000400	/* read permission, owner */

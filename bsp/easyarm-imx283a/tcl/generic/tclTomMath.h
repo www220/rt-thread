@@ -168,7 +168,7 @@ extern "C" {
 typedef int           mp_err;
 
 /* you'll have to tune these... */
-#if defined(BUILD_tcl) || !defined(_WIN32)
+#if defined(BUILD_tcl) || !defined(_WIN32_R)
 MODULE_SCOPE int KARATSUBA_MUL_CUTOFF,
            KARATSUBA_SQR_CUTOFF,
            TOOM_MUL_CUTOFF,
@@ -622,7 +622,7 @@ int mp_exptmod(mp_int *a, mp_int *b, mp_int *c, mp_int *d);
 #endif
 
 /* table of first PRIME_SIZE primes */
-#if defined(BUILD_tcl) || !defined(_WIN32)
+#if defined(BUILD_tcl) || !defined(_WIN32_R)
 MODULE_SCOPE const mp_digit ltm_prime_tab[];
 #endif
 
@@ -821,7 +821,7 @@ int s_mp_exptmod (mp_int * G, mp_int * X, mp_int * P, mp_int * Y, int mode);
 void bn_reverse(unsigned char *s, int len);
 */
 
-#if defined(BUILD_tcl) || !defined(_WIN32)
+#if defined(BUILD_tcl) || !defined(_WIN32_R)
 MODULE_SCOPE const char *mp_s_rmap;
 #endif
 

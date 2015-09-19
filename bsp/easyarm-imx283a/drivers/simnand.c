@@ -33,12 +33,6 @@ static rt_err_t nanddrv_file_read_page(struct rt_mtd_nand_device *device,
     rt_uint8_t *spare, rt_uint32_t spare_len)
 {
     rt_uint32_t offset,code;
-    page = page + device->block_start * device->pages_per_block;
-
-    if (page / device->pages_per_block > device->block_end)
-    {
-        return -RT_EIO;
-    }
 
     /* write page */
     if (data != NULL && data_len != 0)
@@ -64,12 +58,6 @@ static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
     const rt_uint8_t *oob, rt_uint32_t spare_len)
 {
     rt_uint32_t offset,code;
-
-    page = page + device->block_start * device->pages_per_block;
-    if (page / device->pages_per_block > device->block_end)
-    {
-        return -RT_EIO;
-    }
 
     /* write page */
     if (data != RT_NULL && data_len != 0)
@@ -111,7 +99,7 @@ static rt_err_t nanddrv_file_check_block(struct rt_mtd_nand_device *device, rt_u
     rt_uint8_t state = 0;
     rt_uint32_t code;
 
-    SetFilePointer(file, block * BLOCK_SIZE, NULL, FILE_BEGIN);
+    SetFilePointer(file, block * BLOCK_SIZE + PAGE_DATA_SIZE, NULL, FILE_BEGIN);
     ReadFile(file, &state, 1, &code, 0);
 
     return (state==0xff)?RT_EOK:-RT_EIO;
@@ -122,7 +110,7 @@ static rt_err_t nanddrv_file_mark_block(struct rt_mtd_nand_device *device, rt_ui
     rt_uint8_t state = 0;
     rt_uint32_t code;
 
-    SetFilePointer(file, block * BLOCK_SIZE, NULL, FILE_BEGIN);
+    SetFilePointer(file, block * BLOCK_SIZE + PAGE_DATA_SIZE, NULL, FILE_BEGIN);
     WriteFile(file, &state, 1, &code, 0);
 
     return RT_EOK;;

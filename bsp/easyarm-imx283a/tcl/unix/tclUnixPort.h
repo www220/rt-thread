@@ -40,6 +40,12 @@
 #define TCL_LIBRARY    "."
 #define TCL_PACKAGE_PATH    "."
 
+#ifdef _MSC_VER
+#define inline __inline
+#include <stdio.h>
+#define snprintf _snprintf
+#endif
+
 #include <sys/types.h>
 #define utime(x,y) 0
 static inline mode_t umask(mode_t __mask) { return 0; }

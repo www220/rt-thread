@@ -26,6 +26,7 @@
 #include <rthw.h>
 
 #include "board.h"
+#include <stdlib.h>
 #include <mmu.h>
 
 unsigned long loops_per_jiffy = 0x1bb00;

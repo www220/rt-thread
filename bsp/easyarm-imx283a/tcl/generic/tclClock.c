@@ -19,7 +19,7 @@
  * Windows has mktime. The configurators do not check.
  */
 
-#ifdef _WIN32
+#ifdef _WIN32_R
 #define HAVE_MKTIME 1
 #endif
 

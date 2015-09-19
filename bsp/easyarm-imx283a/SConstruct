@@ -47,9 +47,6 @@ if rtconfig.PLATFORM == 'cl':
     NORESOURCE
     __inline__=__inline
     RT_USING_NEWLIB
-    STATIC_BUILD
-    BUILD_tcl
-    SQLITE_TEST
     ''')
     env.Append(CCFLAGS = rtconfig.CFLAGS)
     env.Append(LINKFLAGS = rtconfig.LFLAGS)
@@ -62,8 +59,14 @@ Export('rtconfig')
 # prepare building environment
 objs = PrepareBuilding(env, RTT_ROOT)
 
-if GetDepend('SQLITE_TEST') == True:
-    env['CCFLAGS'] += ' -DSQLITE_TEST'
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend('SQLITE_TEST') == True:
+        env['CCFLAGS'] += ' -DSQLITE_TEST'
+else:
+    if GetDepend('SQLITE_TEST') == True:
+        env['CPPDEFINES'] += ['SQLITE_TEST']
+    if GetDepend('RT_USING_TCLSHELL') == True:
+        env['CPPDEFINES'] += ['STATIC_BUILD','BUILD_tcl']
 
 # make a building
 DoBuilding(TARGET, objs)

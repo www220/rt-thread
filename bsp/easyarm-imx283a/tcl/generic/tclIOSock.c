@@ -11,7 +11,7 @@
 
 #include "tclInt.h"
 
-#if defined(_WIN32) && defined(UNICODE)
+#if defined(_WIN32_R) && defined(UNICODE)
 /* On Windows, we need to do proper Unicode->UTF-8 conversion. */
 
 typedef struct ThreadSpecificData {
@@ -104,7 +104,7 @@ TclSockGetPort(
  *----------------------------------------------------------------------
  */
 
-#if !defined(_WIN32) && !defined(__CYGWIN__)
+#if !defined(_WIN32_R) && !defined(__CYGWIN__)
 #   define SOCKET int
 #endif
 

@@ -6,6 +6,9 @@
 # define	SEEK_END	2
 
 #include <sys/types.h>
+
 pid_t getpid(void );
+int access(const char *__path, int __amode );
+int link(const char *__path1, const char *__path2 );
 
 #endif

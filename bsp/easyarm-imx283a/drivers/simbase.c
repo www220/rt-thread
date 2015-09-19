@@ -34,6 +34,7 @@ void rt_hw_board_init()
 #endif
 }
 
+static int libcinit =0;
 void libc_system_init()
 {
 #ifdef RT_USING_DFS
@@ -55,14 +56,26 @@ void libc_system_init()
     fd = open("/dev/console", O_WRONLY, 0);	/* for stdout */
     fd = open("/dev/console", O_WRONLY, 0);	/* for stderr */
 #endif
+    libcinit = 1;
 }
 
 int _write (int fh, const void *buf, unsigned cnt)
 {
-    if (fh < 3)
-        return write(fh, buf, cnt);
-    else
+    if (fh < 3) {
+        //lib初始化在后面，直接输出无法printf
+        if (libcinit) {
+            return write(fh, buf, cnt);
+        } else {
+            rt_device_t dev = rt_console_get_device();
+            rt_uint16_t old_flag = dev->open_flag;
+            dev->open_flag |= RT_DEVICE_FLAG_STREAM;
+            rt_device_write(dev, 0, buf, cnt);
+            dev->open_flag = old_flag;
+            return cnt;
+        }
+    } else {
         return -1;
+    }
 }
 
 errno_t _tsopen_s (

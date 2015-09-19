@@ -444,7 +444,7 @@ TclUnsetEnv(
      * that no = should be included, and Windows requires it.
      */
 
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32_R) || defined(__CYGWIN__)
     string = ckalloc(length + 2);
     memcpy(string, name, (size_t) length);
     string[length] = '=';
@@ -453,7 +453,7 @@ TclUnsetEnv(
     string = ckalloc(length + 1);
     memcpy(string, name, (size_t) length);
     string[length] = '\0';
-#endif /* _WIN32 */
+#endif /* _WIN32_R */
 
     Tcl_UtfToExternalDString(NULL, string, -1, &envString);
     string = ckrealloc(string, Tcl_DStringLength(&envString) + 1);
