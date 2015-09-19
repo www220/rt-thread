@@ -49,6 +49,7 @@ if rtconfig.PLATFORM == 'cl':
     RT_USING_NEWLIB
     STATIC_BUILD
     BUILD_tcl
+    SQLITE_TEST
     ''')
     env.Append(CCFLAGS = rtconfig.CFLAGS)
     env.Append(LINKFLAGS = rtconfig.LFLAGS)

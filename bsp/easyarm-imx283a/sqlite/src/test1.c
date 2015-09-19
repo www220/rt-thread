@@ -6344,6 +6344,8 @@ static int tclLoadStaticExtensionCmd(
     { "spellfix",              sqlite3_spellfix_init             },
     { "totype",                sqlite3_totype_init               },
     { "wholenumber",           sqlite3_wholenumber_init          },
+#else
+    { "",                      0                                 }
 #endif
   };
   sqlite3 *db;

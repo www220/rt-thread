@@ -10,12 +10,6 @@
 #define strtok_r strtok_s
 #define strcasecmp strcmp
 
-typedef	unsigned char	u_char;
-typedef	unsigned short	u_short;
-typedef	unsigned int	u_int;
-typedef	unsigned long	u_long;
-typedef unsigned int	mode_t;
-
 #define errno (*__errno())
 extern int *__errno (void);
 
@@ -138,9 +132,9 @@ extern int *__errno (void);
 #define DFS_FD_MAX					20
 
 /* SECTION: sqlite, sql */
-//#define RT_USING_SQLITE3
-//#define SQLITE_TEST 1
-//#define RT_USING_TCLSHELL
+#define RT_USING_SQLITE3
+#define SQLITE_TEST 1
+#define RT_USING_TCLSHELL
 
 #define rttTempFileDir "/mnt/tmp"
 #define rttCfgFileDir "/mnt/config"

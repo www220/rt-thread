@@ -70,6 +70,7 @@
 */
 
 #include "sqlite3.h"
+#include "sqliteInt.h"
 
 #include "os_setup.h"
 #if SQLITE_OS_WIN
