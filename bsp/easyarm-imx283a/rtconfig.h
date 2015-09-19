@@ -9,6 +9,11 @@
 #define free     rt_free
 
 #define strtok_r strtok_s
+#define strcasecmp strcmp
+typedef	unsigned char	u_char;
+typedef	unsigned short	u_short;
+typedef	unsigned int	u_int;
+typedef	unsigned long	u_long;
 
 //从“type1”转换到“type2”可能丢失数据
 #pragma warning(disable:4244)

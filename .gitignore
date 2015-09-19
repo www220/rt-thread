@@ -22,3 +22,11 @@ documentation/html
 *.i
 *.d
 /bsp/easyarm-imx283a/elftosb/imx28_ivt_uboot.sb
+/bsp/easyarm-imx283a/project.opensdf
+/bsp/easyarm-imx283a/project.sdf
+/bsp/easyarm-imx283a/project.sln
+/bsp/easyarm-imx283a/project.suo
+/bsp/easyarm-imx283a/project.vcxproj
+/bsp/easyarm-imx283a/project.vcxproj.filters
+/bsp/easyarm-imx283a/project.vcxproj.user
+/bsp/easyarm-imx283a/ipch

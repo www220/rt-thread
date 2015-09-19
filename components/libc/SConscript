@@ -13,6 +13,8 @@ if GetDepend('RT_USING_LIBC'):
         objs = objs + SConscript('armlibc/SConscript')
     elif rtconfig.PLATFORM == 'iar':
         objs = objs + SConscript('dlib/SConscript')
+    elif rtconfig.PLATFORM == 'cl':
+        objs = objs + SConscript('vslib/SConscript')
 else:
     if rtconfig.PLATFORM == 'gcc':
         objs = objs + SConscript('minilibc/SConscript')

@@ -81,6 +81,7 @@ extern volatile int wtdog_count;
 extern volatile int sys_stauts;
 void inittmppath(void);
 
+#ifndef _MSC_VER
 extern void __delay(int loops);
 extern void __bad_udelay(void);
 extern void __udelay(unsigned long usecs);
@@ -181,4 +182,5 @@ static inline void mxs_clock_disable(u32 hwreg, u32 gate)
 	writel(reg, hwreg);
 }
 
+#endif
 #endif

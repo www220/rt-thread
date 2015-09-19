@@ -30,10 +30,11 @@ void rt_hw_board_init()
 #endif
 }
 
-void libc_system_init(const char* tty_name)
+void libc_system_init()
 {
 #ifdef RT_USING_DFS
     int fd;
+    struct rt_device *console_dev;
 
 #ifndef RT_USING_DFS_DEVFS
 #error Please enable devfs by defining RT_USING_DFS_DEVFS in rtconfig.h
@@ -41,7 +42,9 @@ void libc_system_init(const char* tty_name)
 
     /* init console device */
     extern void rt_console_init(const char* device_name);
-    rt_console_init(tty_name);
+    console_dev = rt_console_get_device();
+    if (console_dev)
+        rt_console_init(console_dev->parent.name);
 
     /* open console as stdin/stdout/stderr */
     fd = open("/dev/console", O_RDONLY, 0);	/* for stdin */

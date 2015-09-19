@@ -1,0 +1,11 @@
+from building import *
+
+src	= Glob('*.c')
+cwd = GetCurrentDir()
+
+CPPPATH = [cwd]
+
+group = DefineGroup('vslib', src, depend = ['RT_USING_LIBC'], 
+	CPPPATH = CPPPATH)
+
+Return('group')

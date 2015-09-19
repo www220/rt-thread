@@ -179,7 +179,7 @@ int cmd_msleep(int argc, char** argv)
 	rt_thread_delay(sleep);
 	return 0;
 }
-
+#ifndef _MSC_VER
 int cmd_reboot(int argc, char** argv)
 {
 	wtdog_count = 100;
@@ -208,7 +208,7 @@ int cmd_beep(int argc, char** argv)
     }
 	return 0;
 }
-
+#endif
 #ifdef RT_USING_TCLSHELL
 #include "tcl.h"
 int cmd_tcl(int argc, char** argv)
@@ -247,6 +247,8 @@ FINSH_FUNCTION_EXPORT_ALIAS(cmd_tcl, __cmd_tcl, TCL.)
 
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_sh, __cmd_sh, Shell the FILEs.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_msleep, __cmd_msleep, Sleep ms.)
+#ifndef _MSC_VER
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_reboot, __cmd_reboot, Reboot With WDT.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_beep, __cmd_beep, Beep.)
+#endif
 #endif //FINSH_USING_MSH
