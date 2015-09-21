@@ -1,3 +1,56 @@
+#include <rtthread.h>
+#include <rtdevice.h>
+#include <sys/types.h>
+
+#ifdef RT_USING_DFS
+#include <dfs_posix.h>
+#endif
+
+void libc_system_init()
+{
+#ifdef RT_USING_DFS
+    int fd;
+    struct rt_device *console_dev;
+
+#ifndef RT_USING_DFS_DEVFS
+#error Please enable devfs by defining RT_USING_DFS_DEVFS in rtconfig.h
+#endif
+
+    /* init console device */
+    extern void rt_console_init(const char* device_name);
+    console_dev = rt_console_get_device();
+    if (console_dev)
+        rt_console_init(console_dev->parent.name);
+
+    /* open console as stdin/stdout/stderr */
+    fd = open("/dev/console", O_RDONLY, 0);	/* for stdin */
+    fd = open("/dev/console", O_WRONLY, 0);	/* for stdout */
+    fd = open("/dev/console", O_WRONLY, 0);	/* for stderr */
+#endif
+}
+
+int _write (int fh, const void *buf, unsigned cnt)
+{
+    if (fh < 3)
+    {
+#ifdef RT_USING_CONSOLE
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        if (console_device != 0) rt_device_write(console_device, 0, buf, cnt);
+        return cnt;
+#else
+        return 0;
+#endif
+    }
+    else
+    {
+#ifdef RT_USING_DFS
+        return write(fh, buf, cnt);;
+#else
+        return 0;
+#endif
+    }
+}
 
 int*
 __errno(void)

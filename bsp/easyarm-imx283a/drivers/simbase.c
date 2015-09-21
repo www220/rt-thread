@@ -34,61 +34,6 @@ void rt_hw_board_init()
 #endif
 }
 
-static int libcinit =0;
-void libc_system_init()
-{
-#ifdef RT_USING_DFS
-    int fd;
-    struct rt_device *console_dev;
-
-#ifndef RT_USING_DFS_DEVFS
-#error Please enable devfs by defining RT_USING_DFS_DEVFS in rtconfig.h
-#endif
-
-    /* init console device */
-    extern void rt_console_init(const char* device_name);
-    console_dev = rt_console_get_device();
-    if (console_dev)
-        rt_console_init(console_dev->parent.name);
-
-    /* open console as stdin/stdout/stderr */
-    fd = open("/dev/console", O_RDONLY, 0);	/* for stdin */
-    fd = open("/dev/console", O_WRONLY, 0);	/* for stdout */
-    fd = open("/dev/console", O_WRONLY, 0);	/* for stderr */
-#endif
-    libcinit = 1;
-}
-
-int _write (int fh, const void *buf, unsigned cnt)
-{
-    if (fh < 3) {
-        //lib初始化在后面，直接输出无法printf
-        if (libcinit) {
-            return write(fh, buf, cnt);
-        } else {
-            rt_device_t dev = rt_console_get_device();
-            rt_uint16_t old_flag = dev->open_flag;
-            dev->open_flag |= RT_DEVICE_FLAG_STREAM;
-            rt_device_write(dev, 0, buf, cnt);
-            dev->open_flag = old_flag;
-            return cnt;
-        }
-    } else {
-        return -1;
-    }
-}
-
-errno_t _tsopen_s (
-        int * pfh,
-        const char *path,
-        int oflag,
-        int shflag,
-        int pmode
-        )
-{
-    return -1;
-}
-
 extern void *rt_interrupt_main_thread;
 void cpu_usage_idle_hook(void)
 {

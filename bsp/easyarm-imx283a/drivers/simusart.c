@@ -398,7 +398,7 @@ void rt_hw_usart_init()
 
     /* register uart1 */
     rt_hw_serial_register_vs(&uart1_device, "dbgu",
-        RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_STREAM | RT_DEVICE_FLAG_INT_RX,
+        RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX,
         &uart1);
 #endif
 }
