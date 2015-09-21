@@ -930,7 +930,15 @@ static int yaffs2_ybicmp(const void *a, const void *b)
 	return aseq - bseq;
 }
 
-static int scan_chunk = -100;
+struct yaffs_summary_tags {
+    unsigned obj_id;
+    unsigned chunk_id;
+    unsigned n_bytes;
+};
+static struct yaffs_summary_tags scan_sum_tag[256];
+static int scan_do = 0;
+static int scan_init = 0;
+static int scan_chunk = -1;
 static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
 		struct yaffs_block_info *bi,
 		int blk, int chunk_in_block,
@@ -1008,6 +1016,8 @@ static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
                     //error
                     else
                         scan_chunk = -1;
+                    scan_init = 1;
+                    scan_do = 0;
 				} else {
 					/* This is a partially written block
 					 * that is not the current
@@ -1018,6 +1028,7 @@ static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
 						blk);
                     //error
                     scan_chunk = -1;
+                    scan_init = 0;
 				}
 			}
 		}
@@ -1050,6 +1061,16 @@ static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
 		*found_chunks = 1;
 
 		yaffs_set_chunk_bit(dev, blk, chunk_in_block);
+        //add summary tag
+        if (scan_init) {
+            struct yaffs_packed_tags2_tags_only tags_only;
+            struct yaffs_summary_tags *sum_tags;
+            yaffs_pack_tags2_tags_only(&tags_only, &tags);
+            sum_tags = &scan_sum_tag[chunk_in_block];
+            sum_tags->chunk_id = tags_only.chunk_id;
+            sum_tags->n_bytes = tags_only.n_bytes;
+            sum_tags->obj_id = tags_only.obj_id;
+        }
 		bi->pages_in_use++;
 
 		in = yaffs_find_or_create_by_number(dev,
@@ -1097,6 +1118,16 @@ static inline int yaffs2_scan_chunk(struct yaffs_dev *dev,
 		*found_chunks = 1;
 
 		yaffs_set_chunk_bit(dev, blk, chunk_in_block);
+        //add summary tag
+        if (scan_init) {
+            struct yaffs_packed_tags2_tags_only tags_only;
+            struct yaffs_summary_tags *sum_tags;
+            yaffs_pack_tags2_tags_only(&tags_only, &tags);
+            sum_tags = &scan_sum_tag[chunk_in_block];
+            sum_tags->chunk_id = tags_only.chunk_id;
+            sum_tags->n_bytes = tags_only.n_bytes;
+            sum_tags->obj_id = tags_only.obj_id;
+        }
 		bi->pages_in_use++;
 
 		oh = NULL;
@@ -1486,9 +1517,10 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
 			c = dev->chunks_per_summary - 1;
 		else
 			c = dev->param.chunks_per_block - 1;
+
         //init scan_chunk
-        if (scan_chunk == -100)
-            scan_chunk = c;
+        scan_chunk = c;
+        scan_init = 0;
 
 		for (/* c is already initialised */;
 		     !alloc_failed && c >= 0 &&
@@ -1517,6 +1549,12 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
 		    bi->block_state == YAFFS_BLOCK_STATE_FULL) {
 			yaffs_block_became_dirty(dev, blk);
 		}
+
+        //check scan_chunk
+        if (scan_init && scan_chunk >= 0 
+            && scan_chunk+1 == bi->pages_in_use 
+            && bi->pages_in_use < dev->chunks_per_summary)
+            scan_do = 1;
 	}
 
 #if 1
@@ -1524,7 +1562,7 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
     if (dev->alloc_block > 0) {
         bi = yaffs_get_block_info(dev, dev->alloc_block);
         if (bi->block_state == YAFFS_BLOCK_STATE_ALLOCATING) {
-            if (scan_chunk < 0 || scan_chunk+1 != bi->pages_in_use) {
+            if (!scan_do) {
                 yaffs_trace(YAFFS_TRACE_SCAN, " Alloc_Block:%d Page_In_Use:%d State_Full",
                             dev->alloc_block, bi->pages_in_use); 
                 bi->block_state = YAFFS_BLOCK_STATE_FULL;
@@ -1532,6 +1570,8 @@ int yaffs2_scan_backwards(struct yaffs_dev *dev)
             } else {
                 yaffs_trace(YAFFS_TRACE_SCAN, " Alloc_Block:%d Alloc_Page:%d",
                             dev->alloc_block, dev->alloc_page);
+                if (dev->sum_tags)
+                    memcpy(dev->sum_tags, scan_sum_tag, dev->chunks_per_summary*sizeof(struct yaffs_summary_tags));
             }
         }
     }
