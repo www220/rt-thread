@@ -383,3 +383,8 @@ _isatty(int fd)
 
 	return 0;
 }
+
+void __libc_init_array(void)
+{
+	/* we not use __libc init_aray to initialize C++ objects */
+}
