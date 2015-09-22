@@ -132,7 +132,7 @@ extern int *__errno (void);
 #define DFS_FD_MAX					20
 
 /* SECTION: sqlite, sql */
-#define RT_USING_SQLITE3
+//#define RT_USING_SQLITE3
 //#define SQLITE_TEST 1
 //#define RT_USING_TCLSHELL
 

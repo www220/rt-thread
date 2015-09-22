@@ -45,6 +45,7 @@ void cpu_usage_idle_hook(void)
 
 int cmd_beep(int argc, char** argv)
 {
+#ifndef DIS_BEEP
     int beep = 100,i;
     if (argc > 1)
         beep = atol(argv[1]);
@@ -53,6 +54,7 @@ int cmd_beep(int argc, char** argv)
         Beep(2000,100);
         rt_thread_delay(50);
     }
+#endif
     return 0;
 }
 

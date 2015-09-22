@@ -51,6 +51,7 @@
 //#define RT_USING_UART4
 //#define RT_USING_UART5
 
+#define DIS_BEEP
 #define PIN_WDT		PINID_GPMI_RDY1
 #define MXS280A
 #ifndef MXS280A

@@ -150,3 +150,22 @@ gettimeofday(struct timeval *tp, struct timezone *tzp)
 
     return 0;
 }
+
+int	
+settimeofday(const struct timeval *tp, const struct timezone *tzp)
+{
+    struct tm atm;
+    SYSTEMTIME st;
+
+    atm = *localtime(&tp->tv_sec);
+    st.wSecond = atm.tm_sec;
+    st.wMinute = atm.tm_min;
+    st.wHour = atm.tm_hour;
+    st.wDay = atm.tm_mday;
+    st.wMonth = atm.tm_mon + 1;        // tm_mon is 0 based
+    st.wYear = atm.tm_year + 1900;     // tm_year is 1900 based
+    st.wMilliseconds = tp->tv_usec / 1000;
+    SetLocalTime(&st);
+
+    return 0;
+}

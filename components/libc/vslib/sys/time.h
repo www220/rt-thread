@@ -17,5 +17,7 @@ struct timezone {
 };
 
 #include <time.h>
+int gettimeofday(struct timeval *tp, struct timezone *tzp);
+int settimeofday(const struct timeval *tp, const struct timezone *tzp);
 
 #endif

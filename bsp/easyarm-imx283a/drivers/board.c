@@ -154,6 +154,7 @@ int cmd_reboot(int argc, char** argv)
 
 int cmd_beep(int argc, char** argv)
 {
+#ifndef DIS_BEEP
 	int beep = 100,i;
 	if (argc > 1)
 		beep = atol(argv[1]);
@@ -167,6 +168,7 @@ int cmd_beep(int argc, char** argv)
 		else
     		udelay(250);
     }
+#endif
 	return 0;
 }
 

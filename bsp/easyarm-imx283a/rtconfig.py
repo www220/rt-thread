@@ -3,9 +3,9 @@ ARCH     = 'arm'
 CPU      = 'arm926'
 CROSS_TOOL = 'gcc'
 
-ARCH     = 'sim'
-CPU      = 'win32'
-CROSS_TOOL = 'msvc'
+#ARCH     = 'sim'
+#CPU      = 'win32'
+#CROSS_TOOL = 'msvc'
 
 #------- toolchains path -------------------------------------------------------
 if os.getenv('RTT_CC'):

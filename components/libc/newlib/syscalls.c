@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <rtthread.h>
+#include <rtdevice.h>
 
 #ifdef RT_USING_DFS
 #include <dfs_posix.h>
@@ -265,6 +266,23 @@ _gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
 	}
 	__tp->tv_sec = sysnow;
 	__tp->tv_usec = sysms;
+	return 0;
+#endif
+}
+
+int
+settimeofday(const struct timeval *__tp, const struct timezone *__tzp)
+{
+#ifndef RT_USING_RTC
+	/* return "not supported" */
+	return -1;
+#else
+	rt_device_t device;
+	device = rt_device_find("rtc");
+    if (device == RT_NULL)
+        return -1;
+    /* update to RTC device. */
+    rt_device_control(device, RT_DEVICE_CTRL_RTC_SET_TIME, (void *)&__tp->tv_sec);
 	return 0;
 #endif
 }

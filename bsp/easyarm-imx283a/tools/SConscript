@@ -13,6 +13,7 @@ netio.c
 ping.c
 tcpecho.c
 udpecho.c
+ntp.c
 """)
 
 if GetDepend(['RT_USING_LWIP']):
