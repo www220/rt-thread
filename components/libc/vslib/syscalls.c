@@ -1,6 +1,8 @@
 #include <rtthread.h>
-#include <rtdevice.h>
 #include <sys/types.h>
+#include <time.h>
+#include <io.h>
+#include <Windows.h>
 
 #ifdef RT_USING_DFS
 #include <dfs_posix.h>
@@ -38,6 +40,44 @@ void libc_system_init(void)
 #endif
 }
 
+errno_t _sopen_s (
+    int * pfh,
+    const char *path,
+    int oflag,
+    int shflag,
+    int pmode
+    )
+{
+#ifndef RT_USING_DFS
+    return -1;
+#else
+    *pfh = open(path,oflag);
+    return (*pfh < 0)?(-1):(0);
+#endif
+}
+
+long _lseek (
+    int fh,
+    long pos,
+    int mthd
+    )
+{
+#ifndef RT_USING_DFS
+    return -1;
+#else
+    return lseek(fh, pos, mthd);
+#endif
+}
+
+int _read (int fh, void *buf, unsigned cnt)
+{
+#ifndef RT_USING_DFS
+    return 0;
+#else
+    return read(fh, buf, cnt);
+#endif
+}
+
 int _write (int fh, const void *buf, unsigned cnt)
 {
     if (fh < 3)
@@ -61,6 +101,15 @@ int _write (int fh, const void *buf, unsigned cnt)
     }
 }
 
+int _close (int fh)
+{
+#ifndef RT_USING_DFS
+    return 0;
+#else
+    return close(fh);
+#endif
+}
+
 int*
 __errno(void)
 {
@@ -77,11 +126,27 @@ link(const char *__path1, const char *__path2)
 int 
 mkstemp(char *path)
 {
-    return -1;
+    char *file = mktemp(path);
+    if (file == NULL)
+        return -1;
+    return open(file,O_RDWR|O_CREAT);
 }
 
 int	
 gettimeofday(struct timeval *tp, struct timezone *tzp)
 {
-    return -1;
+    struct tm atm;
+    SYSTEMTIME st;
+
+    GetLocalTime(&st);
+    atm.tm_sec = st.wSecond;
+    atm.tm_min = st.wMinute;
+    atm.tm_hour = st.wHour;
+    atm.tm_mday = st.wDay;
+    atm.tm_mon = st.wMonth - 1;        // tm_mon is 0 based
+    atm.tm_year = st.wYear - 1900;     // tm_year is 1900 based
+    tp->tv_sec = mktime(&atm);
+    tp->tv_usec = st.wMilliseconds*1000;
+
+    return 0;
 }

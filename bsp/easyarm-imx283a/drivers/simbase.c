@@ -45,6 +45,14 @@ void cpu_usage_idle_hook(void)
 
 int cmd_beep(int argc, char** argv)
 {
+    int beep = 100,i;
+    if (argc > 1)
+        beep = atol(argv[1]);
+    for (i=0;i<beep;i+=100)
+    {
+        Beep(2000,100);
+        rt_thread_delay(50);
+    }
     return 0;
 }
 
