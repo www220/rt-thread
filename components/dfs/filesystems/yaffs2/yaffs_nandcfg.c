@@ -122,8 +122,8 @@ void yaffs_config(ynandif_Geometry * g, struct rt_mtd_nand_device * dev)
 /* configuration for yaffs's log */
 unsigned yaffs_trace_mask =
 
-	YAFFS_TRACE_SCAN |
-	YAFFS_TRACE_GC |
+	//YAFFS_TRACE_SCAN |
+	//YAFFS_TRACE_GC |
 	YAFFS_TRACE_ERASE |
 	YAFFS_TRACE_ERROR |
 	YAFFS_TRACE_TRACING |

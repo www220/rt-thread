@@ -293,6 +293,8 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 	struct at91_mci *mmc = (struct at91_mci*)host->private_data;
 
 	if (io_cfg->power_mode == MMCSD_POWER_UP) {
+		mmc->io_cfg = *io_cfg;
+
 		/* Set REF_IO0 at 297.731 MHz */
 		regval = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_FRAC0);
 		regval &= ~BM_CLKCTRL_FRAC0_IO0FRAC;
@@ -342,6 +344,7 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 
 		/* Set initial bit clock 400 KHz */
 		set_bit_clock(mmc, 400000);
+		mmc->io_cfg.clock = 400000;
 
 		/* Send initial 74 clock cycles (185 us @ 400 KHz)*/
 		ssp_mmc_write(mmc, HW_SSP_CMD0_SET, BM_SSP_CMD0_CONT_CLKING_EN);
@@ -349,7 +352,7 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 		ssp_mmc_write(mmc, HW_SSP_CMD0_CLR, BM_SSP_CMD0_CONT_CLKING_EN);
 
 		set_bit_width(mmc, 0);
-		mmc->io_cfg = *io_cfg;
+		mmc->io_cfg.bus_width = 0;
 		return;
 	}
 

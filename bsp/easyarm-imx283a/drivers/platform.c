@@ -132,6 +132,7 @@ char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *
 RTM_EXPORT(GetPrivateStringData)
 
 #if defined(FINSH_USING_MSH)
+#include <shell.h>
 #include <finsh.h>
 #include <msh.h>
 int cmd_sh(int argc, char** argv)
@@ -165,7 +166,9 @@ int cmd_sh(int argc, char** argv)
 			linelen++;
 		}
 		/* run sh */
+		rt_kprintf("%s\n",line);
 		msh_exec(line,linelen);
+		rt_kprintf(FINSH_PROMPT);
 	}
     fclose(file);
     return 0;

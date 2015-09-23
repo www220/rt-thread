@@ -235,6 +235,17 @@ static void rt_thread_entry_main(void* parameter)
         rt_kprintf("Mount /mnt failed!\n");
 #endif
 
+#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
+    tf_init();
+    elm_init();
+#endif
+#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
+    if (dfs_mount("mmc", "/mmc", "elm", 0, 0) == 0)
+        rt_kprintf("Mount /mmc ok!\n");
+    else
+        rt_kprintf("Mount /mmc failed!\n");
+#endif
+
 #endif
 
 #ifdef RT_USING_LIBC
@@ -263,19 +274,6 @@ static void rt_thread_entry_main(void* parameter)
     rt_kprintf("RtGUI initialized!\n");
 #endif
 
-#ifdef RT_USING_DFS
-#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
-    tf_init();
-    elm_init();
-#endif
-#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
-    if (dfs_mount("mmc", "/mmc", "elm", 0, 0) == 0)
-        rt_kprintf("Mount /mmc ok!\n");
-    else
-        rt_kprintf("Mount /mmc failed!\n");
-#endif
-#endif
-
     /* list date */
 #ifdef RT_USING_RTC
     list_date();
@@ -285,6 +283,7 @@ static void rt_thread_entry_main(void* parameter)
 #ifdef RT_USING_FINSH
     finsh_system_init();
     finsh_set_device(FINSH_DEVICE_NAME);
+   	rt_thread_delay(100);
 #endif
 
 #if defined(FINSH_USING_MSH)
