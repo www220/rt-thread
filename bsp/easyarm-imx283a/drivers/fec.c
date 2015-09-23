@@ -16,7 +16,13 @@
 //#define ETH_DEBUG
 //#define ETH_RX_DUMP
 //#define ETH_TX_DUMP
+//#define ETH_LINK
+
+#ifdef ETH_LINK
 #define STM32_LINK_PRINTF         rt_kprintf
+#else
+#define STM32_LINK_PRINTF(...)
+#endif
 
 #ifdef ETH_DEBUG
 #define STM32_ETH_PRINTF          rt_kprintf

@@ -215,10 +215,6 @@ static void rt_thread_entry_main(void* parameter)
     devfs_init();
 #endif
 
-#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
-    tf_init();
-    elm_init();
-#endif
 #if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     nand_init();
     dfs_yaffs_init();
@@ -231,12 +227,6 @@ static void rt_thread_entry_main(void* parameter)
 #ifdef RT_USING_DFS_DEVFS
     dfs_mount(RT_NULL, "/dev", "devfs", 0, 0);
     rt_kprintf("Mount /dev ok!\n");
-#endif
-#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
-    if (dfs_mount("mmc", "/mmc", "elm", 0, 0) == 0)
-        rt_kprintf("Mount /mmc ok!\n");
-    else
-        rt_kprintf("Mount /mmc failed!\n");
 #endif
 #if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     if (dfs_mount("nand0", "/mnt", "yaffs2", 0, 0) == 0)
@@ -271,6 +261,19 @@ static void rt_thread_entry_main(void* parameter)
     touch_init();
     rtgui_system_server_init();
     rt_kprintf("RtGUI initialized!\n");
+#endif
+
+#ifdef RT_USING_DFS
+#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
+    tf_init();
+    elm_init();
+#endif
+#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
+    if (dfs_mount("mmc", "/mmc", "elm", 0, 0) == 0)
+        rt_kprintf("Mount /mmc ok!\n");
+    else
+        rt_kprintf("Mount /mmc failed!\n");
+#endif
 #endif
 
     /* list date */
