@@ -191,7 +191,7 @@ static rt_int32_t mmcsd_parse_scr(struct rt_mmcsd_card *card)
 
 static rt_int32_t mmcsd_switch(struct rt_mmcsd_card *card)
 {
-    rt_int32_t err;
+    rt_int32_t err = 0;
     struct rt_mmcsd_host *host = card->host;
     struct rt_mmcsd_req req;
     struct rt_mmcsd_cmd cmd;

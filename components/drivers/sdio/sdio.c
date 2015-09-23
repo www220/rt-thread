@@ -812,6 +812,7 @@ out:
     return 0;
 }
 
+extern rt_err_t mmcsd_get_card_addr(struct rt_mmcsd_host *host, rt_uint32_t *rca);
 static rt_int32_t sdio_init_card(struct rt_mmcsd_host *host, rt_uint32_t ocr)
 {
     rt_int32_t err = 0;

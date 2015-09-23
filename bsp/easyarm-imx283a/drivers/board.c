@@ -134,6 +134,11 @@ void rt_hw_board_init()
     rt_hw_mtd_nand_init();
 #endif
 
+#ifdef RT_USING_SDIO
+    /* initialize ssp */
+    rt_hw_ssp_init();
+#endif
+
     pin_gpio_set(PIN_WDT, 1);
     rt_kprintf("loops %d, init %d, all %d\n",loops_per_jiffy,init[2]-init[1],init[5]-init[0]);
 }

@@ -76,6 +76,7 @@ void rt_hw_timer_init(void);
 void rt_hw_spi_init(void);
 void rt_hw_rtc_init(void);
 void rt_hw_mtd_nand_init(void);
+void rt_hw_ssp_init(void);
 
 extern volatile int eth_wtdog;
 extern volatile int eth_linkstatus;

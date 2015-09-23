@@ -109,8 +109,6 @@ static rt_err_t rt_mmcsd_req_blk(struct rt_mmcsd_card *card,
                                  rt_size_t             blks,
                                  rt_uint8_t            dir)
 {
-    void *aligned_buf;
-    
     struct rt_mmcsd_cmd  cmd, stop;
     struct rt_mmcsd_data  data;
     struct rt_mmcsd_req  req;

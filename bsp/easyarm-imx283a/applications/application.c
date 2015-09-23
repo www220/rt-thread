@@ -53,9 +53,8 @@ extern void dfs_yaffs_init(void);
 #ifdef RT_USING_DFS_ROMFS
 #include <dfs_romfs.h>
 #endif
-#ifdef RT_USING_DFS_ELMFAT
-extern rt_err_t w25qxx_init(const char * flash_device_name, const char * spi_device_name);
-extern rt_err_t w25ftl_flash_init(const char * ftl_device_name, const char * flash_device_name);
+#ifdef RT_USING_SDIO
+extern void tf_init(void);
 #endif
 #ifdef RT_USING_MTD_NAND
 extern void nand_init(void);
@@ -216,10 +215,9 @@ static void rt_thread_entry_main(void* parameter)
     devfs_init();
 #endif
 
-#if defined(RT_USING_SPI) && defined(RT_USING_DFS_ELMFAT)
-    w25qxx_init("flash0", "spi10");
+#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
+    tf_init();
     elm_init();
-    w25ftl_flash_init("ftl0", "flash0");
 #endif
 #if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     nand_init();
@@ -234,11 +232,11 @@ static void rt_thread_entry_main(void* parameter)
     dfs_mount(RT_NULL, "/dev", "devfs", 0, 0);
     rt_kprintf("Mount /dev ok!\n");
 #endif
-#if defined(RT_USING_SPI) && defined(RT_USING_DFS_ELMFAT)
-    if (dfs_mount("ftl0", "/mnt", "elm", 0, 0) == 0)
-        rt_kprintf("Mount /mnt ok!\n");
+#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
+    if (dfs_mount("mmc", "/mmc", "elm", 0, 0) == 0)
+        rt_kprintf("Mount /mmc ok!\n");
     else
-        rt_kprintf("Mount /mnt failed!\n");
+        rt_kprintf("Mount /mmc failed!\n");
 #endif
 #if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     if (dfs_mount("nand0", "/mnt", "yaffs2", 0, 0) == 0)

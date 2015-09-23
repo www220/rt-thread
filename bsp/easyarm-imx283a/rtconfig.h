@@ -114,14 +114,14 @@ extern int *__errno (void);
 #define RT_USING_DFS
 #define DFS_USING_WORKDIR
 
-//#define RT_USING_DFS_ELMFAT
+#define RT_USING_DFS_ELMFAT
 #define RT_DFS_ELM_DRIVES			2
 #define RT_DFS_ELM_REENTRANT
 //#define RT_DFS_ELM_USE_ERASE
 #define RT_DFS_ELM_CODE_PAGE		1252
 #define RT_DFS_ELM_USE_LFN			3
 #define RT_DFS_ELM_MAX_LFN			255
-#define RT_DFS_ELM_MAX_SECTOR_SIZE  4096
+#define RT_DFS_ELM_MAX_SECTOR_SIZE  512
 
 #define RT_USING_DFS_YAFFS2
 
