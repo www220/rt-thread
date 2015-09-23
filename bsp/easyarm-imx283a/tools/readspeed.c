@@ -18,7 +18,7 @@
 
 void readspeed(const char* filename, int block_size)
 {
-    int fd;
+    int fd,length;
     char *buff_ptr;
     rt_size_t total_length;
     rt_tick_t tick;
@@ -43,10 +43,12 @@ void readspeed(const char* filename, int block_size)
     total_length = 0;
     while (1)
     {
-        int length;
         length = read(fd, buff_ptr, block_size);
-
-        if (length <= 0) break;
+        if (length != block_size)
+		{
+			rt_kprintf("read failed\n");
+			break;
+		}
         total_length += length;
     }
     tick = rt_tick_get() - tick;
@@ -56,7 +58,7 @@ void readspeed(const char* filename, int block_size)
 	rt_free(buff_ptr);
 
     /* calculate read speed */
-    rt_kprintf("File read speed: %d byte/s\n", total_length /tick * RT_TICK_PER_SECOND);
+    rt_kprintf("File read speed: %d byte/s\n", total_length * RT_TICK_PER_SECOND / tick);
 }
 
 #ifdef RT_USING_FINSH
