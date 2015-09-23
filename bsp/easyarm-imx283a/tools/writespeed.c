@@ -77,9 +77,9 @@ int cmd_writespeed(int argc, char** argv)
 		return 1;
 	}
 	if (argc > 2)
-		blocksize = atol(argv[2]);
+		total_length = atol(argv[2]);
 	if (argc > 3)
-		total_length = atol(argv[3]);
+		blocksize = atol(argv[3]);
 	writespeed(argv[1],total_length,blocksize);
 	return 0;
 }

@@ -291,10 +291,8 @@ static void at91_mci_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *re
 	else
 	{
 		req->cmd->err = ssp_mmc_send_cmd(host,req->cmd);
-		if (req->cmd->err != 0) {
-			if (req->stop)
-				req->stop->err = ssp_mmc_send_cmd(host,req->stop);
-		}
+		if (req->stop)
+			req->stop->err = ssp_mmc_send_cmd(host,req->stop);
 		mmcsd_req_complete(host);
 	}
 }
