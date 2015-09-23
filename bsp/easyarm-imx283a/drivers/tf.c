@@ -116,8 +116,8 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	i = 0;
 	while (ssp_mmc_read(mmc, HW_SSP_STATUS) & (BM_SSP_STATUS_BUSY |
 		BM_SSP_STATUS_DATA_BUSY | BM_SSP_STATUS_CMD_BUSY)) {
-		mdelay(1);
-		if (i++ == 1000) {
+		udelay(100);
+		if (i++ == 10000) {
 			printf("MMC: Bus busy timeout!\n");
 			return TIMEOUT;
 		}
@@ -176,8 +176,8 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	/* Wait for the command to complete */
 	i = 0;
 	do {
-		mdelay(1);
-		if (i++ == 1000) {
+		udelay(100);
+		if (i++ == 10000) {
 			printf("MMC: Command %ld busy\n",
 				cmd->cmd_code);
 			break;
