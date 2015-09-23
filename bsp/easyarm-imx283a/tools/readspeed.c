@@ -18,8 +18,9 @@
 
 void readspeed(const char* filename, int block_size)
 {
-    int fd,length;
+    int fd, index, length;
     char *buff_ptr;
+    struct stat st;
     rt_size_t total_length;
     rt_tick_t tick;
 
@@ -29,6 +30,8 @@ void readspeed(const char* filename, int block_size)
         rt_kprintf("open file:%s failed\n", filename);
         return;
     }
+    fstat(fd, &st);
+    total_length = st.st_size;
 
     buff_ptr = rt_malloc(block_size);
     if (buff_ptr == RT_NULL)
@@ -40,8 +43,8 @@ void readspeed(const char* filename, int block_size)
     }
 
     tick = rt_tick_get();
-    total_length = 0;
-    while (1)
+    index = 0;
+	while (index < total_length / block_size)
     {
         length = read(fd, buff_ptr, block_size);
         if (length != block_size)
@@ -49,7 +52,7 @@ void readspeed(const char* filename, int block_size)
 			rt_kprintf("read failed\n");
 			break;
 		}
-        total_length += length;
+        index ++;
     }
     tick = rt_tick_get() - tick;
 
@@ -58,14 +61,15 @@ void readspeed(const char* filename, int block_size)
 	rt_free(buff_ptr);
 
     /* calculate read speed */
-    rt_kprintf("File read speed: %d byte/s\n", total_length * RT_TICK_PER_SECOND / tick);
+	length = index * block_size * 10/ tick;
+    rt_kprintf("File read speed: %d %d.%d Kbyte/s\n", index * block_size, length/10, length%10);
 }
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
 int cmd_readspeed(int argc, char** argv)
 {
-	int blocksize = 4096;
+	int blocksize = 8192;
 	if (argc < 2)
 	{
 		rt_kprintf("Usag: readspeed /tmp/test.db\n");

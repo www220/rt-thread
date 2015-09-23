@@ -42,6 +42,7 @@ struct mmcsd_blk_device
 #define RT_MMCSD_MAX_PARTITION 16
 #endif
 
+#if 0
 static rt_int32_t mmcsd_num_wr_blocks(struct rt_mmcsd_card *card)
 {
     rt_int32_t err;
@@ -102,6 +103,7 @@ static rt_int32_t mmcsd_num_wr_blocks(struct rt_mmcsd_card *card)
 
     return blocks;
 }
+#endif
 
 static rt_err_t rt_mmcsd_req_blk(struct rt_mmcsd_card *card,
                                  rt_uint32_t           sector,

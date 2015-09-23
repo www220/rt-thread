@@ -63,14 +63,15 @@ void writespeed(const char* filename, int total_length, int block_size)
 	rt_free(buff_ptr);
 
     /* calculate write speed */
-    rt_kprintf("File write speed: %d byte/s\n", index * block_size * RT_TICK_PER_SECOND / tick);
+	length = index * block_size * 10/ tick;
+    rt_kprintf("File write speed: %d %d.%d Kbyte/s\n", index * block_size, length/10, length%10);
 }
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
 int cmd_writespeed(int argc, char** argv)
 {
-	int blocksize = 4096,total_length = 10*1024*1024;
+	int blocksize = 8192,total_length = 10*1024*1024;
 	if (argc < 2)
 	{
 		rt_kprintf("Usag: writespeed /tmp/test.db\n");
