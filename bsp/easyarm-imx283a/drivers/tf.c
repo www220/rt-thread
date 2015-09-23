@@ -107,7 +107,9 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	int i;
 	struct at91_mci *mmc = (struct at91_mci*)host->private_data;
 
-	printf("MMC: CMD%ld\n", cmd->cmd_code);
+	mmcsd_dbg("Sending command %d flag = %08X, arg = %08X, blocks = %d, length = %d\n",
+		cmd->cmd_code, cmd->flags, cmd->arg,
+		(cmd->data?cmd->data->blks:0),(cmd->data?cmd->data->blksize:0));
 
 	/* Check bus busy */
 	i = 0;
@@ -131,9 +133,9 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	ssp_mmc_write(mmc, HW_SSP_CTRL0_CLR, 0xff3fffff);
 
 	/* Set up command */
-	if (resp_type(cmd) & RESP_R3)
+	if (resp_type(cmd) == RESP_R3 || resp_type(cmd) == RESP_R4)
 		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_IGNORE_CRC);
-	if (resp_type(cmd) & RESP_R1)	/* Need to get response */
+	if (resp_type(cmd) != RESP_NONE)	/* Need to get response */
 		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_GET_RESP);
 	if (resp_type(cmd) == RESP_R2)	/* It's a 136 bits response */
 		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_LONG_RESP);
@@ -279,9 +281,8 @@ void rt_hw_ssp_init(void)
  */
 static void at91_mci_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *req)
 {
-	int ret = ssp_mmc_send_cmd(host,req->cmd);
-	if (ret == 0)
-		mmcsd_req_complete(host);
+	req->cmd->err = ssp_mmc_send_cmd(host,req->cmd);
+	mmcsd_req_complete(host);
 }
 
 /*

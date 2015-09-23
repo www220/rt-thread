@@ -94,6 +94,7 @@ extern int *__errno (void);
 #define RT_USING_MTD_NAND
 #define RT_MMCSD_DBG
 #define RT_USING_SDIO
+#define RT_MMCSD_STACK_SIZE 4096
 
 /* SECTION: Console options */
 #define RT_USING_CONSOLE
