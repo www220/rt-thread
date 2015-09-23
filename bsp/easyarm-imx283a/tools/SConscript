@@ -5,6 +5,8 @@ from building import *
 cwd = GetCurrentDir()
 
 src = Split("""
+readspeed.c
+writespeed.c
 """)
 
 ethdev_src = Split("""

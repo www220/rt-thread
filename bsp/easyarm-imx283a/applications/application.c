@@ -240,7 +240,7 @@ static void rt_thread_entry_main(void* parameter)
     elm_init();
 #endif
 #if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
-    if (dfs_mount("mmc", "/mmc", "elm", 0, 0) == 0)
+    if (dfs_mount("sd0", "/mmc", "elm", 0, 0) == 0)
         rt_kprintf("Mount /mmc ok!\n");
     else
         rt_kprintf("Mount /mmc failed!\n");

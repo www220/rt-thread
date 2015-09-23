@@ -101,13 +101,14 @@ static void set_bit_width(struct at91_mci *mmc, u8 width)
 #define TIMEOUT			-19
 
 #define mdelay(x) rt_thread_delay(x)
+static volatile int mci_run;
 extern int __rt_ffs(int value);
 static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd)
 {
 	int i;
 	struct at91_mci *mmc = (struct at91_mci*)host->private_data;
 
-	mmcsd_dbg("Sending command %d flag = %08X, arg = %08X, blocks = %d, length = %d\n",
+	mmcsd_dbg("Sending command %2d flag = %08X, arg = %08X, blocks = %d, length = %d\n",
 		cmd->cmd_code, cmd->flags, cmd->arg,
 		(cmd->data?cmd->data->blks:0),(cmd->data?cmd->data->blksize:0));
 
@@ -126,6 +127,7 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	/* See if card is present */
 	if (ssp_mmc_read(mmc, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT) {
 		printf("MMC: No card detected!\n");
+		mci_run = 0;
 		return NO_CARD_ERR;
 	}
 
@@ -281,8 +283,22 @@ void rt_hw_ssp_init(void)
  */
 static void at91_mci_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *req)
 {
-	req->cmd->err = ssp_mmc_send_cmd(host,req->cmd);
-	mmcsd_req_complete(host);
+	if (req->stop)
+	{
+		req->stop->err = ssp_mmc_send_cmd(host,req->stop);
+		mmcsd_req_complete(host);
+		return;
+	}
+	if (req->cmd->cmd_code == 5)
+	{
+		req->cmd->err = COMM_ERR;
+		mmcsd_req_complete(host);
+	}
+	else
+	{
+		req->cmd->err = ssp_mmc_send_cmd(host,req->cmd);
+		mmcsd_req_complete(host);
+	}
 }
 
 /*
@@ -376,8 +392,8 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 		switch (io_cfg->power_mode)
 		{
 			case MMCSD_POWER_OFF:
-				break;
-			case MMCSD_POWER_ON:
+				printf("MMC: Power Off!\n");
+				mci_run = 0;
 				break;
 		}
 	}
@@ -385,28 +401,23 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 	mmc->io_cfg = *io_cfg;
 }
 
-static void at91_mci_enable_sdio_irq(struct rt_mmcsd_host *host, rt_int32_t enable)
-{
-	rt_kprintf("%s\n","at91_mci_enable_sdio_irq");
-}
-
 static const struct rt_mmcsd_host_ops ops = {
 	at91_mci_request,
 	at91_mci_set_iocfg,
 	RT_NULL,
-	at91_mci_enable_sdio_irq,
+	RT_NULL,
 };
 
 struct imx_ssp_mmc_cfg ssp_mmc_cfg = {
 	REGS_SSP0_BASE, HW_CLKCTRL_SSP0, BM_CLKCTRL_CLKSEQ_BYPASS_SSP0
 };
 static struct at91_mci mci = {
-	.io_cfg = {-1,-1,-1,-1,-1,-1},
 	.cfg = &ssp_mmc_cfg,
 };
 
 void tf_init(void)
 {
+	int i;
 	struct rt_mmcsd_host *host;
 
 	rt_mmcsd_core_init();
@@ -424,13 +435,20 @@ void tf_init(void)
 	host->valid_ocr = VDD_32_33 | VDD_31_32 | VDD_30_31 | \
 				VDD_29_30 | VDD_28_29 | VDD_27_28;
 	host->flags = MMCSD_BUSWIDTH_4 | MMCSD_MUTBLKWRITE | \
-				MMCSD_SUP_HIGHSPEED | MMCSD_SUP_SDIO_IRQ;
+				MMCSD_SUP_HIGHSPEED;
 	host->max_seg_size = 32 * 1024;
 	host->max_dma_segs = 0;
 	host->max_blk_size = 512;
 	host->max_blk_count = 32;
 	host->private_data = &mci;
 
+	mci_run = 1;
 	mmcsd_change(host);
-	rt_thread_delay(2000);
+	for (i=0; i<20 && mci_run; i++) {
+		rt_thread_delay(100);
+		if (rt_device_find("sd0") != RT_NULL) {
+			rt_thread_delay(100);
+			break;
+		}
+	}
 }
