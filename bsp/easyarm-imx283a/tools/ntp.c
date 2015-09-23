@@ -112,7 +112,6 @@ void rfc1305(uint32_t *data)
     tv_set.tv_usec = USEC(ntohl(((uint32_t *)data)[11]));
     if (settimeofday(&tv_set, NULL) < 0) {
         printf("settimeofday\n");
-        exit(1);
     }
 }
 
@@ -166,6 +165,9 @@ int cmd_ntp(int argc, char *argv[])
                             printf("time updated %s",ctime(&now));
                             return 0;
                         }
+                    }
+                    else {
+                        printf("recv\n");
                     }
                 }
                 else {

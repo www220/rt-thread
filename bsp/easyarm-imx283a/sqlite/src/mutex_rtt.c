@@ -154,7 +154,9 @@ static sqlite3_mutex *pthreadMutexAlloc(int iType){
 #if SQLITE_MUTEX_NREF
         p->id = iType;
 #endif
-        sprintf(name, "sqlmtx%d", iType);
+        static unsigned short counter = 0;
+        sprintf(name, "sqlmt%d", 20+counter);
+        counter++;
         rt_mutex_init(&p->mutex, name, RT_IPC_FLAG_FIFO);
       }
       break;

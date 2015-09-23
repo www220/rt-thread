@@ -41,7 +41,6 @@
 #define TCL_PACKAGE_PATH    "."
 
 #ifdef _MSC_VER
-#define inline __inline
 #include <stdio.h>
 #define snprintf _snprintf
 #endif

@@ -77,6 +77,7 @@ extern int *__errno (void);
 //#define RT_USING_SMALL_MEM
 /* Using SLAB Allocator */
 #define RT_USING_SLAB
+#define RT_USING_MODULE
 #define RT_SERIAL_RB_BUFSZ 4096
 
 /* Using Libc */
@@ -91,6 +92,7 @@ extern int *__errno (void);
 #define RT_USING_RTC
 #define RT_MTD_NAND_DEBUG
 #define RT_USING_MTD_NAND
+#define RT_USING_SDIO
 
 /* SECTION: Console options */
 #define RT_USING_CONSOLE
@@ -113,8 +115,9 @@ extern int *__errno (void);
 #define DFS_USING_WORKDIR
 
 //#define RT_USING_DFS_ELMFAT
+#define RT_DFS_ELM_DRIVES			2
 #define RT_DFS_ELM_REENTRANT
-#define RT_DFS_ELM_USE_ERASE
+//#define RT_DFS_ELM_USE_ERASE
 #define RT_DFS_ELM_CODE_PAGE		1252
 #define RT_DFS_ELM_USE_LFN			3
 #define RT_DFS_ELM_MAX_LFN			255
