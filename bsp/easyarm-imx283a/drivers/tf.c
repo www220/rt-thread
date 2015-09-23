@@ -6,19 +6,223 @@
 #include "board.h"
 #include "tf.h"
 
-struct mxs_mci {
+struct at91_mci {
 	struct rt_mmcsd_host *host;
 	struct rt_mmcsd_req *req;
 	struct rt_mmcsd_cmd *cmd;
-	struct rt_timer timer;
-	//struct rt_semaphore sem_ack;
-	rt_uint32_t *buf;
-	rt_uint32_t current_status;
+	struct rt_mmcsd_io_cfg io_cfg;
+	struct imx_ssp_mmc_cfg *cfg;
+};
+
+static inline int ssp_mmc_read(struct at91_mci *mmc, uint reg)
+{
+	struct imx_ssp_mmc_cfg *cfg = mmc->cfg;
+	return REG_RD(cfg->ssp_mmc_base, reg);
+}
+
+static inline void ssp_mmc_write(struct at91_mci *mmc, uint reg, uint val)
+{
+	struct imx_ssp_mmc_cfg *cfg = mmc->cfg;
+	REG_WR(cfg->ssp_mmc_base, reg, val);
+}
+
+static void set_bit_clock(struct at91_mci *mmc, u32 clock)
+{
+	const u32 sspclk = 480000 * 18 / 29 / 1;	/* 297931 KHz */
+	u32 divide, rate, tgtclk;
+
+	/*
+	 * SSP bit rate = SSPCLK / (CLOCK_DIVIDE * (1 + CLOCK_RATE)),
+	 * CLOCK_DIVIDE has to be an even value from 2 to 254, and
+	 * CLOCK_RATE could be any integer from 0 to 255.
+	 */
+	clock /= 1000;		/* KHz */
+	for (divide = 2; divide < 254; divide += 2) {
+		rate = sspclk / clock / divide;
+		if (rate <= 256)
+			break;
+	}
+
+	tgtclk = sspclk / divide / rate;
+	while (tgtclk > clock) {
+		rate++;
+		tgtclk = sspclk / divide / rate;
+	}
+	if (rate > 256)
+		rate = 256;
+
+	/* Always set timeout the maximum */
+	ssp_mmc_write(mmc, HW_SSP_TIMING, BM_SSP_TIMING_TIMEOUT |
+		divide << BP_SSP_TIMING_CLOCK_DIVIDE |
+		(rate - 1) << BP_SSP_TIMING_CLOCK_RATE);
+
+	printf("MMC: Set clock rate to %d KHz (requested %d KHz)\n",
+		tgtclk, clock);
+}
+
+static struct pin_desc ssp_pins_desc[] = {
+	{ PINID_SSP0_DATA0, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_SSP0_DATA1, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_SSP0_DATA2, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_SSP0_DATA3, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_SSP0_CMD, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_SSP0_DETECT, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+	{ PINID_SSP0_SCK, PIN_FUN1, PAD_8MA, PAD_3V3, 1 },
+};
+static struct pin_group ssp_pins = {
+	.pins		= ssp_pins_desc,
+	.nr_pins	= ARRAY_SIZE(ssp_pins_desc)
 };
 
 void rt_hw_ssp_init(void)
 {
+    /* Set up SSP pins */
+	pin_set_group(&ssp_pins);
 
+	/* Set up SD0 WP pin */
+	pin_set_type(PINID_GPMI_CE1N, PIN_GPIO);
+	pin_gpio_direction(PINID_GPMI_CE1N, 0);
+}
+
+/*
+ * Handle an MMC request
+ */
+static void at91_mci_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *req)
+{
+rt_kprintf("%s\n","at91_mci_request");
+}
+
+/*
+ * Set the IOCFG
+ */
+static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cfg *io_cfg)
+{
+	rt_uint32_t regval;
+	struct at91_mci *mmc = (struct at91_mci*)host->private_data;
+
+	if (io_cfg->power_mode == MMCSD_POWER_UP) {
+		mmc->io_cfg = *io_cfg;
+		return;
+	}
+
+	/*
+	 * Set up SSPCLK
+	 */
+	if (io_cfg->clock != mmc->io_cfg.clock)
+	{if (io_cfg->clock == 0) {
+		/* Turn off SSPCLK */
+		REG_WR(REGS_CLKCTRL_BASE, mmc->cfg->clkctrl_ssp_offset,
+			REG_RD(REGS_CLKCTRL_BASE, mmc->cfg->clkctrl_ssp_offset) |
+			BM_CLKCTRL_SSP_CLKGATE);
+		} else {
+		/* Set REF_IO0 at 297.731 MHz */
+		regval = REG_RD(REGS_CLKCTRL_BASE, HW_CLKCTRL_FRAC0);
+		regval &= ~BM_CLKCTRL_FRAC0_IO0FRAC;
+		REG_WR(REGS_CLKCTRL_BASE, HW_CLKCTRL_FRAC0,
+			regval | (29 << BP_CLKCTRL_FRAC0_IO0FRAC));
+		/* Enable REF_IO0 */
+		REG_CLR(REGS_CLKCTRL_BASE, HW_CLKCTRL_FRAC0,
+			BM_CLKCTRL_FRAC0_CLKGATEIO0);
+
+		/* Source SSPCLK from REF_IO0 */
+		REG_CLR(REGS_CLKCTRL_BASE, HW_CLKCTRL_CLKSEQ,
+			mmc->cfg->clkctrl_clkseq_ssp_offset);
+		/* Turn on SSPCLK */
+		REG_WR(REGS_CLKCTRL_BASE, mmc->cfg->clkctrl_ssp_offset,
+			REG_RD(REGS_CLKCTRL_BASE, mmc->cfg->clkctrl_ssp_offset) &
+			~BM_CLKCTRL_SSP_CLKGATE);
+		/* Set SSPCLK divide 1 */
+		regval = REG_RD(REGS_CLKCTRL_BASE, mmc->cfg->clkctrl_ssp_offset);
+		regval &= ~(BM_CLKCTRL_SSP_DIV_FRAC_EN | BM_CLKCTRL_SSP_DIV);
+		REG_WR(REGS_CLKCTRL_BASE, mmc->cfg->clkctrl_ssp_offset,
+			regval | (1 << BP_CLKCTRL_SSP_DIV));
+		/* Wait for new divide ready */
+		do {
+			udelay(10);
+		} while (REG_RD(REGS_CLKCTRL_BASE, mmc->cfg->clkctrl_ssp_offset) &
+			BM_CLKCTRL_SSP_BUSY);
+
+		/* Prepare for software reset */
+		ssp_mmc_write(mmc, HW_SSP_CTRL0_CLR, BM_SSP_CTRL0_SFTRST);
+		ssp_mmc_write(mmc, HW_SSP_CTRL0_CLR, BM_SSP_CTRL0_CLKGATE);
+		/* Assert reset */
+		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_SFTRST);
+		/* Wait for confirmation */
+		while (!(ssp_mmc_read(mmc, HW_SSP_CTRL0) & BM_SSP_CTRL0_CLKGATE))
+			;
+		/* Done */
+		ssp_mmc_write(mmc, HW_SSP_CTRL0_CLR, BM_SSP_CTRL0_SFTRST);
+		ssp_mmc_write(mmc, HW_SSP_CTRL0_CLR, BM_SSP_CTRL0_CLKGATE);
+
+		/* 8 bits word length in MMC mode */
+		regval = ssp_mmc_read(mmc, HW_SSP_CTRL1);
+		regval &= ~(BM_SSP_CTRL1_SSP_MODE | BM_SSP_CTRL1_WORD_LENGTH);
+		ssp_mmc_write(mmc, HW_SSP_CTRL1, regval |
+			(BV_SSP_CTRL1_SSP_MODE__SD_MMC << BP_SSP_CTRL1_SSP_MODE) |
+			(BV_SSP_CTRL1_WORD_LENGTH__EIGHT_BITS <<
+				BP_SSP_CTRL1_WORD_LENGTH));
+
+		/* Set initial bit clock 400 KHz */
+		set_bit_clock(mmc, 400000);
+
+		/* Send initial 74 clock cycles (185 us @ 400 KHz)*/
+		ssp_mmc_write(mmc, HW_SSP_CMD0_SET, BM_SSP_CMD0_CONT_CLKING_EN);
+		udelay(200);
+		ssp_mmc_write(mmc, HW_SSP_CMD0_CLR, BM_SSP_CMD0_CONT_CLKING_EN);
+	}}
+
+	/* maybe switch power to the card */
+	if (io_cfg->bus_width != mmc->io_cfg.bus_width)
+	{
+		int bus_width = 0;
+		/* Set the bus width */
+		regval = ssp_mmc_read(mmc, HW_SSP_CTRL0);
+		regval &= ~BM_SSP_CTRL0_BUS_WIDTH;
+		switch (io_cfg->bus_width) {
+		case MMCSD_BUS_WIDTH_1:
+			regval |= (BV_SSP_CTRL0_BUS_WIDTH__ONE_BIT <<
+					BP_SSP_CTRL0_BUS_WIDTH);
+			bus_width = 1;
+			break;
+		case MMCSD_BUS_WIDTH_4:
+			regval |= (BV_SSP_CTRL0_BUS_WIDTH__FOUR_BIT <<
+					BP_SSP_CTRL0_BUS_WIDTH);
+			bus_width = 4;
+			break;
+		case MMCSD_BUS_WIDTH_8:
+			regval |= (BV_SSP_CTRL0_BUS_WIDTH__EIGHT_BIT <<
+					BP_SSP_CTRL0_BUS_WIDTH);
+			bus_width = 8;
+		}
+		ssp_mmc_write(mmc, HW_SSP_CTRL0, regval);
+
+		printf("MMC: Set %d bits bus width\n",
+			bus_width);
+	}
+
+	/* maybe switch power to the card */
+	if (io_cfg->power_mode != mmc->io_cfg.power_mode)
+	{
+		switch (io_cfg->power_mode)
+		{
+			case MMCSD_POWER_OFF:
+				break;
+			case MMCSD_POWER_UP:
+				break;
+			case MMCSD_POWER_ON:
+				break;
+			default:
+				rt_kprintf("unknown power_mode %d\n", io_cfg->power_mode);
+				break;
+		}
+	}
+
+	mmc->io_cfg = *io_cfg;
+}
+
+static void at91_mci_enable_sdio_irq(struct rt_mmcsd_host *host, rt_int32_t enable)
+{
+	rt_kprintf("%s\n","at91_mci_enable_sdio_irq");
 }
 
 static const struct rt_mmcsd_host_ops ops = {
@@ -28,8 +232,12 @@ static const struct rt_mmcsd_host_ops ops = {
 	at91_mci_enable_sdio_irq,
 };
 
-static struct mxs_mci mci = {
-
+struct imx_ssp_mmc_cfg ssp_mmc_cfg = {
+	REGS_SSP0_BASE, HW_CLKCTRL_SSP0, BM_CLKCTRL_CLKSEQ_BYPASS_SSP0
+};
+static struct at91_mci mci = {
+	.io_cfg = {-1,-1,-1,-1,-1,-1},
+	.cfg = &ssp_mmc_cfg,
 };
 
 void tf_init(void)
@@ -41,22 +249,23 @@ void tf_init(void)
 
 	host = mmcsd_alloc_host();
 	if (!host)
-	{
-		rt_kprintf("alloc mmchost failed\n");
 		return;
-	}
+
+	mci.host = host;
 
 	host->ops = &ops;
-	host->freq_min = 375000;
-	host->freq_max = 25000000;
-	host->valid_ocr = VDD_32_33 | VDD_33_34;
+	host->freq_min = 400000;
+	host->freq_max = 148000000;
+	host->valid_ocr = VDD_32_33 | VDD_31_32 | VDD_30_31 | \
+				VDD_29_30 | VDD_28_29 | VDD_27_28;
 	host->flags = MMCSD_BUSWIDTH_4 | MMCSD_MUTBLKWRITE | \
 				MMCSD_SUP_HIGHSPEED | MMCSD_SUP_SDIO_IRQ;
 	host->max_seg_size = 65535;
 	host->max_dma_segs = 2;
 	host->max_blk_size = 512;
 	host->max_blk_count = 4096;
-	host->private_data = mci;
+	host->private_data = &mci;
 
 	mmcsd_change(host);
+	rt_thread_delay(2000);
 }

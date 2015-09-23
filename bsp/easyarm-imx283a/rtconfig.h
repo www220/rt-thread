@@ -92,6 +92,7 @@ extern int *__errno (void);
 #define RT_USING_RTC
 #define RT_MTD_NAND_DEBUG
 #define RT_USING_MTD_NAND
+#define RT_MMCSD_DBG
 #define RT_USING_SDIO
 
 /* SECTION: Console options */

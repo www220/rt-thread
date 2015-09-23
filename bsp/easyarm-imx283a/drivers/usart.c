@@ -95,7 +95,7 @@ static struct pin_group uart5_pins = {
 
 #if defined(RT_USING_DBGU)
 static struct rt_serial_device serial_dbgu;
-struct at91_uart dbgu = {
+static struct at91_uart dbgu = {
 	REGS_UARTDBG_BASE,
 	IRQ_DUART,
 	"DbgU",
@@ -106,7 +106,7 @@ struct at91_uart dbgu = {
 
 #if defined(RT_USING_UART1)
 static struct rt_serial_device serial_uart1;
-struct at91_uart uart1 = {
+static struct at91_uart uart1 = {
 	REGS_UARTAPP0_BASE,
 	IRQ_AUART0,
 	"Uart1",
@@ -117,7 +117,7 @@ struct at91_uart uart1 = {
 
 #if defined(RT_USING_UART2)
 static struct rt_serial_device serial_uart2;
-struct at91_uart uart2 = {
+static struct at91_uart uart2 = {
 	REGS_UARTAPP1_BASE,
 	IRQ_AUART1,
 	"Uart2",
@@ -128,7 +128,7 @@ struct at91_uart uart2 = {
 
 #if defined(RT_USING_UART3)
 static struct rt_serial_device serial_uart3;
-struct at91_uart uart3 = {
+static struct at91_uart uart3 = {
 	REGS_UARTAPP2_BASE,
 	IRQ_AUART2,
 	"Uart3",
@@ -139,7 +139,7 @@ struct at91_uart uart3 = {
 
 #if defined(RT_USING_UART4)
 static struct rt_serial_device serial_uart4;
-struct at91_uart uart4 = {
+static struct at91_uart uart4 = {
 	REGS_UARTAPP3_BASE,
 	IRQ_AUART3,
 	"Uart4",
@@ -150,7 +150,7 @@ struct at91_uart uart4 = {
 
 #if defined(RT_USING_UART5)
 static struct rt_serial_device serial_uart5;
-struct at91_uart uart5 = {
+static struct at91_uart uart5 = {
 	REGS_UARTAPP4_BASE,
 	IRQ_AUART4,
 	"Uart5",
