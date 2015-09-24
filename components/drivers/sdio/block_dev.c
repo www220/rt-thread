@@ -451,6 +451,7 @@ void rt_mmcsd_blk_remove(struct rt_mmcsd_card *card)
             rt_device_unregister(&blk_dev->dev);
             rt_list_remove(&blk_dev->list);
             rt_free(blk_dev);
+            break;
         }
     }
 }

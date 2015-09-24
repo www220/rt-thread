@@ -102,7 +102,7 @@ void yaffsfs_LockInit(void)
 
 #if 1
     rt_thread_init(&thread_gc_func,
-                   "gc_yfs",
+                   "gc_yffs",
                    bg_gc_func,
                    RT_NULL,
                    &bg_gc_func_stack[0],

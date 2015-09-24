@@ -698,7 +698,7 @@ void rt_mmcsd_core_init(void)
         RT_IPC_FLAG_FIFO);
     RT_ASSERT(ret == RT_EOK);
 
-    ret = rt_thread_init(&mmcsd_detect_thread, "sd_dect", mmcsd_detect, RT_NULL,
+    ret = rt_thread_init(&mmcsd_detect_thread, "sd_detect", mmcsd_detect, RT_NULL,
                  &mmcsd_stack[0], RT_MMCSD_STACK_SIZE, RT_MMCSD_THREAD_PREORITY, 20);
     if (ret == RT_EOK) 
     {

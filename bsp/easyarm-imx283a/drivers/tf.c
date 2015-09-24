@@ -5,6 +5,14 @@
 #include <stdlib.h>
 #include "board.h"
 #include "tf.h"
+#include <dfs_fs.h>
+
+#define SD_LINK
+#ifdef SD_LINK
+#define SD_LINK_PRINTF         rt_kprintf
+#else
+#define SD_LINK_PRINTF(...)
+#endif
 
 struct at91_mci {
 	struct rt_mmcsd_host *host;
@@ -410,6 +418,47 @@ static struct at91_mci mci = {
 	.cfg = &ssp_mmc_cfg,
 };
 
+static void sd_monitor_thread_entry(void *parameter)
+{
+    uint32_t card,status,i;
+    card  = (ssp_mmc_read(&mci, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT);
+
+    while(1)
+    {
+        status  = (ssp_mmc_read(&mci, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT);
+        if (status != card) {
+            if (status) {
+        		SD_LINK_PRINTF("MMC: No card detected!\n");
+        		if (mci.host->card) {
+        			dfs_unmount("/mmc");
+        	        rt_kprintf("Unmount /mmc ok!\n");
+        		    rt_mmcsd_blk_remove(mci.host->card);
+        		    rt_free(mci.host->card);
+        		    mci.host->card = RT_NULL;
+        		}
+        	} else {
+        		SD_LINK_PRINTF("MMC: Card detected!\n");
+        		mci_run = 1;
+        		mmcsd_change(mci.host);
+        		for (i=0; i<20 && mci_run; i++) {
+        			rt_thread_delay(100);
+        			if (rt_device_find("sd0") != RT_NULL) {
+        				rt_thread_delay(100);
+        				break;
+        			}
+        		}
+        	    if (dfs_mount("sd0", "/mmc", "elm", 0, 0) == 0)
+        	        rt_kprintf("Mount /mmc ok!\n");
+        	    else
+        	        rt_kprintf("Mount /mmc failed!\n");
+        	}
+            card = status;
+        }
+
+        rt_thread_delay(RT_TICK_PER_SECOND);
+    } /* while(1) */
+}
+
 void tf_init(void)
 {
 	int i;
@@ -446,4 +495,17 @@ void tf_init(void)
 			break;
 		}
 	}
+
+    /* start sd monitor */
+    {
+        rt_thread_t tid;
+        tid = rt_thread_create("sd",
+                               sd_monitor_thread_entry,
+                               RT_NULL,
+                               2048,
+                               RT_THREAD_PRIORITY_MAX - 2,
+                               20);
+        if (tid != RT_NULL)
+            rt_thread_startup(tid);
+    }
 }
