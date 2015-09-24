@@ -233,6 +233,10 @@ static void rt_thread_entry_main(void* parameter)
         rt_kprintf("Mount /mnt ok!\n");
     else
         rt_kprintf("Mount /mnt failed!\n");
+    if (dfs_mount("nand1", "/tmp", "yaffs2", 0, 0) == 0)
+        rt_kprintf("Mount /tmp ok!\n");
+    else
+        rt_kprintf("Mount /tmp failed!\n");
 #endif
 
 #if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)

@@ -95,6 +95,7 @@ extern int *__errno (void);
 //#define RT_MMCSD_DBG
 #define RT_USING_SDIO
 #define RT_MMCSD_STACK_SIZE 4096
+#define RT_USING_USB_HOST
 
 /* SECTION: Console options */
 #define RT_USING_CONSOLE
@@ -141,7 +142,7 @@ extern int *__errno (void);
 //#define SQLITE_TEST 1
 //#define RT_USING_TCLSHELL
 
-#define rttTempFileDir "/mnt/tmp"
+#define rttTempFileDir "/tmp"
 #define rttCfgFileDir "/mnt/config"
 #define rttResFileDir "/mnt/resource"
 extern int rttGetTempname(int nBuf, char *zBuf);

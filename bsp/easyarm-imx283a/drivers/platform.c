@@ -219,6 +219,64 @@ int cmd_tcl(int argc, char** argv)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_tcl, __cmd_tcl, TCL.)
 #endif
 
+extern int dfs_mount(const char *device_name, const char *path, const char *filesystemtype, rt_uint32_t rwflag, const void *data);
+int cmd_mount(int argc, char **argv)
+{
+    if (argc < 4)
+    {
+        rt_kprintf("Usage: mount ftl0 /spi elm\n");
+        return -RT_ERROR;
+    }
+    return dfs_mount(argv[1], argv[2], argv[3], 0, 0);
+}
+
+extern int dfs_unmount(const char *specialfile);
+int cmd_unmount(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("Usage: unmount /spi\n");
+        return -RT_ERROR;
+    }
+    return dfs_unmount(argv[1]);
+}
+
+extern int df(const char *path);
+int cmd_df(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("Usage: df /spi\n");
+        return -RT_ERROR;
+    }
+    return df(argv[1]);
+}
+
+int cmd_echo(int argc, char** argv)
+{
+    struct dfs_fd fd;
+    if (argc < 3)
+    {
+        rt_kprintf("Usage: echo [FILE] [INFO]\n");
+        rt_kprintf("Write FILE...\n");
+        return 0;
+    }
+
+    if (dfs_file_open(&fd, argv[1], DFS_O_CREAT|DFS_O_RDWR) < 0)
+    {
+        rt_kprintf("Open %s failed\n", argv[1]);
+        return 1;
+    }
+    dfs_file_write(&fd,argv[2],strlen(argv[2]));
+    dfs_file_write(&fd,"\r\n",2);
+    dfs_file_close(&fd);
+    return 0;
+}
+
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_echo, __cmd_echo, Write FILE);
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_df, __cmd_df, get disk free);
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_unmount, __cmd_unmount, unmount path);
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_mount, __cmd_mount, mount path to device);
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_sh, __cmd_sh, Shell the FILEs.)
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_msleep, __cmd_msleep, Sleep ms.)
 #endif //FINSH_USING_MSH

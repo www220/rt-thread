@@ -85,7 +85,7 @@
 
 #define NFC_DMA_DESCRIPTOR_COUNT	(4)
 static struct mxs_dma_desc *dma_desc[NFC_DMA_DESCRIPTOR_COUNT];
-static struct rt_mtd_nand_device _nanddrv_file_device;
+static struct rt_mtd_nand_device _nanddrv_file_device[2];
 
 static u8 *data_buf = 0;
 static u8 *oob_buf = 0;
@@ -1348,17 +1348,28 @@ void rt_hw_mtd_nand_init(void)
 	m_u32BlkMarkByteOfs = blk_mark_bit_offs >> 3;
 	m_u32BlkMarkBitStart  = blk_mark_bit_offs & 0x7;
 
-    _nanddrv_file_device.plane_num = 2;
-    _nanddrv_file_device.oob_size = OOB_SIZE;
-    _nanddrv_file_device.oob_free = GPMI_NFC_METADATA_SIZE;
-    _nanddrv_file_device.page_size = PAGE_DATA_SIZE;
-    _nanddrv_file_device.pages_per_block = PAGE_PER_BLOCK;
-    _nanddrv_file_device.block_start = 160;
-    _nanddrv_file_device.block_end = BLOCK_NUM / 2;
-    _nanddrv_file_device.block_total = _nanddrv_file_device.block_end - _nanddrv_file_device.block_start;
-    _nanddrv_file_device.ops = &_ops;
+    _nanddrv_file_device[0].plane_num = 2;
+    _nanddrv_file_device[0].oob_size = OOB_SIZE;
+    _nanddrv_file_device[0].oob_free = GPMI_NFC_METADATA_SIZE;
+    _nanddrv_file_device[0].page_size = PAGE_DATA_SIZE;
+    _nanddrv_file_device[0].pages_per_block = PAGE_PER_BLOCK;
+    _nanddrv_file_device[0].block_start = 160;
+    _nanddrv_file_device[0].block_end = BLOCK_NUM / 2 + 160;
+    _nanddrv_file_device[0].block_total = _nanddrv_file_device[0].block_end - _nanddrv_file_device[0].block_start;
+    _nanddrv_file_device[0].ops = &_ops;
 
-    rt_mtd_nand_register_device("nand0", &_nanddrv_file_device);
+    _nanddrv_file_device[1].plane_num = 2;
+    _nanddrv_file_device[1].oob_size = OOB_SIZE;
+    _nanddrv_file_device[1].oob_free = GPMI_NFC_METADATA_SIZE;
+    _nanddrv_file_device[1].page_size = PAGE_DATA_SIZE;
+    _nanddrv_file_device[1].pages_per_block = PAGE_PER_BLOCK;
+    _nanddrv_file_device[1].block_start = _nanddrv_file_device[0].block_end;
+    _nanddrv_file_device[1].block_end = BLOCK_NUM / 2 + 240;
+    _nanddrv_file_device[1].block_total = _nanddrv_file_device[0].block_end - _nanddrv_file_device[1].block_start;
+    _nanddrv_file_device[1].ops = &_ops;
+
+    rt_mtd_nand_register_device("nand0", &_nanddrv_file_device[0]);
+    rt_mtd_nand_register_device("nand1", &_nanddrv_file_device[1]);
 }
 
 void nand_init(void)
@@ -1383,13 +1394,13 @@ void nand_init(void)
 	 * Reset the chip, required by some chips (e.g. Micron MT29FxGxxxxx)
 	 * after power-up
 	 */
-	nand_command(&_nanddrv_file_device, NAND_CMD_RESET, -1, -1);
+	nand_command(&_nanddrv_file_device[0], NAND_CMD_RESET, -1, -1);
 
 	/* Send the command for reading device ID */
-	nand_command(&_nanddrv_file_device, NAND_CMD_READID, 0x00, -1);
+	nand_command(&_nanddrv_file_device[0], NAND_CMD_READID, 0x00, -1);
 
 	/* Read manufacturer and device IDs */
-	nand_read_buf(&_nanddrv_file_device, id, 4);
+	nand_read_buf(&_nanddrv_file_device[0], id, 4);
     rt_kprintf("NAND ID:%x %x ", id[0], id[1]);
     if (id[0] == 0xc2 && id[1] == 0xf1)
         rt_kprintf("MXIC NAND 128Mib\n");
@@ -1399,16 +1410,23 @@ void nand_init(void)
 
 #if defined(RT_USING_FINSH)
 #include <finsh.h>
-void nand_eraseall()
+int nand_eraseall(int argc, char **argv)
 {
-    int index;
-    for (index = _nanddrv_file_device.block_start; index < _nanddrv_file_device.block_end; index ++)
+    int index,pos = 0;
+    if (argc < 2)
     {
-        if (nanddrv_file_erase_block(&_nanddrv_file_device, index) != 0)
-            rt_kprintf("Nand Erase %d BadBlock\n", index);
+        rt_kprintf("Usage: nand_eraseall 0 or 1\n");
+        return -1;
     }
+    pos = atol(argv[1]) % 2;
+    for (index = _nanddrv_file_device[pos].block_start; index < _nanddrv_file_device[pos].block_end; index ++)
+    {
+        if (nanddrv_file_erase_block(&_nanddrv_file_device[pos], index) != 0)
+            rt_kprintf("Nand Erase %d %d BadBlock\n", pos, index);
+    }
+    rt_kprintf("Nand Erase %d Ok\n", pos);
+    return 0;
 }
-FINSH_FUNCTION_EXPORT(nand_eraseall, erase all of block in the nand flash);
 FINSH_FUNCTION_EXPORT_ALIAS(nand_eraseall, __cmd_nand_eraseall,  erase all of block in the nand flash)
 
 #endif //RT_USING_FINSH
