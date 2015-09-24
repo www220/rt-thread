@@ -16,8 +16,6 @@
 
 struct at91_mci {
 	struct rt_mmcsd_host *host;
-	struct rt_mmcsd_req *req;
-	struct rt_mmcsd_cmd *cmd;
 	struct rt_mmcsd_io_cfg io_cfg;
 	struct imx_ssp_mmc_cfg *cfg;
 };

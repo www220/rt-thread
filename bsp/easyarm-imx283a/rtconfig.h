@@ -96,6 +96,7 @@ extern int *__errno (void);
 #define RT_USING_SDIO
 #define RT_MMCSD_STACK_SIZE 4096
 #define RT_USING_USB_HOST
+#define RT_USBH_MSTORAGE
 
 /* SECTION: Console options */
 #define RT_USING_CONSOLE

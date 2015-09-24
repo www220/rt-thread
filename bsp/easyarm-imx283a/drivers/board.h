@@ -78,12 +78,14 @@ void rt_hw_spi_init(void);
 void rt_hw_rtc_init(void);
 void rt_hw_mtd_nand_init(void);
 void rt_hw_ssp_init(void);
+void rt_hw_usbh_init(void);
 
 extern volatile int eth_wtdog;
 extern volatile int eth_linkstatus;
 extern volatile int wtdog_count;
 extern volatile int sys_stauts;
 void inittmppath(void);
+void cleartmppath(void);
 
 #ifndef _MSC_VER
 extern void __delay(int loops);

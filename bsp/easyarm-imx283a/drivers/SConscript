@@ -42,12 +42,16 @@ nand.c
 apbh_dma.c
 """)
 
+nandsim_src = Split("""
+simnand.c
+""")
+
 tfdev_src = Split("""
 tf.c
 """)
 
-nandsim_src = Split("""
-simnand.c
+usbhdev_src = Split("""
+usbh.c
 """)
 
 lcddev_src = Split("""
@@ -86,6 +90,10 @@ if rtconfig.PLATFORM != 'cl':
     if GetDepend(['RT_USING_SDIO']):
         src += tfdev_src
         
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_USB_HOST']):
+        src += usbhdev_src
+
 if rtconfig.PLATFORM != 'cl':
     if GetDepend(['RT_USING_RTGUI']):
         src += lcddev_src

@@ -29,6 +29,7 @@
 
 #include <board.h>
 #include <rtthread.h>
+#include <rtdevice.h>
 
 #define LED_ERR_PORT		PIN_ERR
 #define LED_ERR_PIN		
@@ -59,6 +60,10 @@ extern void tf_init(void);
 #ifdef RT_USING_MTD_NAND
 extern void nand_init(void);
 #endif
+#endif
+
+#ifdef RT_USING_USB_HOST
+extern void usbh_init(void);
 #endif
 
 #ifdef RT_USING_RTC
@@ -250,6 +255,11 @@ static void rt_thread_entry_main(void* parameter)
         rt_kprintf("Mount /mmc failed!\n");
 #endif
 
+#endif
+
+#ifdef RT_USING_USB_HOST
+    usbh_init();
+	rt_usb_host_init();
 #endif
 
 #ifdef RT_USING_LIBC

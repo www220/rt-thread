@@ -8,6 +8,13 @@
 
 void inittmppath(void)
 {
+    mkdir(rttCfgFileDir, 666);
+    mkdir(rttResFileDir, 666);
+    cleartmppath();
+}
+
+void cleartmppath(void)
+{
 #ifdef RT_USING_DFS
     char buf[100];
 	struct dirent *ent = NULL;
@@ -29,9 +36,6 @@ void inittmppath(void)
 		}
 		closedir(pDir);
 	}
-    
-    mkdir(rttCfgFileDir, 666);
-    mkdir(rttResFileDir, 666);
 #endif
 }
 
