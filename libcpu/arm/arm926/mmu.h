@@ -26,6 +26,9 @@
 
 #include <rtthread.h>
 
+#define HEAP_BEGIN        0x40000000
+#define HEAP_END          0x43F00000
+
 #define CACHE_LINE_SIZE     32
 
 #define DESC_SEC            (0x2|(1<<4))

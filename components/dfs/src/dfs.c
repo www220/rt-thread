@@ -229,9 +229,16 @@ int fd_is_open(const char *pathname)
 
         /* get file path name under mounted file system */
         if (fs->path[0] == '/' && fs->path[1] == '\0')
+        {
             mountpath = fullpath;
+        }
         else
-            mountpath = fullpath + strlen(fs->path);
+        {
+            if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+                mountpath = fullpath;
+            else
+                mountpath = fullpath + strlen(fs->path);
+        }
 
         dfs_lock();
 #ifdef DFS_USING_STDIO

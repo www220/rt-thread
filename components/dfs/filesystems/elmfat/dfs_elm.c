@@ -402,6 +402,7 @@ int dfs_elm_open(struct dfs_fd *file)
         {
             file->pos  = fd->fptr;
             file->size = fd->fsize;
+            file->blksize = RT_DFS_ELM_MAX_SECTOR_SIZE;
             file->data = fd;
 
             if (file->flags & DFS_O_APPEND)
@@ -738,6 +739,7 @@ int dfs_elm_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
             st->st_mode &= ~(DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH);
 
         st->st_size  = file_info.fsize;
+        st->st_blksize = RT_DFS_ELM_MAX_SECTOR_SIZE;
 
         /* get st_mtime. */
         {
@@ -778,6 +780,35 @@ int dfs_elm_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
     return elm_result_to_dfs(result);
 }
 
+int dfs_elm_truncate(struct dfs_fd *file, rt_off_t length)
+{
+    FRESULT result = FR_OK;
+    FIL *fd;
+
+    if (file->type == FT_DIRECTORY)
+    {
+        return -DFS_STATUS_EISDIR;
+    }
+
+    fd = (FIL *)(file->data);
+    RT_ASSERT(fd != RT_NULL);
+
+    result = f_lseek(fd, length);
+    /* update position and file size */
+    file->pos = fd->fptr;
+    file->size = fd->fsize;
+    /* truncate file */
+    if (result == FR_OK)
+    {
+        result = f_truncate(fd);
+        /* update position and file size */
+        file->pos = fd->fptr;
+        file->size = fd->fsize;
+    }
+
+    return elm_result_to_dfs(result);
+}
+
 static const struct dfs_filesystem_operation dfs_elm =
 {
     "elm",
@@ -798,6 +829,7 @@ static const struct dfs_filesystem_operation dfs_elm =
     dfs_elm_unlink,
     dfs_elm_stat,
     dfs_elm_rename,
+    dfs_elm_truncate,
 };
 
 int elm_init(void)
@@ -907,7 +939,7 @@ DRESULT disk_ioctl(BYTE drv, BYTE ctrl, void *buff)
 
 rt_time_t get_fattime(void)
 {
-    return 0;
+    return time(0);
 }
 
 #if _FS_REENTRANT

@@ -41,7 +41,7 @@
  *
  * @return the non-negative integer on successful open, others for failed.
  */
-int open(const char *file, int flags, int mode)
+int open(const char *file, int flags, ...)
 {
     int fd, result;
     struct dfs_fd *d;
@@ -132,6 +132,17 @@ int read(int fd, void *buf, size_t len)
     int result;
     struct dfs_fd *d;
 
+#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
+    if (fd < 3)
+    {
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        if (console_device != 0) 
+            len = rt_device_read(console_device, 0, buf, len);
+        return (console_device)?len:0;
+    }
+#endif
+
     /* get the fd */
     d = fd_get(fd);
     if (d == RT_NULL)
@@ -175,6 +186,17 @@ int write(int fd, const void *buf, size_t len)
 {
     int result;
     struct dfs_fd *d;
+
+#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
+    if (fd < 3)
+    {
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        if (console_device != 0) 
+            len = rt_device_write(console_device, 0, buf, len);
+        return len;
+    }
+#endif
 
     /* get the fd */
     d = fd_get(fd);
@@ -377,6 +399,7 @@ int fstat(int fildes, struct stat *buf)
 
     buf->st_size    = d->size;
     buf->st_mtime   = 0;
+    buf->st_blksize = d->blksize;
 
     fd_put(d);
 

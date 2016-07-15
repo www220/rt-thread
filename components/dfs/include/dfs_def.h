@@ -307,6 +307,7 @@ struct dfs_fd
 
     rt_uint32_t flags;           /* Descriptor flags */
     rt_size_t   size;            /* Size in bytes */
+    rt_size_t blksize;           /* Size in bytes */
     rt_off_t    pos;             /* Current file position */
 
     void *data;                  /* Specific file system data */

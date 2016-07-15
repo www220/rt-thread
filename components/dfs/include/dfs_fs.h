@@ -60,6 +60,7 @@ struct dfs_filesystem_operation
     int (*unlink)   (struct dfs_filesystem *fs, const char *pathname);
     int (*stat)     (struct dfs_filesystem *fs, const char *filename, struct stat *buf);
     int (*rename)   (struct dfs_filesystem *fs, const char *oldpath, const char *newpath);
+    int (*truncate) (struct dfs_fd *fd, rt_off_t length);
 };
 
 /* Mounted file system */

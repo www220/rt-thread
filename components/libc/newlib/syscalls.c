@@ -1,7 +1,9 @@
 #include <reent.h>
 #include <sys/errno.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <rtthread.h>
+#include <rtdevice.h>
 
 #ifdef RT_USING_DFS
 #include <dfs_posix.h>
@@ -50,9 +52,14 @@ _fork_r(struct _reent *ptr)
 int
 _fstat_r(struct _reent *ptr, int fd, struct stat *pstat)
 {
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
+#ifndef RT_USING_DFS
+	return 0;
+#else
+	int rc;
+
+	rc = fstat(fd, pstat);
+	return rc;
+#endif
 }
 
 int
@@ -66,9 +73,7 @@ _isatty_r(struct _reent *ptr, int fd)
 {
 	if (fd >=0 && fd < 3) return 1;
 
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
+	return 0;
 }
 
 int
@@ -201,147 +206,69 @@ _wait_r(struct _reent *ptr, int *status)
 	return -1;
 }
 
-#ifdef RT_USING_DEVICE
 _ssize_t
 _write_r(struct _reent *ptr, int fd, const void *buf, size_t nbytes)
 {
-	if (fd < 3)
-	{
-#ifdef RT_USING_CONSOLE
-		rt_device_t console_device;
-		extern rt_device_t rt_console_get_device(void);
-
-		console_device = rt_console_get_device();
-		if (console_device != 0) rt_device_write(console_device, 0, buf, nbytes);
-		return nbytes;
+#ifndef RT_USING_DFS
+	return 0;
 #else
-        return 0;
+	_ssize_t rc;
+
+	rc = write(fd, buf, nbytes);
+	return rc;
 #endif
+}
+
+int
+_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
+{
+#ifndef RT_USING_RTC
+	/* return "not supported" */
+	ptr->_errno = ENOTSUP;
+	return -1;
+#else
+	static time_t sysnow = 0;
+	static uint16_t sysms = 0;
+	time_t nownow = time(NULL);
+	uint16_t nowms = rt_tick_get() % 1000;
+	if (sysnow == 0 && sysms == 0)
+	{
+		sysnow = nownow;
+		sysms = nowms;
 	}
 	else
 	{
-#ifdef RT_USING_DFS
-	    _ssize_t rc;
-
-	    rc = write(fd, buf, nbytes);
-	    return rc;
-#else
-        return 0;
-#endif
+		//如果毫秒走的比较快，在秒上面增加
+		if ((sysnow == nownow)
+				&& (nowms<sysnow))
+			sysnow = nownow+1;
+		else
+			sysnow = nownow;
+		sysms = nowms;
 	}
-}
-#endif
-
-#ifndef RT_USING_PTHREADS
-
-#ifndef MILLISECOND_PER_SECOND
-#define MILLISECOND_PER_SECOND	1000UL
-#endif
-
-#ifndef MICROSECOND_PER_SECOND
-#define MICROSECOND_PER_SECOND	1000000UL
-#endif
-
-#ifndef NANOSECOND_PER_SECOND
-#define NANOSECOND_PER_SECOND	1000000000UL
-#endif
-
-#define MILLISECOND_PER_TICK	(MILLISECOND_PER_SECOND / RT_TICK_PER_SECOND)
-#define MICROSECOND_PER_TICK	(MICROSECOND_PER_SECOND / RT_TICK_PER_SECOND)
-#define NANOSECOND_PER_TICK		(NANOSECOND_PER_SECOND  / RT_TICK_PER_SECOND)
-
-
-struct timeval _timevalue = {0};
-#ifdef RT_USING_DEVICE
-static void libc_system_time_init(void)
-{
-	time_t time;
-	rt_tick_t tick;
-	rt_device_t device;
-
-	time = 0;
-	device = rt_device_find("rtc");
-	if (device != RT_NULL)
-	{
-		/* get realtime seconds */
-		rt_device_control(device, RT_DEVICE_CTRL_RTC_GET_TIME, &time);
-	}
-
-	/* get tick */
-	tick = rt_tick_get();
-
-	_timevalue.tv_usec = MICROSECOND_PER_SECOND - (tick%RT_TICK_PER_SECOND) * MICROSECOND_PER_TICK;
-	_timevalue.tv_sec = time - tick/RT_TICK_PER_SECOND - 1;
-}
-#endif
-
-int libc_get_time(struct timespec *time)
-{
-	rt_tick_t tick;
-	static rt_bool_t inited = 0;
-
-	RT_ASSERT(time != RT_NULL);
-
-	/* initialize system time */
-	if (inited == 0)
-	{
-		libc_system_time_init();
-		inited = 1;
-	}
-
-	/* get tick */
-	tick = rt_tick_get();
-
-	time->tv_sec = _timevalue.tv_sec + tick / RT_TICK_PER_SECOND;
-	time->tv_nsec = (_timevalue.tv_usec + (tick % RT_TICK_PER_SECOND) * MICROSECOND_PER_TICK) * 1000;
-
+	__tp->tv_sec = sysnow;
+	__tp->tv_usec = sysms * 1000l;
 	return 0;
-}
-
-int
-_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
-{
-	struct timespec tp;
-
-	if (libc_get_time(&tp) == 0)
-	{
-		if (__tp != RT_NULL)
-		{
-			__tp->tv_sec  = tp.tv_sec;
-			__tp->tv_usec = tp.tv_nsec / 1000UL;
-		}
-
-		return tp.tv_sec;
-	}
-
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
-}
-#else
-/* POSIX thread provides clock_gettime function */
-#include <time.h>
-int
-_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
-{
-	struct timespec tp;
-
-	if (clock_gettime(CLOCK_REALTIME, &tp) == 0)
-	{
-		if (__tp != RT_NULL)
-		{
-			__tp->tv_sec  = tp.tv_sec;
-			__tp->tv_usec = tp.tv_nsec / 1000UL;
-		}
-
-		return tp.tv_sec;
-	}
-
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
-}
 #endif
+}
+
+int
+settimeofday(const struct timeval *__tp, const struct timezone *__tzp)
+{
+#ifndef RT_USING_RTC
+	/* return "not supported" */
+	return -1;
+#else
+	rt_device_t device;
+	device = rt_device_find("rtc");
+    if (device == RT_NULL)
+        return -1;
+    /* update to RTC device. */
+    rt_device_control(device, RT_DEVICE_CTRL_RTC_SET_TIME, (void *)&__tp->tv_sec);
+	return 0;
+#endif
+}
+RTM_EXPORT(settimeofday);
 
 /* Memory routine */
 void *
@@ -443,22 +370,22 @@ _system(const char *s)
     return;
 }
 
+int*
+__errno(void)
+{
+	static volatile int gun_errno;
+	return (int *)&gun_errno;
+}
+
+int
+_isatty(int fd)
+{
+	if (fd >=0 && fd < 3) return 1;
+
+	return 0;
+}
+
 void __libc_init_array(void)
 {
 	/* we not use __libc init_aray to initialize C++ objects */
-}
-
-void abort(void)
-{
-    if (rt_thread_self())
-    {
-        rt_thread_t self = rt_thread_self();
-
-        rt_kprintf("thread:%-8.*s abort!\n", RT_NAME_MAX, self->name);
-        rt_thread_suspend(self);
-
-        rt_schedule();
-    }
-
-	while (1);
 }
