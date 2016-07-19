@@ -57,7 +57,7 @@ void tcpecho(void)
     {
         echo_tid = rt_thread_create("echo",
 			tcpecho_entry, RT_NULL,
-            512, 30, 5);
+            512, 30, 20);
         if (echo_tid != RT_NULL)
             rt_thread_startup(echo_tid);
     }

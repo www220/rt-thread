@@ -61,7 +61,7 @@
 //#define RT_USING_SMALL_MEM
 /* Using SLAB Allocator */
 #define RT_USING_SLAB
-//#define RT_USING_MODULE
+#define RT_USING_PROCESS
 #define RT_SERIAL_RB_BUFSZ 4096
 
 /* Using Libc */

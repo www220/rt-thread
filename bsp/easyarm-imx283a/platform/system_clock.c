@@ -211,4 +211,5 @@ FINSH_FUNCTION_EXPORT(list_cpuinfo, list cpu info);
 MSH_CMD_EXPORT(list_cpuinfo, list cpu info);
 FINSH_VAR_EXPORT(dma_align_mem, finsh_type_int, dma ram pos for finsh)
 FINSH_VAR_EXPORT(dma_align_max, finsh_type_int, dma_max pos for finsh)
+FINSH_VAR_EXPORT(mod_align_max, finsh_type_int, mod_max pos for finsh)
 #endif

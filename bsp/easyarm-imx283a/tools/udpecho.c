@@ -39,7 +39,7 @@ void udpecho(void)
 	{
 		echo_tid = rt_thread_create("uecho",
 									udpecho_entry, RT_NULL,
-									512, 30, 5);
+									512, 30, 20);
 		if (echo_tid != RT_NULL)
 			rt_thread_startup(echo_tid);
 	}

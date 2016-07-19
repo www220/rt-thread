@@ -70,6 +70,10 @@ extern unsigned char *dma_align_max;
 #define memalign_max(x,y) dma_align_max; dma_align_max += (u32)(((u32)(y)+31)&(u32)(~31))
 #define freealign_max(x)
 
+extern unsigned char *mod_align_max;
+#define memalign_mod(x,y) mod_align_max; mod_align_max += (u32)(((u32)(y)+4095)&(u32)(~4095))
+#define freealign_mod(x,y) if ((u32)(((u32)(y)+4095)&(u32)(~4095))+(x)==mod_align_max) mod_align_max -= (u32)(((u32)(y)+4095)&(u32)(~4095))
+
 /* Dma addresses are 32-bits wide.  */
 typedef u32 dma_addr_t;
 

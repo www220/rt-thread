@@ -407,7 +407,7 @@ int rt_application_init()
                    rt_thread_entry_wtdog,
                    RT_NULL,
                    &thread_wtdog_stack[0],
-                   sizeof(thread_wtdog_stack),2,10);
+                   sizeof(thread_wtdog_stack),2,20);
     rt_thread_startup(&thread_wtdog);
     //------- init main thread
     rt_thread_init(&thread_main,
@@ -415,7 +415,7 @@ int rt_application_init()
                    rt_thread_entry_main,
                    RT_NULL,
                    &thread_main_stack[0],
-                   sizeof(thread_main_stack),10,10);
+                   sizeof(thread_main_stack),10,20);
     rt_thread_startup(&thread_main);
 
     return 0;

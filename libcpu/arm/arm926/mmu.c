@@ -278,7 +278,7 @@ void mmu_enable_dcache()
     asm volatile
     (
         "mrc p15, 0, r0, c1, c0, 0 \n"
-        "orr r0, r0, #(1<<2) \n"
+        "orr r0, r0, #4 \n"
         "mcr p15, 0, r0, c1, c0, 0 \n"
         :::"r0"
     );
@@ -302,7 +302,7 @@ void mmu_disable_dcache()
     asm volatile
     (
         "mrc p15, 0, r0, c1, c0, 0 \n"
-        "bic r0, r0, #(1<<2) \n"
+        "bic r0, r0, #4 \n"
         "mcr p15, 0, r0, c1, c0, 0 \n"
         :::"r0"
     );
@@ -314,7 +314,7 @@ void mmu_enable_alignfault()
     asm volatile
     (
         "mrc p15, 0, r0, c1, c0, 0 \n"
-        "orr r0, r0, #1 \n"
+        "orr r0, r0, #2 \n"
         "mcr p15, 0, r0, c1, c0, 0 \n"
         :::"r0"
     );
@@ -326,7 +326,7 @@ void mmu_disable_alignfault()
     asm volatile
     (
         "mrc p15, 0, r0, c1, c0, 0 \n"
-        "bic r0, r0, #1 \n"
+        "bic r0, r0, #2 \n"
         "mcr p15, 0, r0, c1, c0, 0 \n"
         :::"r0"
     );
@@ -405,8 +405,10 @@ void mmu_invalidate_dcache_all()
 #pragma data_alignment=(16*1024)
 static volatile rt_uint32_t _page_table[4*1024];
 #else
-static volatile rt_uint32_t _page_table[4*1024] \
+static volatile rt_uint32_t _page_table[(1+PROCESS_MAX)*4096] \
     __attribute__((aligned(16*1024)));
+static volatile rt_uint32_t _small_table[(PROCESS_MAX*MMU_L2_SIZE)*256] \
+    __attribute__((aligned(1024)));
 #endif
 
 void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
@@ -442,6 +444,13 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
 
     /* set MMU table address */
     mmu_setttbase((rt_uint32_t)_page_table);
+    /* copy base MMU table */
+    for (size=1; size<=PROCESS_MAX; size++)
+    {
+        rt_uint32_t index = 0;
+        for (; index<4096; index++)
+            _page_table[size*4096+index] = _page_table[index];
+    }
 
     /* enables MMU */
     mmu_enable();

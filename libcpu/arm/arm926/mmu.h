@@ -26,8 +26,11 @@
 
 #include <rtthread.h>
 
-#define HEAP_BEGIN        0x40000000
+#define HEAP_BEGIN        0x40A00000
 #define HEAP_END          0x43F00000
+
+#define PROCESS_MAX       16
+#define MMU_L2_SIZE       ((HEAP_END-HEAP_BEGIN)/0x100000)
 
 #define CACHE_LINE_SIZE     32
 

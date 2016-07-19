@@ -73,14 +73,15 @@ void calibrate_delay(void)
 
 static struct mem_desc hw_mem_desc[] =
 {
-	{ 0x00000000, 0xFFFFFFFF, 0x00000000, RW_NCNB },     /* None cached for 4G memory */
-	{ HEAP_BEGIN, HEAP_END-1, HEAP_BEGIN, RW_CB },       /* 63M cached SDRAM memory */
+	{ 0x80000000, 0xFFFFFFFF, 0x80000000, RW_NCNB },     /* None cached for io memory */
+	{ 0x40000000, HEAP_END-1, 0x40000000, RW_CB },       /* 63M cached SDRAM memory */
 	{ HEAP_END,   HEAP_END+0xFFFFF, HEAP_END, RW_NCNB },     /* 1M none-cached SDRAM */
 	{ 0x00000000, 0x00020000, 0x00000000, RW_NCNB },     /* isr vector table */
 };
 /* None-cached RAM DMA */
 unsigned char * dma_align_mem = (unsigned char *)0x00000100;
 unsigned char * dma_align_max = (unsigned char *)HEAP_END;
+unsigned char * mod_align_max = (unsigned char *)0x40400000;
 
 static struct pin_desc led_pins_desc[] = {
 	{ PIN_WDT, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },

@@ -643,6 +643,7 @@ void mmcsd_detect(void *param)
                     if (init_sdio(host, ocr))
                         mmcsd_power_off(host);
                     mmcsd_host_unlock(host);
+                    rt_mb_send(&mmcsd_hotpluge_mb, (rt_uint32_t)host);
                     continue;
                 }
 
@@ -655,6 +656,7 @@ void mmcsd_detect(void *param)
                     if (init_sd(host, ocr))
                         mmcsd_power_off(host);
                     mmcsd_host_unlock(host);
+                    rt_mb_send(&mmcsd_hotpluge_mb, (rt_uint32_t)host);
                     continue;
                 }
                 
@@ -671,6 +673,7 @@ void mmcsd_detect(void *param)
                     continue;
                 }
                 mmcsd_host_unlock(host);
+                rt_mb_send(&mmcsd_hotpluge_mb, (rt_uint32_t)host);
             }
             else
             {

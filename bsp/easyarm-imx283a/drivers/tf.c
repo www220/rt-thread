@@ -131,7 +131,6 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 
 	/* See if card is present */
 	if (ssp_mmc_read(mmc, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT) {
-		printf("MMC: No card detected!\n");
 		mci_run = 0;
 		return NO_CARD_ERR;
 	}
@@ -426,17 +425,20 @@ static void sd_monitor_thread_entry(void *parameter)
         status  = (ssp_mmc_read(&mci, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT);
         if (status != card) {
             if (status) {
-        		SD_LINK_PRINTF("MMC: No card detected!\n");
+        		printf("MMC: No card detected!\n");
         		if (mci.host->card) {
             		mmcsd_change(mci.host);
-            		mmcsd_wait_cd_changed(2000);
-        			rt_kprintf("Unmount /mmc ok!\n");
+            		mmcsd_wait_cd_changed(5000);
+            		if (mci.host->card == NULL)
+            			rt_kprintf("Unmount /mmc ok!\n");
+            		else
+            			rt_kprintf("Unmount /mmc failed!\n");
         		}
         	} else {
-        		SD_LINK_PRINTF("MMC: Card detected!\n");
+        		printf("MMC: Card detected!\n");
         		mci_run = 1;
         		mmcsd_change(mci.host);
-        		mmcsd_wait_cd_changed(2000);
+        		mmcsd_wait_cd_changed(5000);
         	    if (dfs_mount("sd0", "/mmc", "elm", 0, 0) == 0)
         	        rt_kprintf("Mount /mmc ok!\n");
         	    else
@@ -477,7 +479,11 @@ void tf_init(void)
 
 	mci_run = 1;
 	mmcsd_change(host);
-	mmcsd_wait_cd_changed(2000);
+	mmcsd_wait_cd_changed(5000);
+	if (mci_run)
+        printf("MMC: Card detected!\n");
+	else
+        printf("MMC: No card detected!\n");
 
     /* start sd monitor */
     {
