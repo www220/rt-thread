@@ -57,7 +57,16 @@ rt_hw_context_switch:
     LDR     SP, [R1]                @; get new task stack pointer
     LDMFD   SP!, {R4}               @; pop new task spsr
     MSR     SPSR_cxsf, R4
+    TST     R4, #3
+    BEQ     rt_hw_context_switch_usr
     LDMFD   SP!, {R0-R12, LR, PC}^  @; pop new task r0-r12, lr & pc
+rt_hw_context_switch_usr:
+    LDR     R5, [R1]
+    ADD     R5, #16*4
+    STMFD   SP!, {R5}
+    LDMFD   SP!, {SP}^
+    LDMFD   SP!, {R0-R12, LR}^      @; pop new task r0-r12, lr & pc
+    LDMFD   SP!, {PC}^
 
 /*
  * void rt_hw_context_switch_to(rt_uint32 to);
@@ -68,7 +77,16 @@ rt_hw_context_switch_to:
     LDR     SP, [R0]                @; get new task stack pointer
     LDMFD   SP!, {R4}               @; pop new task cpsr
     MSR     SPSR_cxsf, R4
+    TST     R4, #3
+    BEQ     rt_hw_context_switch_to_usr
     LDMFD   SP!, {R0-R12, LR, PC}^  @; pop new task r0-r12, lr & pc
+rt_hw_context_switch_to_usr:
+    LDR     R5, [R0]
+    ADD     R5, #16*4
+    STMFD   SP!, {R5}
+    LDMFD   SP!, {SP}^
+    LDMFD   SP!, {R0-R12, LR}^      @; pop new task r0-r12, lr & pc
+    LDMFD   SP!, {PC}^
 
 /*
  * void rt_hw_context_switch_interrupt(rt_uint32 from, rt_uint32 to);

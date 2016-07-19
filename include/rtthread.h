@@ -407,7 +407,7 @@ rt_err_t  rt_device_control(rt_device_t dev, rt_uint8_t cmd, void *arg);
 /*@}*/
 #endif
 
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
 /**
  * @addtogroup Module
  */

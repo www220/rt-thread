@@ -230,40 +230,6 @@ int SetPrivateStringData(const char *name, const char *buf, const char *file)
 }
 RTM_EXPORT(SetPrivateStringData);
 
-#ifdef RT_USING_MODULE
-void *load_module_func(const char* name, const char* func, int type)
-{
-    struct rt_module_symtab* i;
-    char chBuf[128];
-    struct rt_module *module = rt_module_find(name);
-    if (module == RT_NULL)
-    {
-        if (type == 0)
-            sprintf(chBuf,"%s/io/%s/%s.mo",rttIoScanDir,name,name);
-        else if (type == 1)
-            sprintf(chBuf,"%s/ds/%s/%s.mo",rttIoScanDir,name,name);
-        else if (type == 2)
-            sprintf(chBuf,"%s/%s.mo",rttLibFileDir,name);
-        else
-            return RT_NULL;
-        module = rt_module_open(chBuf);
-        if (module == RT_NULL)
-            return RT_NULL;
-    }
-    //
-    if (func == RT_NULL)
-        return module;
-    //
-    for (i=module->rtm_begin; i<module->rtm_end; i++)
-    {
-        if (rt_strcmp(func,i->name) == 0)
-            return i->addr;
-    }
-    return RT_NULL;
-}
-RTM_EXPORT(load_module_func);
-#endif
-
 #ifdef RT_USING_LWIP
 #include "lwip/netif.h"
 int getnetif_addr(char* netif_name, u32_t *ip_addr, u32_t *ip_gate, u32_t *ip_mask, u32_t *bs_addr)
@@ -438,55 +404,6 @@ int cmd_df(int argc, char **argv)
     }
     return df(argv[1]);
 }
-
-#ifdef RT_USING_MODULE
-typedef int (*DOFUNC)(int, char**);
-int cmd_rundll(int argc, char** argv)
-{
-    DOFUNC func;
-    if (argc < 3)
-    {
-        rt_kprintf("Usage: rundll [FILE] [FUNC]\n");
-        return 0;
-    }
-
-    func = (DOFUNC)load_module_func(argv[1],argv[2],2);
-    if (func)
-    {
-        int i;
-        char *parse[20] = {0};
-        for (i=2; i<argc; i++)
-            parse[i-2] = argv[i];
-        func(argc-2, parse);
-        rt_kprintf("load %s run %s successed\n", argv[1], argv[2]);
-    }
-    else
-    {
-        rt_kprintf("failed to load %s run %s\n", argv[1], argv[2]);
-    }
-    return 0;
-}
-
-int cmd_loaddll(int argc, char** argv)
-{
-    void *func;
-    if (argc < 2)
-    {
-        rt_kprintf("Usage: loaddll [FILE]\n");
-        return 0;
-    }
-
-    func = load_module_func(argv[1],0,2);
-    if (func)
-        rt_kprintf("load %s successed\n", argv[1]);
-    else
-        rt_kprintf("failed to load %s\n", argv[1]);
-    return 0;
-}
-
-FINSH_FUNCTION_EXPORT_ALIAS(cmd_rundll, __cmd_rundll, Load Module Func);
-FINSH_FUNCTION_EXPORT_ALIAS(cmd_loaddll, __cmd_loaddll, Load Module);
-#endif
 
 int cmd_uptime(int argc, char** argv)
 {

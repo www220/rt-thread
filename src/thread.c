@@ -104,7 +104,8 @@ static rt_err_t _rt_thread_init(struct rt_thread *thread,
     rt_memset(thread->stack_addr, '#', thread->stack_size);
     thread->sp = (void *)rt_hw_stack_init(thread->entry, thread->parameter,
         (void *)((char *)thread->stack_addr + thread->stack_size - 4),
-        (void *)rt_thread_exit);
+        (void *)rt_thread_exit,priority&0x80);
+    priority &= 0x7f;
 
     /* priority init */
     RT_ASSERT(priority < RT_THREAD_PRIORITY_MAX);

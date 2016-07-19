@@ -137,7 +137,7 @@ Reset_Handler:
     MSR     CPSR_cxsf, R0
     
     @; Set CO-Processor
-    @; little-end，disbale I/D Cache MMU, vector table is 0x00000000
+    @; little-end, disbale I/D Cache MMU, vector table is 0x00000000
     MRC     P15, 0, R0, C1, C0, 0   @; Read CP15
     LDR     R1, =0x00003085         @; set clear bits
     BIC     R0, R0, R1
@@ -226,38 +226,81 @@ ctor_end:
 Undef_Handler:
     SUB     SP, SP, #S_FRAME_SIZE
     STMIA   SP, {R0 - R12}          @; Calling R0-R12
+    ADD     R6, SP, #S_FRAME_SIZE
     ADD     R8, SP, #S_PC
-    STMDB   R8, {SP, LR}            @; Calling SP, LR
+    STMDB   R8, {R6, LR}            @; Calling SP, LR
     STR     LR, [R8, #0]            @; Save calling PC
     MRS     R6, SPSR
-    STR     R6, [R8, #4]            @; Save CPSR
-    STR     R0, [R8, #8]            @; Save SPSR
+    STR     R6, [R8, #4]            @; Save SPSR
+    MRS     R6, CPSR
+    STR     R6, [R8, #8]            @; Save CPSR
     MOV     R0, SP
     BL      rt_hw_trap_udef
     
     .align  5
 SWI_Handler:
+    LDR     SP, =SVC_STACK_START
+    STMFD   SP!, {SP}^
+    LDMFD   SP, {SP}
+    SUB     SP, SP, #S_FRAME_SIZE
+    STMIA   SP, {R0 - R12}          @; Calling R0-R12
+    ADD     R4, SP, #S_PC
+    STMDB   R4, {SP, LR}^           @; Calling SP, LR
+    STR     LR, [R4, #0]            @; Save calling PC
+    MRS     R6, SPSR
+    STR     R6, [R4, #4]            @; Save SPSR
+    MRS     R6, CPSR
+    STR     R6, [R4, #8]            @; Save CPSR
+    MOV     R0, SP
     BL      rt_hw_trap_swi
-    
+    LDR     R0, [R4, #4]            @; Pop Save SPSR
+    MSR     SPSR_cxsf, R0
+    LDMIA   SP!, {R0-R14}^
+    LDMIA   SP!, {PC}^
+
     .align  5
 PAbt_Handler:
+    SUB     SP, SP, #S_FRAME_SIZE
+    STMIA   SP, {R0 - R12}          @; Calling R0-R12
+    ADD     R6, SP, #S_FRAME_SIZE
+    ADD     R8, SP, #S_PC
+    STMDB   R8, {R6, LR}            @; Calling SP, LR
+    STR     LR, [R8, #0]            @; Save calling PC
+    MRS     R6, SPSR
+    STR     R6, [R8, #4]            @; Save SPSR
+    MRS     R6, CPSR
+    STR     R6, [R8, #8]            @; Save CPSR
+    MOV     R0, SP
     BL      rt_hw_trap_pabt
 
     .align  5
 DAbt_Handler:
     SUB     SP, SP, #S_FRAME_SIZE
     STMIA   SP, {R0 - R12}          @; Calling R0-R12
+    ADD     R6, SP, #S_FRAME_SIZE
     ADD     R8, SP, #S_PC
-    STMDB   R8, {SP, LR}            @; Calling SP, LR
+    STMDB   R8, {R6, LR}            @; Calling SP, LR
     STR     LR, [R8, #0]            @; Save calling PC
     MRS     R6, SPSR
-    STR     R6, [R8, #4]            @; Save CPSR
-    STR     R0, [R8, #8]            @; Save SPSR
+    STR     R6, [R8, #4]            @; Save SPSR
+    MRS     R6, CPSR
+    STR     R6, [R8, #8]            @; Save CPSR
     MOV     R0, SP
     BL      rt_hw_trap_dabt
 
     .align  5
 Resv_Handler:
+    SUB     SP, SP, #S_FRAME_SIZE
+    STMIA   SP, {R0 - R12}          @; Calling R0-R12
+    ADD     R6, SP, #S_FRAME_SIZE
+    ADD     R8, SP, #S_PC
+    STMDB   R8, {R6, LR}            @; Calling SP, LR
+    STR     LR, [R8, #0]            @; Save calling PC
+    MRS     R6, SPSR
+    STR     R6, [R8, #4]            @; Save SPSR
+    MRS     R6, CPSR
+    STR     R6, [R8, #8]            @; Save CPSR
+    MOV     R0, SP
     BL      rt_hw_trap_resv
 
     .align  5
@@ -297,9 +340,18 @@ rt_hw_context_switch_interrupt_do:
     MRS     R0,  SPSR               @; Get CPSR of interrupt thread
 
     MSR     CPSR_c, #MODE_SVC|NOINT @; Switch to SVC mode and no interrupt
-
+    TST     R0, #3
+    BEQ     rt_hw_context_switch_interrupt_from_usr
     STMFD   SP!, {R2}               @; Push old task's PC
     STMFD   SP!, {R3-R12,LR}        @; Push old task's LR,R12-R3
+    B       rt_hw_context_switch_interrupt_from_usr_do
+rt_hw_context_switch_interrupt_from_usr:
+    STMFD   R1!, {SP}^
+    LDMFD   R1!, {SP}
+    STMFD   SP!, {R2}               @; Push old task's PC
+    STMFD   SP!, {LR}^
+    STMFD   SP!, {R3-R12}           @; Push old task's LR,R12-R3
+rt_hw_context_switch_interrupt_from_usr_do:
     LDMFD   R1, {R1-R3}
     STMFD   SP!, {R1-R3}            @; Push old task's R2-R0
     STMFD   SP!, {R0}               @; Push old task's CPSR
@@ -314,5 +366,13 @@ rt_hw_context_switch_interrupt_do:
 
     LDMFD   SP!, {R4}               @; Pop new task's SPSR
     MSR     SPSR_cxsf, R4
-
+    TST     R4, #3
+    BEQ     rt_hw_context_switch_interrupt_to_usr
     LDMFD   SP!, {R0-R12,LR,PC}^    @; pop new task's R0-R12,LR & PC SPSR 2 CPSR
+rt_hw_context_switch_interrupt_to_usr:
+    LDR     R5, [R6]
+    ADD     R5, #16*4
+    STMFD   SP!, {R5}
+    LDMFD   SP!, {SP}^
+    LDMFD   SP!, {R0-R12,LR}^       @; pop new task's R0-R12,LR & PC SPSR 2 CPSR
+    LDMFD   SP!, {PC}^

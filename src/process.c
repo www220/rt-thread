@@ -25,6 +25,7 @@
 #include <rthw.h>
 #include <rtthread.h>
 #include <rtm.h>
+#include <mmu.h>
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
@@ -51,6 +52,10 @@
 
 #ifndef RT_USING_MODULE_PRIO
 #define RT_USING_MODULE_PRIO (RT_THREAD_PRIORITY_MAX - 2)
+#endif
+
+#if RT_MM_PAGE_SIZE != 4096 || RT_THREAD_PRIORITY_MAX >= 0x80
+#error "RT_MM_PAGE_SIZE == 4096 && RT_THREAD_PRIORITY_MAX<128"
 #endif
 
 #ifdef RT_USING_SLAB
@@ -211,6 +216,111 @@ void rt_module_unload_sethook(void (*hook)(rt_module_t module))
 /*@}*/
 #endif
 
+static struct rt_module *_load_exec_object(const char *name,
+                                             void       *module_ptr)
+{
+    rt_module_t module = RT_NULL;
+    rt_bool_t linked   = RT_FALSE;
+    rt_uint32_t index, module_size = 0;
+    Elf32_Addr vstart_addr, vend_addr;
+    rt_bool_t has_vstart;
+
+    RT_ASSERT(module_ptr != RT_NULL);
+
+    if (rt_memcmp(elf_module->e_ident, RTMMAG, SELFMAG) == 0)
+    {
+        /* rtmlinker finished */
+        linked = RT_TRUE;
+    }
+
+    /* get the ELF image size */
+    has_vstart = RT_FALSE;
+    vstart_addr = vend_addr = RT_NULL;
+    for (index = 0; index < elf_module->e_phnum; index++)
+    {
+        if (phdr[index].p_type != PT_LOAD)
+            continue;
+
+        RT_DEBUG_LOG(RT_DEBUG_MODULE, ("LOAD segment: %d, 0x%p, 0x%08x\n",
+                                       index, phdr[index].p_vaddr, phdr[index].p_memsz));
+
+        if (phdr[index].p_memsz < phdr[index].p_filesz)
+        {
+            rt_kprintf("invalid elf: segment %d: p_memsz: %d, p_filesz: %d\n",
+                       index, phdr[index].p_memsz, phdr[index].p_filesz);
+            return RT_NULL;
+        }
+        if (!has_vstart)
+        {
+            vstart_addr = phdr[index].p_vaddr;
+            vend_addr = phdr[index].p_vaddr + phdr[index].p_memsz;
+            has_vstart = RT_TRUE;
+            if (vend_addr < vstart_addr || vstart_addr != 0x10000000)
+            {
+                rt_kprintf("invalid elf: segment %d: p_vaddr: %d, p_memsz: %d\n",
+                           index, phdr[index].p_vaddr, phdr[index].p_memsz);
+                return RT_NULL;
+            }
+        }
+        else
+        {
+            /* There should not be too much padding in the object files. */
+            rt_kprintf("warning: too much padding before segment %d\n", index);
+            return RT_NULL;
+        }
+    }
+
+    module_size = vend_addr - vstart_addr;
+    module_size = RT_ALIGN(module_size,4096);
+
+    RT_DEBUG_LOG(RT_DEBUG_MODULE, ("module size: %d, vstart_addr: 0x%p\n",
+                                   module_size, vstart_addr));
+
+    if (module_size == 0)
+    {
+        rt_kprintf("Module: size error\n");
+
+        return RT_NULL;
+    }
+
+    /* allocate module */
+    module = (struct rt_module *)rt_object_allocate(RT_Object_Class_Module,
+                                                    name);
+    if (!module)
+        return RT_NULL;
+
+    module->vstart_addr = vstart_addr;
+
+    /* allocate module space */
+    module->module_space = rt_page_alloc(module_size/4096);
+    if (module->module_space == RT_NULL)
+    {
+        rt_kprintf("Module: allocate space failed.\n");
+        rt_object_delete(&(module->parent));
+
+        return RT_NULL;
+    }
+
+    /* zero all space */
+    rt_memset(module->module_space, 0, module_size);
+    mmu_setmap(0,(Elf32_Addr)module->module_space, vstart_addr, module_size);
+
+    for (index = 0; index < elf_module->e_phnum; index++)
+    {
+        if (phdr[index].p_type == PT_LOAD)
+        {
+            rt_memcpy((void *)(phdr[index].p_vaddr),
+                      (rt_uint8_t *)elf_module + phdr[index].p_offset,
+                      phdr[index].p_filesz);
+        }
+    }
+
+    /* set module entry */
+    module->module_entry = (void *)elf_module->e_entry;
+
+    return module;
+}
+
 #define RT_MODULE_ARG_MAX    8
 static int _rt_module_split_arg(char* cmd, rt_size_t length, char* argv[])
 {
@@ -279,7 +389,7 @@ static void module_main_entry(void* parameter)
 
     rt_memset(argv, 0x00, sizeof(argv));
     argc = _rt_module_split_arg((char*)module->module_cmd_line,
-                                module->module_cmd_size, argv);
+                                module->module_cmd_size, argv+1);
     if (argc == 0)
         return;
 
@@ -287,6 +397,7 @@ static void module_main_entry(void* parameter)
                                    module->module_entry,
                                    module->module_cmd_line));
     /* do the main function */
+    argv[0] = (char *)argc;
     ((main_func_t)module->module_entry)(argc, argv);
     return;
 }
@@ -326,6 +437,17 @@ rt_module_t rt_module_do_main(const char *name,
     if (elf_module->e_ident[EI_CLASS] != ELFCLASS32)
     {
         rt_kprintf("Module: ELF class error\n");
+
+        return RT_NULL;
+    }
+
+    if (elf_module->e_type == ET_EXEC)
+    {
+        module = _load_exec_object(name, module_ptr);
+    }
+    else
+    {
+        rt_kprintf("Module: unsupported elf type\n");
 
         return RT_NULL;
     }
@@ -370,7 +492,7 @@ rt_module_t rt_module_do_main(const char *name,
         module->module_thread = rt_thread_create(name,
                                                  module_main_entry, module,
                                                  RT_USING_MODULE_STKSZ,
-                                                 RT_USING_MODULE_PRIO, 20);
+                                                 RT_USING_MODULE_PRIO|0x80, 20);
 
         RT_DEBUG_LOG(RT_DEBUG_MODULE, ("thread entry 0x%x\n",
                                        module->module_entry));

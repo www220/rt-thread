@@ -120,10 +120,6 @@ void cleartmppath(void);
 char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *file);
 int SetPrivateStringData(const char *name, const char *buf, const char *file);
 
-#ifdef RT_USING_MODULE
-void *load_module_func(const char* name, const char* func, int type);
-#endif
-
 #define SysLog_Main(debug_level, format, ...) debug_printf_def(debug_level, "Main", format, ##__VA_ARGS__)
 #define SysLog_Gprs(debug_level, format, ...) debug_printf_def(debug_level, "Gprs", format, ##__VA_ARGS__)
 #define SysLog_Vpn(debug_level, format, ...) debug_printf_def(debug_level, "Vpn", format, ##__VA_ARGS__)

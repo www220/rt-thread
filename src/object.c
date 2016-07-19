@@ -70,7 +70,7 @@ struct rt_object_information rt_object_container[RT_Object_Class_Unknown] =
 #endif
     /* initialize object container - timer */
     {RT_Object_Class_Timer, _OBJ_CONTAINER_LIST_INIT(RT_Object_Class_Timer), sizeof(struct rt_timer)},
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
     /* initialize object container - module */
     {RT_Object_Class_Module, _OBJ_CONTAINER_LIST_INIT(RT_Object_Class_Module), sizeof(struct rt_module)},
 #endif

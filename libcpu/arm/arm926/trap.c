@@ -52,8 +52,8 @@ struct rt_hw_register
     rt_uint32_t sp;
     rt_uint32_t lr;
     rt_uint32_t pc;
+    rt_uint32_t spsr;
     rt_uint32_t cpsr;
-    rt_uint32_t ORIG_r0;
 };
 
 /**
@@ -75,7 +75,7 @@ void rt_hw_show_register (struct rt_hw_register *regs)
                regs->fp, regs->ip);
     rt_kprintf("sp :0x%08x lr :0x%08x pc :0x%08x\n",
                regs->sp, regs->lr, regs->pc);
-    rt_kprintf("cpsr:0x%08x\n", regs->cpsr);
+    rt_kprintf("spsr:0x%08x cpsr:0x%08x\n", regs->spsr, regs->cpsr);
 }
 
 /**
@@ -91,7 +91,7 @@ void rt_hw_trap_udef(struct rt_hw_register *regs)
     rt_hw_show_register(regs);
 
     rt_kprintf("undefined instruction\n");
-    rt_kprintf("thread - %s stack:\n", rt_current_thread->name);
+    rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_FINSH
     list_thread();
@@ -113,7 +113,8 @@ void rt_hw_trap_swi(struct rt_hw_register *regs)
     rt_hw_show_register(regs);
 
     rt_kprintf("software interrupt\n");
-    rt_hw_cpu_shutdown();
+    rt_thread_delay(2000);
+    regs->r0 = rt_tick_get();
 }
 
 /**
@@ -129,7 +130,7 @@ void rt_hw_trap_pabt(struct rt_hw_register *regs)
     rt_hw_show_register(regs);
 
     rt_kprintf("prefetch abort\n");
-    rt_kprintf("thread - %s stack:\n", RT_NAME_MAX, rt_current_thread->name);
+    rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_FINSH
     list_thread();
@@ -147,10 +148,13 @@ void rt_hw_trap_pabt(struct rt_hw_register *regs)
  */
 void rt_hw_trap_dabt(struct rt_hw_register *regs)
 {
+    rt_uint32_t addr,rest;
     rt_hw_show_register(regs);
 
-    rt_kprintf("data abort\n");
-    rt_kprintf("thread - %s stack:\n", RT_NAME_MAX, rt_current_thread->name);
+    __asm volatile("mrc p15, 0, %0, c6, c0, 0":"=r" (addr));
+    __asm volatile("mrc p15, 0, %0, c5, c0, 0":"=r" (rest));
+    rt_kprintf("data abort %x %04x\n",addr,rest);
+    rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_FINSH
     list_thread();
@@ -167,8 +171,14 @@ void rt_hw_trap_dabt(struct rt_hw_register *regs)
  */
 void rt_hw_trap_resv(struct rt_hw_register *regs)
 {
-    rt_kprintf("not used\n");
     rt_hw_show_register(regs);
+
+    rt_kprintf("not used\n");
+    rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
+
+#ifdef RT_USING_FINSH
+    list_thread();
+#endif
     rt_hw_cpu_shutdown();
 }
 

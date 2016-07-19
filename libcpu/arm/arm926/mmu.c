@@ -407,7 +407,7 @@ static volatile rt_uint32_t _page_table[4*1024];
 #else
 static volatile rt_uint32_t _page_table[(1+PROCESS_MAX)*4096] \
     __attribute__((aligned(16*1024)));
-static volatile rt_uint32_t _small_table[(PROCESS_MAX*MMU_L2_SIZE)*256] \
+static volatile rt_uint32_t _small_table[PROCESS_MAX*(4+MMU_L2_SIZE)*256] \
     __attribute__((aligned(1024)));
 #endif
 
@@ -424,6 +424,29 @@ void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
         *pTT = attr |(((paddrStart>>20)+i)<<20);
         pTT++;
     }
+}
+
+void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size)
+{
+    volatile rt_uint32_t *pTT;
+    volatile int nSec,i,j;
+
+    nSec = RT_ALIGN(size,0x10000)/0x10000;
+    pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
+    for (i=0; i<nSec; i++)
+    {
+        *pTT = DESC_PET|DOMAIN0|(rt_uint32_t )&_small_table[pid*(4+MMU_L2_SIZE)*256+i*256];
+        pTT++;
+    }
+    nSec = size/4096;
+    pTT = &_small_table[pid*(4+MMU_L2_SIZE)*256];
+    for(j=0; j<nSec; j++)
+    {
+        *pTT = PET_RW_CB|base;
+        base += 4096;
+        pTT++;
+    }
+    mmu_invalidate_tlb();
 }
 
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
