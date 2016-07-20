@@ -208,7 +208,7 @@ void rt_object_init(struct rt_object         *object,
     register rt_base_t temp;
     struct rt_object_information *information;
 
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
     /* get module object information */
     information = (rt_module_self() != RT_NULL) ?
         &rt_module_self()->module_object[type] : &rt_object_container[type];
@@ -221,6 +221,10 @@ void rt_object_init(struct rt_object         *object,
 
     /* set object type to static */
     object->type = type | RT_Object_Class_Static;
+
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+    object->module_id = (void *)rt_module_self();
+#endif
 
     /* copy name */
     rt_strncpy(object->name, name, RT_NAME_MAX);
@@ -279,7 +283,7 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
 
     RT_DEBUG_NOT_IN_INTERRUPT;
 
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
     /*
      * get module object information,
      * module object should be managed by kernel object container
@@ -306,7 +310,7 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
     /* set object flag */
     object->flag = 0;
 
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
     if (rt_module_self() != RT_NULL)
     {
         object->flag |= RT_OBJECT_FLAG_MODULE;
@@ -412,7 +416,7 @@ rt_object_t rt_object_find(const char *name, rt_uint8_t type)
     /* which is invoke in interrupt status */
     RT_DEBUG_NOT_IN_INTERRUPT;
 
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
     /* check whether to find a object inside a module. */
     {
         const char *name_ptr;

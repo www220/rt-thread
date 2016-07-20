@@ -26,7 +26,7 @@
 
 #include <rtthread.h>
 
-#define HEAP_BEGIN        0x40A00000
+#define HEAP_BEGIN        0x40C00000
 #define HEAP_END          0x43F00000
 
 #define PROCESS_MAX       16
@@ -45,8 +45,10 @@
 
 #define AP_RW               (3<<10) //supervisor=RW, user=RW
 #define AP_RO               (2<<10) //supervisor=RW, user=RO
+#define AP_NA               (1<<10) //supervisor=RW, user=NA
 #define PET_RW              (0xff<<4) //supervisor=RW, user=RW
 #define PET_RO              (0xaa<<4) //supervisor=RW, user=RO
+#define PET_NA              (0x55<<4) //supervisor=RW, user=NA
 
 #define DOMAIN_FAULT        (0x0)
 #define DOMAIN_CHK          (0x1)
@@ -57,10 +59,10 @@
 #define DOMAIN0_ATTR        (DOMAIN_CHK<<0)
 #define DOMAIN1_ATTR        (DOMAIN_FAULT<<2)
 
-#define RW_CB       (AP_RW|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
-#define RW_CNB      (AP_RW|DOMAIN0|CNB|DESC_SEC)    /* Read/Write, cache, write through */
-#define RW_NCNB     (AP_RW|DOMAIN0|NCNB|DESC_SEC)   /* Read/Write without cache and write buffer */
-#define RW_FAULT    (AP_RW|DOMAIN1|NCNB|DESC_SEC)   /* Read/Write without cache and write buffer */
+#define RW_CB       (AP_NA|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
+#define RW_CNB      (AP_NA|DOMAIN0|CNB|DESC_SEC)    /* Read/Write, cache, write through */
+#define RW_NCNB     (AP_NA|DOMAIN0|NCNB|DESC_SEC)   /* Read/Write without cache and write buffer */
+#define RW_FAULT    (AP_NA|DOMAIN1|NCNB|DESC_SEC)   /* Read/Write without cache and write buffer */
 
 #define PET_RW_CB       (PET_RW|CB|DESC_SMALL)     /* Read/Write, cache, write back */
 #define PET_RW_CNB      (PET_RW|CNB|DESC_SMALL)    /* Read/Write, cache, write through */
@@ -77,5 +79,6 @@ struct mem_desc
 
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size);
 void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size);
+void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
 
 #endif

@@ -177,7 +177,7 @@ static cmd_function_t msh_get_cmd(char *cmd, int size)
     return cmd_func;
 }
 
-#if (defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)) && defined(RT_USING_DFS)
+#if defined(RT_USING_MODULE) && defined(RT_USING_DFS)
 /* Return 0 on module executed. Other value indicate error.
  */
 int msh_exec_module(const char *cmd_line, int size)
@@ -319,7 +319,7 @@ int msh_exec(char *cmd, rt_size_t length)
     {
         return cmd_ret;
     }
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     if (msh_exec_module(cmd, length) == 0)
     {
         return 0;
@@ -517,7 +517,7 @@ void msh_auto_complete(char *prefix)
 
             ptr --;
         }
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
         /* There is a chance that the user want to run the module directly. So
          * try to complete the file names. If the completed path is not a
          * module, the system won't crash anyway. */

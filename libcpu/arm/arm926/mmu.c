@@ -407,7 +407,7 @@ static volatile rt_uint32_t _page_table[4*1024];
 #else
 static volatile rt_uint32_t _page_table[(1+PROCESS_MAX)*4096] \
     __attribute__((aligned(16*1024)));
-static volatile rt_uint32_t _small_table[PROCESS_MAX*(4+MMU_L2_SIZE)*256] \
+static volatile rt_uint32_t _small_table[(1+PROCESS_MAX)*(4+MMU_L2_SIZE)*256] \
     __attribute__((aligned(1024)));
 #endif
 
@@ -429,7 +429,7 @@ void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
 void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size)
 {
     volatile rt_uint32_t *pTT;
-    volatile int nSec,i,j;
+    volatile int nSec,i;
 
     nSec = RT_ALIGN(size,0x10000)/0x10000;
     pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
@@ -440,13 +440,38 @@ void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t 
     }
     nSec = size/4096;
     pTT = &_small_table[pid*(4+MMU_L2_SIZE)*256];
-    for(j=0; j<nSec; j++)
+    for(i=0; i<nSec; i++)
     {
         *pTT = PET_RW_CB|base;
         base += 4096;
         pTT++;
     }
-    mmu_invalidate_tlb();
+}
+
+void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
+{
+    volatile rt_uint32_t *pTT,*pSS;
+    volatile int nSec,i,base,j;
+
+    nSec = size/4096;
+    for (i=0; i<nSec; i++)
+    {
+        pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
+        pSS=(rt_uint32_t *)_small_table+pid*(4+MMU_L2_SIZE)*256+(4+(map-HEAP_BEGIN)/0x100000)*256;
+        if ((*pTT & DESC_SEC) == DESC_SEC)
+        {
+            base = map&0xfffff;
+            *pTT = DESC_PET|DOMAIN0|(rt_uint32_t)pSS;
+            for (j=0; j<256; j++)
+            {
+                pSS[j] = PET_NA|CB|DESC_SMALL|base;
+                base += 4096;
+            }
+        }
+        pTT = pSS+((map-HEAP_BEGIN)&0xfffff)/4096;
+        *pTT = PET_RW_CB|map;
+        map += 4096;
+    }
 }
 
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)

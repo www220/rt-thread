@@ -1002,13 +1002,6 @@ typedef struct rt_module *rt_module_t;
 
 /*@{*/
 
-/*
- * module system
- */
-
-#define RT_MODULE_FLAG_WITHENTRY        0x00            /**< with entry point */
-#define RT_MODULE_FLAG_WITHOUTENTRY     0x01            /**< without entry point */
-
 /**
  * Application Module structure
  */
@@ -1026,13 +1019,14 @@ struct rt_module
     rt_uint8_t*                  module_cmd_line;       /**< module command line */
     rt_uint32_t                  module_cmd_size;       /**< the size of module command line */
 
-#ifdef RT_USING_SLAB
     /* module memory allocator */
     void                        *mem_list;              /**< module's free memory list */
     void                        *page_array;            /**< module's using pages */
     rt_uint32_t                  page_cnt;              /**< module's using pages count */
     struct rt_semaphore          mod_sem;               /**< module's using sem */
-#endif
+
+    rt_uint16_t                  nref;                  /**< reference count */
+    rt_uint16_t                  pid;                   /**< pid */
 
     /* object in this module, module object is the last basic object type */
     struct rt_object_information module_object[RT_Object_Class_Unknown];

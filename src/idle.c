@@ -88,7 +88,7 @@ void rt_thread_idle_excute(void)
     {
         rt_base_t lock;
         rt_thread_t thread;
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
         rt_module_t module = RT_NULL;
 #endif
         RT_DEBUG_NOT_IN_INTERRUPT;
@@ -103,7 +103,7 @@ void rt_thread_idle_excute(void)
             thread = rt_list_entry(rt_thread_defunct.next,
                                    struct rt_thread,
                                    tlist);
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
             /* get thread's parent module */
             module = (rt_module_t)thread->module_id;
 
@@ -154,7 +154,7 @@ void rt_thread_idle_excute(void)
         rt_object_delete((rt_object_t)thread);
 #endif
 
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
         if (module != RT_NULL)
         {
             extern rt_err_t rt_module_destroy(rt_module_t module);
