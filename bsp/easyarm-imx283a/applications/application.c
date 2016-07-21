@@ -269,7 +269,7 @@ static void rt_thread_entry_main(void* parameter)
         mkdir("/usb", 666);
         rt_kprintf("File System initialized!\n");
     } else {
-        rt_kprintf("File System Failed!\n");
+        rt_kprintf("File System failed!\n");
         RT_ASSERT(0);
     }
     if (dfs_mount("nand1", "/tmp", "yaffs2", 0, 0) == 0) {
@@ -283,8 +283,8 @@ static void rt_thread_entry_main(void* parameter)
 
 #ifdef RT_USING_DFS_ROMFS
     dfs_mount(RT_NULL, "/rom", "rom", 0, &romfs_root);
-    rt_kprintf("Mount /rot ok!\n");
-    SysLog_Main(rtt_LogNotice, "Mount /rot ok!\n");
+    rt_kprintf("Mount /rom ok!\n");
+    SysLog_Main(rtt_LogNotice, "Mount /rom ok!\n");
 #endif
 #ifdef RT_USING_DFS_DEVFS
     dfs_mount(RT_NULL, "/dev", "devfs", 0, 0);

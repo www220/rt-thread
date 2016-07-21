@@ -75,7 +75,7 @@ static struct mem_desc hw_mem_desc[] =
 {
 	{ 0x80000000, 0xFFFFFFFF, 0x80000000, RW_NCNB },     /* None cached for io memory */
 	{ 0x40000000, HEAP_END-1, 0x40000000, RW_CB },       /* 63M cached SDRAM memory */
-	{ HEAP_END,   HEAP_END+0xFFFFF, HEAP_END, RW_NCNB },     /* 1M none-cached SDRAM */
+	{ HEAP_END,   HEAP_END+0xFFFFF, HEAP_END, RW_NCNB }, /* 1M none-cached SDRAM */
 	{ 0x00000000, 0x00020000, 0x00000000, RW_NCNB },     /* isr vector table */
 };
 /* None-cached RAM DMA */

@@ -309,14 +309,14 @@ static struct rt_module *_load_exec_object(const char *name,
 
         return RT_NULL;
     }
-    mmu_maketls(module->pid);
+    mmu_maketlb(module->pid);
 
     /* allocate module space */
     module->module_space = rt_page_alloc(module_size/RT_MM_PAGE_SIZE);
     if (module->module_space == RT_NULL)
     {
         pids |= (1<<(module->pid-1));
-        mmu_freetls(module->pid);
+        mmu_freetlb(module->pid);
 
         rt_kprintf("Module: allocate space failed.\n");
         rt_object_delete(&(module->parent));
@@ -1014,7 +1014,8 @@ rt_err_t rt_module_destroy(rt_module_t module)
 #endif
 
     /* free tls */
-    mmu_freetls(module->pid);
+    pids |= (1<<(module->pid-1));
+    mmu_freetlb(module->pid);
 
     /* delete module object */
     rt_object_delete((rt_object_t)module);

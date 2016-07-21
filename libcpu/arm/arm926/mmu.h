@@ -78,9 +78,9 @@ struct mem_desc
 };
 
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size);
-void mmu_maketls(rt_uint32_t pid);
-void mmu_freetls(rt_uint32_t pid);
-void mmu_switchtls(rt_uint32_t pid);
+void mmu_maketlb(rt_uint32_t pid);
+void mmu_freetlb(rt_uint32_t pid);
+void mmu_switchtlb(rt_uint32_t pid);
 void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size);
 void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
 void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);

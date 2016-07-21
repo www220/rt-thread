@@ -130,9 +130,11 @@ inline void rt_hw_trap_swi(struct rt_hw_register *regs)
  */
 void rt_hw_trap_pabt(struct rt_hw_register *regs)
 {
+    rt_uint32_t rest;
     rt_hw_show_register(regs);
 
-    rt_kprintf("prefetch abort\n");
+    __asm volatile("mrc p15, 0, %0, c5, c0, 0":"=r" (rest));
+    rt_kprintf("prefetch abort %x %d%d%d%d\n",regs->lr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_FINSH
@@ -156,7 +158,7 @@ void rt_hw_trap_dabt(struct rt_hw_register *regs)
 
     __asm volatile("mrc p15, 0, %0, c6, c0, 0":"=r" (addr));
     __asm volatile("mrc p15, 0, %0, c5, c0, 0":"=r" (rest));
-    rt_kprintf("data abort %x %04x\n",addr,rest);
+    rt_kprintf("data abort %x %d%d%d%d\n",addr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_FINSH

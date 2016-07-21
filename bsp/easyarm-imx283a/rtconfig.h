@@ -19,7 +19,7 @@
 #define RT_DEBUG
 
 #define RT_USING_OVERFLOW_CHECK
-#define RT_USING_CPU_FFS
+//#define RT_USING_CPU_FFS
 
 /* Using Hook */
 #define RT_USING_HOOK

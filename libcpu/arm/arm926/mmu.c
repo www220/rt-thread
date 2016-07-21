@@ -426,7 +426,7 @@ void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
     }
 }
 
-void mmu_maketls(rt_uint32_t pid)
+void mmu_maketlb(rt_uint32_t pid)
 {
     rt_uint32_t i,size;
     for (i=0; i<4096; i++)
@@ -436,7 +436,7 @@ void mmu_maketls(rt_uint32_t pid)
         _small_table[pid*size+i] = 0;
 }
 
-void mmu_freetls(rt_uint32_t pid)
+void mmu_freetlb(rt_uint32_t pid)
 {
     rt_uint32_t i,size;
     for (i=0; i<4096; i++)
@@ -446,7 +446,7 @@ void mmu_freetls(rt_uint32_t pid)
         _small_table[pid*size+i] = 0;
 }
 
-void mmu_switchtls(rt_uint32_t pid)
+void mmu_switchtlb(rt_uint32_t pid)
 {
     register rt_uint32_t value;
 
@@ -491,7 +491,7 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
         pSS=(rt_uint32_t *)_small_table+pid*(4+MMU_L2_SIZE)*256+(4+(map-HEAP_BEGIN)/0x100000)*256;
         if ((*pTT & DESC_SEC) == DESC_SEC)
         {
-            base = map&0xfffff;
+            base = map&0xfff00000;
             *pTT = DESC_PET|DOMAIN0|(rt_uint32_t)pSS;
             for (j=0; j<256; j++)
             {
