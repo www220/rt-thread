@@ -46,7 +46,7 @@
  * @return stack address
  */
 rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
-                             rt_uint8_t *stack_addr, void *texit, rt_uint32_t sysmode)
+                             rt_uint8_t *stack_addr, void *texit)
 {
     rt_uint32_t *stk;
 
@@ -71,17 +71,18 @@ rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
     *(--stk) = 0xdeadbeef;                  /* r1 */
     *(--stk) = (rt_uint32_t)parameter;      /* r0 : argument */
 	/* cpsr */
-	if (!sysmode)
-		if ((rt_uint32_t)tentry & 0x01)
-			*(--stk) = SVCMODE | 0x20;			/* thumb mode */
-		else
-			*(--stk) = SVCMODE;					/* arm mode   */
+	if ((rt_uint32_t)tentry & 0x01)
+		*(--stk) = SVCMODE | 0x20;			/* thumb mode */
 	else
-		if ((rt_uint32_t)tentry & 0x01)
-			*(--stk) = USERMODE | 0x20;			/* thumb mode */
-		else
-			*(--stk) = USERMODE;				/* arm mode   */
+		*(--stk) = SVCMODE;					/* arm mode   */
 
     /* return task's current stack address */
     return (rt_uint8_t *)stk;
+}
+
+void rt_hw_stack_swiuser(void *stack_addr)
+{
+    rt_uint32_t *stk  = (rt_uint32_t *)stack_addr;
+    stk[0] &= ~MODEMASK;
+    stk[0] |= USERMODE;
 }

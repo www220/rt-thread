@@ -88,7 +88,8 @@ static rt_err_t _rt_thread_init(struct rt_thread *thread,
                                 void             *stack_start,
                                 rt_uint32_t       stack_size,
                                 rt_uint8_t        priority,
-                                rt_uint32_t       tick)
+                                rt_uint32_t       tick,
+                                rt_uint32_t       usermode)
 {
     /* init thread list */
     rt_list_init(&(thread->tlist));
@@ -104,8 +105,14 @@ static rt_err_t _rt_thread_init(struct rt_thread *thread,
     rt_memset(thread->stack_addr, '#', thread->stack_size);
     thread->sp = (void *)rt_hw_stack_init(thread->entry, thread->parameter,
         (void *)((char *)thread->stack_addr + thread->stack_size - 4),
-        (void *)rt_thread_exit,priority&0x80);
-    priority &= 0x7f;
+        (void *)rt_thread_exit);
+#ifdef RT_USING_PROCESS
+    if (usermode)
+    {
+        extern void rt_hw_stack_swiuser(void *stack_addr);
+        rt_hw_stack_swiuser(thread->sp);
+    }
+#endif
 
     /* priority init */
     RT_ASSERT(priority < RT_THREAD_PRIORITY_MAX);
@@ -179,7 +186,7 @@ rt_err_t rt_thread_init(struct rt_thread *thread,
                            stack_start,
                            stack_size,
                            priority,
-                           tick);
+                           tick,0);
 }
 RTM_EXPORT(rt_thread_init);
 
@@ -302,16 +309,34 @@ rt_thread_t rt_thread_create(const char *name,
 {
     struct rt_thread *thread;
     void *stack_start;
+    rt_uint32_t usermode = 0;
 
     thread = (struct rt_thread *)rt_object_allocate(RT_Object_Class_Thread,
                                                     name);
     if (thread == RT_NULL)
         return RT_NULL;
 
-    if (priority&0x80)
-        stack_start = (void *)rt_page_alloc(stack_size/4096);
+#ifdef RT_USING_PROCESS
+    if (thread->module_id != RT_NULL || (tick & 0x80000000) == 0x80000000)
+    {
+        rt_uint16_t pid = (tick>>24)&0x7f;
+        if (thread->module_id != RT_NULL)
+            pid = ((rt_module_t)(thread->module_id))->pid;
+        tick &= 0xffffff;
+        usermode = 1;
+        thread->flags |= RT_OBJECT_FLAG_PROCESS;
+
+        stack_size = RT_ALIGN(stack_size,RT_MM_PAGE_SIZE);
+        stack_start = (void *)rt_page_alloc(stack_size/RT_MM_PAGE_SIZE);
+        if (stack_start != RT_NULL)
+        {
+            extern void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
+            mmu_usermap(pid,(rt_uint32_t)stack_start,stack_size);
+        }
+    }
     else
-        stack_start = (void *)RT_KERNEL_MALLOC(stack_size);
+#endif
+    stack_start = (void *)RT_KERNEL_MALLOC(stack_size);
     if (stack_start == RT_NULL)
     {
         /* allocate stack failure */
@@ -327,7 +352,7 @@ rt_thread_t rt_thread_create(const char *name,
                     stack_start,
                     stack_size,
                     priority,
-                    tick);
+                    tick,usermode);
 
     return thread;
 }

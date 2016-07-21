@@ -62,6 +62,7 @@
 //#define RT_USING_SMALL_MEM
 /* Using SLAB Allocator */
 #define RT_USING_SLAB
+#define RT_USING_MODULE
 #define RT_USING_PROCESS
 #define RT_SERIAL_RB_BUFSZ 4096
 
@@ -134,8 +135,8 @@
 
 #define rttTempFileDir "/tmp"
 #define rttLogFileDir "/tmp/log"
-#define rttCfgFileDir "/mnt/config"
-#define rttLibFileDir "/mnt/usrlib"
+#define rttCfgFileDir "/etc"
+#define rttLibFileDir "/usr"
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
 //#define RT_USING_LWIP_HEAD

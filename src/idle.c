@@ -88,7 +88,7 @@ void rt_thread_idle_excute(void)
     {
         rt_base_t lock;
         rt_thread_t thread;
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
         rt_module_t module = RT_NULL;
 #endif
         RT_DEBUG_NOT_IN_INTERRUPT;
@@ -103,7 +103,7 @@ void rt_thread_idle_excute(void)
             thread = rt_list_entry(rt_thread_defunct.next,
                                    struct rt_thread,
                                    tlist);
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
             /* get thread's parent module */
             module = (rt_module_t)thread->module_id;
 
@@ -146,6 +146,14 @@ void rt_thread_idle_excute(void)
         /* the thread belongs to an application module */
         if (thread->flags & RT_OBJECT_FLAG_MODULE)
             rt_module_free((rt_module_t)thread->module_id, thread->stack_addr);
+#ifdef RT_USING_PROCESS
+        else if (thread->flags & RT_OBJECT_FLAG_PROCESS)
+        {
+            extern void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
+            mmu_userunmap(((rt_module_t)thread->module_id)->pid,(rt_uint32_t)thread->stack_addr,thread->stack_size);
+            rt_page_free(thread->stack_addr,thread->stack_size/RT_MM_PAGE_SIZE);
+        }
+#endif
         else
 #endif
         /* release thread's stack */
@@ -154,7 +162,7 @@ void rt_thread_idle_excute(void)
         rt_object_delete((rt_object_t)thread);
 #endif
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
         if (module != RT_NULL)
         {
             extern rt_err_t rt_module_destroy(rt_module_t module);

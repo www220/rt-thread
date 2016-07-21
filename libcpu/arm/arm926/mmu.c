@@ -426,6 +426,37 @@ void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
     }
 }
 
+void mmu_maketls(rt_uint32_t pid)
+{
+    rt_uint32_t i,size;
+    for (i=0; i<4096; i++)
+        _page_table[pid*4096+i] = _page_table[i];
+    size = (4+MMU_L2_SIZE)*256;
+    for (i=0; i<size; i++)
+        _small_table[pid*size+i] = 0;
+}
+
+void mmu_freetls(rt_uint32_t pid)
+{
+    rt_uint32_t i,size;
+    for (i=0; i<4096; i++)
+        _page_table[pid*4096+i] = 0;
+    size = (4+MMU_L2_SIZE)*256;
+    for (i=0; i<size; i++)
+        _small_table[pid*size+i] = 0;
+}
+
+void mmu_switchtls(rt_uint32_t pid)
+{
+    register rt_uint32_t value;
+
+    value = 0;
+    asm volatile ("mcr p15, 0, %0, c8, c7, 0"::"r"(value));
+
+    value = (rt_uint32_t)&_page_table[pid*4096];
+    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(value));
+}
+
 void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size)
 {
     volatile rt_uint32_t *pTT;
@@ -474,6 +505,22 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
     }
 }
 
+void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
+{
+    volatile rt_uint32_t *pTT;
+    volatile int nSec,i;
+
+    nSec = size/4096;
+    pTT = (rt_uint32_t *)_small_table+pid*(4+MMU_L2_SIZE)*256+(4+(map-HEAP_BEGIN)/0x100000)*256;
+    pTT += ((map-HEAP_BEGIN)&0xfffff)/4096;
+    for (i=0; i<nSec; i++)
+    {
+        *pTT = PET_NA|CB|DESC_SMALL|map;
+        map += 4096;
+        pTT++;
+    }
+}
+
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
 {
     /* disable I/D cache */
@@ -492,13 +539,6 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
 
     /* set MMU table address */
     mmu_setttbase((rt_uint32_t)_page_table);
-    /* copy base MMU table */
-    for (size=1; size<=PROCESS_MAX; size++)
-    {
-        rt_uint32_t index = 0;
-        for (; index<4096; index++)
-            _page_table[size*4096+index] = _page_table[index];
-    }
 
     /* enables MMU */
     mmu_enable();

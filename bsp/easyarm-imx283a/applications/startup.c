@@ -63,7 +63,7 @@ void rtthread_startup(void)
 
     rt_system_heap_init((void*)HEAP_BEGIN, (void*)HEAP_END);
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     /* initialize module system*/
     rt_system_module_init();
 #endif

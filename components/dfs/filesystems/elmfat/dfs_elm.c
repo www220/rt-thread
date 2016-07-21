@@ -402,7 +402,6 @@ int dfs_elm_open(struct dfs_fd *file)
         {
             file->pos  = fd->fptr;
             file->size = fd->fsize;
-            file->blksize = RT_DFS_ELM_MAX_SECTOR_SIZE;
             file->data = fd;
 
             if (file->flags & DFS_O_APPEND)
@@ -739,7 +738,6 @@ int dfs_elm_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
             st->st_mode &= ~(DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH);
 
         st->st_size  = file_info.fsize;
-        st->st_blksize = RT_DFS_ELM_MAX_SECTOR_SIZE;
 
         /* get st_mtime. */
         {

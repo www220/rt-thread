@@ -407,7 +407,7 @@ rt_err_t  rt_device_control(rt_device_t dev, rt_uint8_t cmd, void *arg);
 /*@}*/
 #endif
 
-#if defined(RT_USING_MODULE)
+#ifdef RT_USING_MODULE
 /**
  * @addtogroup Module
  */
@@ -436,24 +436,6 @@ void rt_module_unload_sethook(void (*hook)(rt_module_t module));
 
 void rt_module_init_object_container(struct rt_module *module);
 rt_err_t rt_module_destroy(rt_module_t module);
-
-/*
- * application module system initialization
- */
-int rt_system_module_init(void);
-
-/*@}*/
-#elif defined(RT_USING_PROCESS)
-/**
- * @addtogroup Module
- */
-
-/*@{*/
-
-/*
- * module interface
- */
-rt_module_t rt_module_self(void);
 
 /*
  * application module system initialization

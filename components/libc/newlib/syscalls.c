@@ -77,6 +77,14 @@ _isatty_r(struct _reent *ptr, int fd)
 }
 
 int
+_isatty(int fd)
+{
+	if (fd >=0 && fd < 3) return 1;
+
+	return 0;
+}
+
+int
 _kill_r(struct _reent *ptr, int pid, int sig)
 {
 	/* return "not supported" */
@@ -327,30 +335,8 @@ _exit (int status)
 	module = rt_module_self();
 	if (module != RT_NULL)
 	{
-		struct rt_list_node *list;
-		struct rt_object *object;
-
-		rt_enter_critical();
-		
-        /* delete all threads in the module */
-        list = &module->module_object[RT_Object_Class_Thread].object_list;
-        while (list->next != list)
-        {
-            object = rt_list_entry(list->next, struct rt_object, list);
-            if (rt_object_is_systemobject(object) == RT_TRUE)
-            {
-                /* detach static object */
-                rt_thread_detach((rt_thread_t)object);
-            }
-            else
-            {
-                /* delete dynamic object */
-                rt_thread_delete((rt_thread_t)object);
-            }
-        }
-		/* delete main thread */
-		rt_thread_delete(module->module_thread);
-		rt_exit_critical();
+		/* unload assertion module */
+		rt_module_unload(module);
 
 		/* re-schedule */
 		rt_schedule();
@@ -370,22 +356,33 @@ _system(const char *s)
     return;
 }
 
-int*
-__errno(void)
-{
-	static volatile int gun_errno;
-	return (int *)&gun_errno;
-}
-
-int
-_isatty(int fd)
-{
-	if (fd >=0 && fd < 3) return 1;
-
-	return 0;
-}
-
 void __libc_init_array(void)
 {
 	/* we not use __libc init_aray to initialize C++ objects */
+}
+
+void abort(void)
+{
+    if (rt_thread_self())
+    {
+        rt_thread_t self = rt_thread_self();
+
+        rt_kprintf("thread:%-8.*s abort!\n", RT_NAME_MAX, self->name);
+        rt_thread_suspend(self);
+
+        rt_schedule();
+    }
+
+	while (1);
+}
+
+rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
+        rt_uint32_t parm2, rt_uint32_t parm3,
+        rt_uint32_t parm4, rt_uint32_t parm5,
+        rt_uint32_t parm6)
+{
+    rt_kprintf("syscall %d %x %x %x %x %x %x\n",nbr,parm1,
+            parm2,parm3,parm4,parm5,parm6);
+    rt_thread_delay(2000);
+    return ENOTSUP;
 }

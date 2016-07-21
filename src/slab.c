@@ -497,8 +497,10 @@ void *rt_malloc(rt_size_t size)
         return RT_NULL;
 
 #ifdef RT_USING_MODULE
+#ifndef RT_USING_PROCESS
     if (rt_module_self() != RT_NULL)
         return rt_module_malloc(size);
+#endif
 #endif
 
     /*
@@ -708,8 +710,10 @@ void *rt_realloc(void *ptr, rt_size_t size)
     }
 
 #ifdef RT_USING_MODULE
+#ifndef RT_USING_PROCESS
     if (rt_module_self() != RT_NULL)
         return rt_module_realloc(ptr, size);
+#endif
 #endif
 
     /*
@@ -803,12 +807,14 @@ void rt_free(void *ptr)
     RT_OBJECT_HOOK_CALL(rt_free_hook, (ptr));
 
 #ifdef RT_USING_MODULE
+#ifndef RT_USING_PROCESS
     if(rt_module_self() != RT_NULL)
     {
         rt_module_free(rt_module_self(), ptr);
 
         return;
     }
+#endif
 #endif
 
     /* get memory usage */

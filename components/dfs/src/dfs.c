@@ -217,7 +217,7 @@ int fd_is_open(const char *pathname)
     fullpath = dfs_normalize_path(RT_NULL, pathname);
     if (fullpath != RT_NULL)
     {
-        char *mountpath;
+        const char *mountpath;
         fs = dfs_filesystem_lookup(fullpath);
         if (fs == RT_NULL)
         {
@@ -237,7 +237,7 @@ int fd_is_open(const char *pathname)
             if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
                 mountpath = fullpath;
             else
-                mountpath = fullpath + strlen(fs->path);
+                mountpath = dfs_subdir(fs->path, fullpath);
         }
 
         dfs_lock();

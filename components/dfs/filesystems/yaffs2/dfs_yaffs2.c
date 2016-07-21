@@ -119,7 +119,6 @@ static int dfs_yaffs_open(struct dfs_fd* file)
 	int fd;
 	int oflag;
 	int result;
-	struct rt_mtd_nand_device * mtd;
 		
 	oflag = file->flags;
 	if (oflag & DFS_O_DIRECTORY) /* operations about dir */
@@ -149,8 +148,6 @@ static int dfs_yaffs_open(struct dfs_fd* file)
 	file->data = (void *)fd;
 	file->pos  = yaffs_lseek(fd,0,SEEK_CUR); 
 	file->size = yaffs_lseek(fd,0,SEEK_END);
-	mtd = RT_MTD_NAND_DEVICE(file->fs->dev_id);
-	file->blksize = mtd->page_size;
 	yaffs_lseek(fd, file->pos, SEEK_SET);
 
 	if (oflag & DFS_O_APPEND)

@@ -31,10 +31,6 @@
 #include <finsh.h>
 #endif
 
-#ifdef RT_USING_DFS
-#include <dfs_posix.h>
-#endif
-
 #ifdef RT_USING_PROCESS
 #include "module.h"
 
@@ -50,8 +46,12 @@
 #define IS_AX(s)          ((s.sh_flags & SHF_ALLOC) && (s.sh_flags & SHF_EXECINSTR))
 #define IS_AW(s)          ((s.sh_flags & SHF_ALLOC) && (s.sh_flags & SHF_WRITE))
 
+#ifdef RT_USING_MODULE_STKSZ
+#undef RT_USING_MODULE_STKSZ
+#endif
+
 #ifndef RT_USING_MODULE_STKSZ
-#define RT_USING_MODULE_STKSZ (128 * 1024)
+#define RT_USING_MODULE_STKSZ (4096 * 32)
 #endif
 
 #ifndef RT_USING_MODULE_PRIO
@@ -59,16 +59,16 @@
 #endif
 
 #if RT_MM_PAGE_SIZE != 4096
-#error "RT_MM_PAGE_SIZE == 4096 && RT_THREAD_PRIORITY_MAX<128"
-#endif
-#if RT_THREAD_PRIORITY_MAX >= 0x80
-#error "RT_THREAD_PRIORITY_MAX<128"
+#error "RT_MM_PAGE_SIZE == 4096"
 #endif
 #ifndef RT_USING_SLAB
 #error "defined RT_USING_SLAB"
 #endif
+#if PROCESS_MAX > 64
+#error "PROCESS_MAX <= 64"
+#endif
 
-#define PAGE_COUNT_MAX    256
+#define PAGE_COUNT_MAX    256 * 16
 static volatile rt_uint32_t pids = 0;
 
 /* module memory allocator */
@@ -121,7 +121,7 @@ rt_module_t rt_module_self(void)
 }
 RTM_EXPORT(rt_module_self);
 
-static void rt_module_init_object_container(struct rt_module *module)
+void rt_module_init_object_container(struct rt_module *module)
 {
     RT_ASSERT(module != RT_NULL);
 
@@ -192,6 +192,41 @@ static void rt_module_init_object_container(struct rt_module *module)
     module->module_object[RT_Object_Class_Timer].type = RT_Object_Class_Timer;
 }
 
+#ifdef RT_USING_HOOK
+static void (*rt_module_load_hook)(rt_module_t module);
+static void (*rt_module_unload_hook)(rt_module_t module);
+
+/**
+ * @addtogroup Hook
+ */
+
+/*@{*/
+
+/**
+ * This function will set a hook function, which will be invoked when module
+ * be loaded to system.
+ *
+ * @param hook the hook function
+ */
+void rt_module_load_sethook(void (*hook)(rt_module_t module))
+{
+    rt_module_load_hook = hook;
+}
+
+/**
+ * This function will set a hook function, which will be invoked when module
+ * be unloaded from system.
+ *
+ * @param hook the hook function
+ */
+void rt_module_unload_sethook(void (*hook)(rt_module_t module))
+{
+    rt_module_unload_hook = hook;
+}
+
+/*@}*/
+#endif
+
 static struct rt_module *_load_exec_object(const char *name,
                                              void       *module_ptr)
 {
@@ -240,7 +275,7 @@ static struct rt_module *_load_exec_object(const char *name,
     }
 
     module_size = vend_addr - vstart_addr;
-    module_size = RT_ALIGN(module_size,4096);
+    module_size = RT_ALIGN(module_size,RT_MM_PAGE_SIZE);
 
     RT_DEBUG_LOG(RT_DEBUG_MODULE, ("module size: %d, vstart_addr: 0x%p\n",
                                    module_size, vstart_addr));
@@ -259,16 +294,30 @@ static struct rt_module *_load_exec_object(const char *name,
         return RT_NULL;
 
     module->vstart_addr = vstart_addr;
+    module->module_size = module_size;
 
-    module->nref = 1;
+    module->nref = 0;
+    module->symtab = RT_NULL;
+    module->nsym = 0;
+
     extern int __rt_ffs(int value);
     module->pid = __rt_ffs(pids);
+    if (module->pid == 0)
+    {
+        rt_kprintf("Module: allocate pid failed.\n");
+        rt_object_delete(&(module->parent));
+
+        return RT_NULL;
+    }
+    mmu_maketls(module->pid);
 
     /* allocate module space */
-    module->module_space = rt_page_alloc(module_size/4096);
+    module->module_space = rt_page_alloc(module_size/RT_MM_PAGE_SIZE);
     if (module->module_space == RT_NULL)
     {
         pids |= (1<<(module->pid-1));
+        mmu_freetls(module->pid);
+
         rt_kprintf("Module: allocate space failed.\n");
         rt_object_delete(&(module->parent));
 
@@ -290,13 +339,64 @@ static struct rt_module *_load_exec_object(const char *name,
     }
 
     /* set module entry */
-    module->module_entry = module->module_space
-        + elf_module->e_entry - vstart_addr;
+    module->module_entry = (void *)elf_module->e_entry;
+
+    /* construct module symbol table */
+    for (index = 0; index < elf_module->e_shnum; index ++)
+    {
+        /* find .dynsym section */
+        rt_uint8_t *shstrab;
+        shstrab = (rt_uint8_t *)module_ptr +
+            shdr[elf_module->e_shstrndx].sh_offset;
+        if (rt_strcmp((const char *)(shstrab + shdr[index].sh_name), ELF_DYNSYM) == 0)
+            break;
+    }
+
+    /* found .dynsym section */
+    if (0 && (index != elf_module->e_shnum))
+    {
+        int i, count = 0;
+        Elf32_Sym  *symtab = RT_NULL;
+        rt_uint8_t *strtab = RT_NULL;
+
+        symtab =(Elf32_Sym *)((rt_uint8_t *)module_ptr + shdr[index].sh_offset);
+        strtab = (rt_uint8_t *)module_ptr + shdr[shdr[index].sh_link].sh_offset;
+
+        for (i = 0; i < shdr[index].sh_size/sizeof(Elf32_Sym); i++)
+        {
+            if ((ELF_ST_BIND(symtab[i].st_info) == STB_GLOBAL) &&
+                (ELF_ST_TYPE(symtab[i].st_info) == STT_FUNC))
+                count ++;
+        }
+
+        module->symtab = (struct rt_module_symtab *)rt_malloc
+            (count * sizeof(struct rt_module_symtab));
+        module->nsym = count;
+        for (i = 0, count = 0; i < shdr[index].sh_size/sizeof(Elf32_Sym); i++)
+        {
+            rt_size_t length;
+
+            if ((ELF_ST_BIND(symtab[i].st_info) != STB_GLOBAL) ||
+                (ELF_ST_TYPE(symtab[i].st_info) != STT_FUNC))
+                continue;
+
+            length = rt_strlen((const char *)(strtab + symtab[i].st_name)) + 1;
+
+            module->symtab[count].addr =
+                (void *)(module->module_space + symtab[i].st_value);
+            module->symtab[count].name = rt_malloc(length);
+            rt_memset((void *)module->symtab[count].name, 0, length);
+            rt_memcpy((void *)module->symtab[count].name,
+                      strtab + symtab[i].st_name,
+                      length);
+            count ++;
+        }
+    }
 
     return module;
 }
 
-#define RT_MODULE_ARG_MAX    20
+#define RT_MODULE_ARG_MAX    12
 static int _rt_module_split_arg(char* cmd, rt_size_t length, char* argv[])
 {
     int argc = 0;
@@ -346,6 +446,21 @@ static void module_main_entry(void* parameter)
     rt_module_t module = (rt_module_t) parameter;
     if (module == RT_NULL)
         return;
+
+    if (module->module_cmd_line == RT_NULL && module->module_cmd_size != 0)
+        /* malloc for module_cmd_line failed. */
+        return;
+
+    /* FIXME: we should run some C++ initialize code before jump into the
+     * entry. */
+
+    if (module->module_cmd_line == RT_NULL)
+    {
+        RT_DEBUG_LOG(RT_DEBUG_MODULE, ("run bare entry: 0x%p\n",
+                                       module->module_entry));
+        ((main_func_t)module->module_entry)(0, RT_NULL);
+        return;
+    }
 
     rt_memset(argv, 0x00, sizeof(argv));
     argc = _rt_module_split_arg((char*)module->module_cmd_line,
@@ -419,41 +534,90 @@ rt_module_t rt_module_do_main(const char *name,
     /* init module object container */
     rt_module_init_object_container(module);
 
-    /* set module argument */
-    module->module_cmd_line = (rt_uint8_t*)rt_malloc(line_size + 1);
-    if (module->module_cmd_line)
+    if (line_size && cmd_line)
     {
-        rt_memcpy(module->module_cmd_line, cmd_line, line_size);
-        module->module_cmd_line[line_size] = '\0';
+        /* set module argument */
+        module->module_cmd_size = RT_ALIGN(line_size+1,RT_MM_PAGE_SIZE);
+        module->module_cmd_line = (rt_uint8_t*)rt_page_alloc(module->module_cmd_size/RT_MM_PAGE_SIZE);
+        if (module->module_cmd_line)
+        {
+            rt_memcpy(module->module_cmd_line, cmd_line, line_size);
+            module->module_cmd_line[line_size] = '\0';
+            mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,module->module_cmd_size);
+        }
     }
-    module->module_cmd_size = line_size;
+    else
+    {
+        /* initialize an empty command */
+        module->module_cmd_line = RT_NULL;
+        module->module_cmd_size = 0;
+    }
 
-    /* init module memory allocator */
-    module->mem_list = RT_NULL;
+    /* increase module reference count */
+    module->nref ++;
 
-    /* create page array */
-    module->page_array =
-        (void *)rt_malloc(PAGE_COUNT_MAX * sizeof(struct rt_page_info));
-    module->page_cnt = 0;
+    if (elf_module->e_entry != 0)
+    {
+#ifdef RT_USING_SLAB
+        /* init module memory allocator */
+        module->mem_list = RT_NULL;
 
-    /* create module thread */
-    module->module_thread = rt_thread_create(name,
-                                             module_main_entry, module,
-                                             RT_USING_MODULE_STKSZ,
-                                             RT_USING_MODULE_PRIO|0x80, 20);
+        /* create page array */
+        module->page_array =
+            (void *)rt_malloc(PAGE_COUNT_MAX * sizeof(struct rt_page_info));
+        module->page_cnt = 0;
 
-    RT_DEBUG_LOG(RT_DEBUG_MODULE, ("thread entry 0x%x\n",
-                                   module->module_entry));
+        /* initialize heap semaphore */
+        module->mod_sem = rt_sem_create(name, 1, RT_IPC_FLAG_FIFO);
+#endif
 
-    /* set module id */
-    module->module_thread->module_id = (void *)module;
-    mmu_usermap(module->pid,(Elf32_Addr)module->module_thread->stack_addr,module->module_thread->stack_size);
+        /* create module thread */
+        module->module_thread = rt_thread_create(name,
+                                                 module_main_entry, module,
+                                                 RT_USING_MODULE_STKSZ,
+                                                 RT_USING_MODULE_PRIO, ((0x80|module->pid)<<24)|20);
 
-    /* startup module thread */
-    rt_thread_startup(module->module_thread);
+        RT_DEBUG_LOG(RT_DEBUG_MODULE, ("thread entry 0x%x\n",
+                                       module->module_entry));
+
+        /* set module id */
+        module->module_thread->module_id = (void *)module;
+        module->parent.flag |= RT_MODULE_FLAG_WITHENTRY;
+
+        /* startup module thread */
+        rt_thread_startup(module->module_thread);
+    }
+    else
+    {
+        /* without entry point */
+        module->parent.flag |= RT_MODULE_FLAG_WITHOUTENTRY;
+    }
+
+#ifdef RT_USING_HOOK
+    if (rt_module_load_hook != RT_NULL)
+    {
+        rt_module_load_hook(module);
+    }
+#endif
 
     return module;
 }
+
+/**
+ * This function will load a module from memory and create a thread for it
+ *
+ * @param name the name of module, which shall be unique
+ * @param module_ptr the memory address of module image
+ *
+ * @return the module object
+ */
+rt_module_t rt_module_load(const char *name, void *module_ptr)
+{
+    return rt_module_do_main(name, module_ptr, name, rt_strlen(name));
+}
+
+#ifdef RT_USING_DFS
+#include <dfs_posix.h>
 
 static char* _module_name(const char *path)
 {
@@ -481,6 +645,78 @@ static char* _module_name(const char *path)
     name[size] = '\0';
 
     return name;
+}
+
+/**
+ * This function will load a module from a file
+ *
+ * @param path the full path of application module
+ *
+ * @return the module object
+ */
+rt_module_t rt_module_open(const char *path)
+{
+    int fd, length;
+    struct rt_module *module;
+    struct stat s;
+    char *buffer, *offset_ptr;
+    char *name;
+
+    RT_DEBUG_NOT_IN_INTERRUPT;
+
+    /* check parameters */
+    RT_ASSERT(path != RT_NULL);
+
+    if (stat(path, &s) !=0)
+    {
+        rt_kprintf("Module: access %s failed\n", path);
+
+        return RT_NULL;
+    }
+    buffer = (char *)rt_malloc(s.st_size);
+    if (buffer == RT_NULL)
+    {
+        rt_kprintf("Module: out of memory\n");
+
+        return RT_NULL;
+    }
+
+    offset_ptr = buffer;
+    fd = open(path, O_RDONLY, 0);
+    if (fd < 0)
+    {
+        rt_kprintf("Module: open %s failed\n", path);
+        rt_free(buffer);
+
+        return RT_NULL;
+    }
+
+    do
+    {
+        length = read(fd, offset_ptr, 4096);
+        if (length > 0)
+        {
+            offset_ptr += length;
+        }
+    }while (length > 0);
+
+    /* close fd */
+    close(fd);
+
+    if ((rt_uint32_t)offset_ptr - (rt_uint32_t)buffer != s.st_size)
+    {
+        rt_kprintf("Module: read file failed\n");
+        rt_free(buffer);
+
+        return RT_NULL;
+    }
+
+    name   = _module_name(path);
+    module = rt_module_load(name, (void *)buffer);
+    rt_free(buffer);
+    rt_free(name);
+
+    return module;
 }
 
 /**
@@ -564,6 +800,13 @@ __exit:
     return module;
 }
 
+#if defined(RT_USING_FINSH)
+#include <finsh.h>
+FINSH_FUNCTION_EXPORT_ALIAS(rt_module_open, exec, exec module from a file);
+#endif
+
+#endif
+
 /**
  * This function will destroy a module and release its resource.
  *
@@ -573,6 +816,7 @@ __exit:
  */
 rt_err_t rt_module_destroy(rt_module_t module)
 {
+    int i;
     struct rt_object *object;
     struct rt_list_node *list;
 
@@ -586,28 +830,9 @@ rt_err_t rt_module_destroy(rt_module_t module)
     RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_destroy: %8.*s\n",
                                    RT_NAME_MAX, module->parent.name));
 
-    rt_enter_critical();
-    /* delete all sub-threads */
-    list = &module->module_object[RT_Object_Class_Thread].object_list;
-    while (list->next != list)
+    /* module has entry point */
+    if (!(module->parent.flag & RT_MODULE_FLAG_WITHOUTENTRY))
     {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_thread_detach((rt_thread_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_thread_delete((rt_thread_t)object);
-        }
-    }
-
-    /* delete the main thread of module */
-    rt_thread_delete(module->module_thread);
-    rt_exit_critical();
-
 #ifdef RT_USING_SEMAPHORE
         /* delete semaphores */
         list = &module->module_object[RT_Object_Class_Semaphore].object_list;
@@ -752,9 +977,11 @@ rt_err_t rt_module_destroy(rt_module_t module)
         /* delete command line */
         if (module->module_cmd_line != RT_NULL)
         {
-            rt_free(module->module_cmd_line);
+            rt_page_free(module->module_cmd_line,module->module_cmd_size/RT_MM_PAGE_SIZE);
         }
+    }
 
+#ifdef RT_USING_SLAB
     if (module->page_cnt > 0)
     {
         struct rt_page_info *page = (struct rt_page_info *)module->page_array;
@@ -766,12 +993,28 @@ rt_err_t rt_module_destroy(rt_module_t module)
             rt_module_free_page(module, page[0].page_ptr, page[0].npage);
         }
     }
+#endif
 
     /* release module space memory */
-    rt_free(module->module_space);
+    rt_page_free(module->module_space,module->module_size/RT_MM_PAGE_SIZE);
 
+    /* release module symbol table */
+    for (i = 0; i < module->nsym; i ++)
+    {
+        rt_free((void *)module->symtab[i].name);
+    }
+    if (module->symtab != RT_NULL)
+        rt_free(module->symtab);
+
+#ifdef RT_USING_SLAB
     if (module->page_array != RT_NULL)
         rt_free(module->page_array);
+    if (module->mod_sem != RT_NULL)
+        rt_sem_delete(module->mod_sem);
+#endif
+
+    /* free tls */
+    mmu_freetls(module->pid);
 
     /* delete module object */
     rt_object_delete((rt_object_t)module);
@@ -779,6 +1022,107 @@ rt_err_t rt_module_destroy(rt_module_t module)
     return RT_EOK;
 }
 
+/**
+ * This function will unload a module from memory and release resources
+ *
+ * @param module the module to be unloaded
+ *
+ * @return the operation status, RT_EOK on OK; -RT_ERROR on error
+ */
+rt_err_t rt_module_unload(rt_module_t module)
+{
+    struct rt_object *object;
+    struct rt_list_node *list;
+
+    RT_DEBUG_NOT_IN_INTERRUPT;
+
+    /* check parameter */
+    if (module == RT_NULL)
+        return -RT_ERROR;
+
+    rt_enter_critical();
+    if (!(module->parent.flag & RT_MODULE_FLAG_WITHOUTENTRY))
+    {
+        /* delete all sub-threads */
+        list = &module->module_object[RT_Object_Class_Thread].object_list;
+        while (list->next != list)
+        {
+            object = rt_list_entry(list->next, struct rt_object, list);
+            if (rt_object_is_systemobject(object) == RT_TRUE)
+            {
+                /* detach static object */
+                rt_thread_detach((rt_thread_t)object);
+            }
+            else
+            {
+                /* delete dynamic object */
+                rt_thread_delete((rt_thread_t)object);
+            }
+        }
+
+        /* delete the main thread of module */
+        if (module->module_thread != RT_NULL)
+        {
+            rt_thread_delete(module->module_thread);
+        }
+    }
+    rt_exit_critical();
+
+#ifdef RT_USING_HOOK
+    if (rt_module_unload_hook != RT_NULL)
+    {
+        rt_module_unload_hook(module);
+    }
+#endif
+
+    return RT_EOK;
+}
+
+/**
+ * This function will find the specified module.
+ *
+ * @param name the name of module finding
+ *
+ * @return the module
+ */
+rt_module_t rt_module_find(const char *name)
+{
+    struct rt_object_information *information;
+    struct rt_object *object;
+    struct rt_list_node *node;
+
+    extern struct rt_object_information rt_object_container[];
+
+    RT_DEBUG_NOT_IN_INTERRUPT;
+
+    /* enter critical */
+    rt_enter_critical();
+
+    /* try to find device object */
+    information = &rt_object_container[RT_Object_Class_Module];
+    for (node = information->object_list.next;
+         node != &(information->object_list);
+         node = node->next)
+    {
+        object = rt_list_entry(node, struct rt_object, list);
+        if (rt_strncmp(object->name, name, RT_NAME_MAX) == 0)
+        {
+            /* leave critical */
+            rt_exit_critical();
+
+            return (rt_module_t)object;
+        }
+    }
+
+    /* leave critical */
+    rt_exit_critical();
+
+    /* not found */
+    return RT_NULL;
+}
+RTM_EXPORT(rt_module_find);
+
+#ifdef RT_USING_SLAB
 /*
  * This function will allocate the numbers page with specified size
  * in page memory.
@@ -894,7 +1238,7 @@ void *rt_module_malloc(rt_size_t size)
     RT_ASSERT(size != 0);
     RT_ASSERT(nunits != 0);
 
-    rt_sem_take(&self_module->mod_sem, RT_WAITING_FOREVER);
+    rt_sem_take(self_module->mod_sem, RT_WAITING_FOREVER);
 
     for (prev = (struct rt_mem_head **)&self_module->mem_list;
          (b = *prev) != RT_NULL;
@@ -911,7 +1255,7 @@ void *rt_module_malloc(rt_size_t size)
 
             RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_malloc 0x%x, %d\n",
                                            b + 1, size));
-            rt_sem_release(&self_module->mod_sem);
+            rt_sem_release(self_module->mod_sem);
 
             return (void *)(b + 1);
         }
@@ -924,7 +1268,7 @@ void *rt_module_malloc(rt_size_t size)
             RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_malloc 0x%x, %d\n",
                                            b + 1, size));
 
-            rt_sem_release(&self_module->mod_sem);
+            rt_sem_release(self_module->mod_sem);
 
             return (void *)(b + 1);
         }
@@ -949,7 +1293,7 @@ void *rt_module_malloc(rt_size_t size)
     up->next = b;
     *prev    = up;
 
-    rt_sem_release(&self_module->mod_sem);
+    rt_sem_release(self_module->mod_sem);
 
     return rt_module_malloc(size);
 }
@@ -969,7 +1313,7 @@ void rt_module_free(rt_module_t module, void *addr)
 
     RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_free 0x%x\n", addr));
 
-    rt_sem_take(&module->mod_sem, RT_WAITING_FOREVER);
+    rt_sem_take(module->mod_sem, RT_WAITING_FOREVER);
 
     n = (struct rt_mem_head *)addr - 1;
     prev = (struct rt_mem_head **)&module->mem_list;
@@ -1016,7 +1360,7 @@ void rt_module_free(rt_module_t module, void *addr)
             }
 
             /* unlock */
-            rt_sem_release(&module->mod_sem);
+            rt_sem_release(module->mod_sem);
 
             return;
         }
@@ -1055,7 +1399,7 @@ void rt_module_free(rt_module_t module, void *addr)
             }
 
             /* unlock */
-            rt_sem_release(&module->mod_sem);
+            rt_sem_release(module->mod_sem);
 
             return;
         }
@@ -1094,7 +1438,7 @@ void rt_module_free(rt_module_t module, void *addr)
     }
 
     /* unlock */
-    rt_sem_release(&module->mod_sem);
+    rt_sem_release(module->mod_sem);
 }
 
 /**
@@ -1191,5 +1535,49 @@ void *rt_module_realloc(void *ptr, rt_size_t size)
         }
     }
 }
+
+#ifdef RT_USING_FINSH
+#include <finsh.h>
+
+void list_memlist(const char *name)
+{
+    rt_module_t module;
+    struct rt_mem_head **prev;
+    struct rt_mem_head *b;
+
+    module = rt_module_find(name);
+    if (module == RT_NULL)
+        return;
+
+    for (prev = (struct rt_mem_head **)&module->mem_list;
+         (b = *prev) != RT_NULL;
+         prev = &(b->next))
+    {
+        rt_kprintf("0x%x--%d\n", b, b->size * sizeof(struct rt_mem_head));
+    }
+}
+FINSH_FUNCTION_EXPORT(list_memlist, list module free memory information)
+
+void list_mempage(const char *name)
+{
+    rt_module_t module;
+    struct rt_page_info *page;
+    int i;
+
+    module = rt_module_find(name);
+    if (module == RT_NULL)
+        return;
+
+    page = (struct rt_page_info *)module->page_array;
+
+    for (i = 0; i < module->page_cnt; i ++)
+    {
+        rt_kprintf("0x%x--%d\n", page[i].page_ptr, page[i].npage);
+    }
+}
+FINSH_FUNCTION_EXPORT(list_mempage, list module using memory page information)
+#endif /* RT_USING_FINSH */
+
+#endif /* RT_USING_SLAB */
 
 #endif

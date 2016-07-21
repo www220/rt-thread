@@ -70,7 +70,7 @@ struct rt_object_information rt_object_container[RT_Object_Class_Unknown] =
 #endif
     /* initialize object container - timer */
     {RT_Object_Class_Timer, _OBJ_CONTAINER_LIST_INIT(RT_Object_Class_Timer), sizeof(struct rt_timer)},
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     /* initialize object container - module */
     {RT_Object_Class_Module, _OBJ_CONTAINER_LIST_INIT(RT_Object_Class_Module), sizeof(struct rt_module)},
 #endif
@@ -208,7 +208,7 @@ void rt_object_init(struct rt_object         *object,
     register rt_base_t temp;
     struct rt_object_information *information;
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     /* get module object information */
     information = (rt_module_self() != RT_NULL) ?
         &rt_module_self()->module_object[type] : &rt_object_container[type];
@@ -222,7 +222,10 @@ void rt_object_init(struct rt_object         *object,
     /* set object type to static */
     object->type = type | RT_Object_Class_Static;
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+    /* set object flag */
+    object->flag = 0;
+
+#ifdef RT_USING_MODULE
     object->module_id = (void *)rt_module_self();
 #endif
 
@@ -283,7 +286,7 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
 
     RT_DEBUG_NOT_IN_INTERRUPT;
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     /*
      * get module object information,
      * module object should be managed by kernel object container
@@ -310,11 +313,13 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
     /* set object flag */
     object->flag = 0;
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
+#ifndef RT_USING_PROCESS
     if (rt_module_self() != RT_NULL)
     {
         object->flag |= RT_OBJECT_FLAG_MODULE;
     }
+#endif
     object->module_id = (void *)rt_module_self();
 #endif
 
@@ -416,7 +421,7 @@ rt_object_t rt_object_find(const char *name, rt_uint8_t type)
     /* which is invoke in interrupt status */
     RT_DEBUG_NOT_IN_INTERRUPT;
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     /* check whether to find a object inside a module. */
     {
         const char *name_ptr;

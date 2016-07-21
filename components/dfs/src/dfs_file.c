@@ -77,7 +77,6 @@ int dfs_file_open(struct dfs_fd *fd, const char *path, int flags)
     fd->type  = FT_REGULAR;
     fd->flags = flags;
     fd->size  = 0;
-    fd->blksize = 0;
     fd->pos   = 0;
 
     if (!(fs->ops->flags & DFS_FS_FLAG_FULLPATH))
@@ -393,7 +392,6 @@ int dfs_file_stat(const char *path, struct stat *buf)
 
         buf->st_size    = 0;
         buf->st_mtime   = 0;
-        buf->st_blksize = 512;
 
         /* release full path */
         rt_free(fullpath);

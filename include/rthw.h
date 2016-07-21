@@ -49,8 +49,7 @@ void rt_hw_cpu_shutdown(void);
 rt_uint8_t *rt_hw_stack_init(void       *entry,
                              void       *parameter,
                              rt_uint8_t *stack_addr,
-                             void       *exit,
-                             rt_uint32_t sysmode);
+                             void       *exit);
 
 /*
  * Interrupt handler definition

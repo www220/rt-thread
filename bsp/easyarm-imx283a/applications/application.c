@@ -254,24 +254,23 @@ static void rt_thread_entry_main(void* parameter)
     dfs_yaffs_init();
 #endif
 
+#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
+    tf_init();
+    elm_init();
+#endif
+
     debug_printf_init();
-#ifdef RT_USING_DFS_ROMFS
-    dfs_mount(RT_NULL, "/", "rom", 0, &romfs_root);
-    rt_kprintf("File System initialized!\n");
-    SysLog_Main(rtt_LogNotice, "File System initialized!\n");
-#endif
-#ifdef RT_USING_DFS_DEVFS
-    dfs_mount(RT_NULL, "/dev", "devfs", 0, 0);
-    rt_kprintf("Mount /dev ok!\n");
-    SysLog_Main(rtt_LogNotice, "Mount /dev ok!\n");
-#endif
 #if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
-    if (dfs_mount("nand0", "/mnt", "yaffs2", 0, 0) == 0) {
-        rt_kprintf("Mount /mnt ok!\n");
-        SysLog_Main(rtt_LogNotice, "Mount /mnt ok!\n");
+    if (dfs_mount("nand0", "/", "yaffs2", 0, 0) == 0) {
+        mkdir("/tmp", 666);
+        mkdir("/rom", 666);
+        mkdir("/dev", 666);
+        mkdir("/mmc", 666);
+        mkdir("/usb", 666);
+        rt_kprintf("File System initialized!\n");
     } else {
-        rt_kprintf("Mount /mnt failed!\n");
-        SysLog_Main(rtt_LogWarn, "Mount /mnt failed!\n");
+        rt_kprintf("File System Failed!\n");
+        RT_ASSERT(0);
     }
     if (dfs_mount("nand1", "/tmp", "yaffs2", 0, 0) == 0) {
         rt_kprintf("Mount /tmp ok!\n");
@@ -282,10 +281,17 @@ static void rt_thread_entry_main(void* parameter)
     }
 #endif
 
-#if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
-    tf_init();
-    elm_init();
+#ifdef RT_USING_DFS_ROMFS
+    dfs_mount(RT_NULL, "/rom", "rom", 0, &romfs_root);
+    rt_kprintf("Mount /rot ok!\n");
+    SysLog_Main(rtt_LogNotice, "Mount /rot ok!\n");
 #endif
+#ifdef RT_USING_DFS_DEVFS
+    dfs_mount(RT_NULL, "/dev", "devfs", 0, 0);
+    rt_kprintf("Mount /dev ok!\n");
+    SysLog_Main(rtt_LogNotice, "Mount /dev ok!\n");
+#endif
+
 #if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
     if (dfs_mount("sd0", "/mmc", "elm", 0, 0) == 0) {
         rt_kprintf("Mount /mmc ok!\n");

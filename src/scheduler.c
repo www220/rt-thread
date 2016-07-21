@@ -46,6 +46,10 @@ extern int __rt_ffs(int value);
 
 rt_list_t rt_thread_priority_table[RT_THREAD_PRIORITY_MAX];
 struct rt_thread *rt_current_thread;
+#ifdef RT_USING_PROCESS
+struct rt_module *rt_current_module;
+extern void mmu_switchtls(rt_uint32_t pid);
+#endif
 
 rt_uint8_t rt_current_priority;
 
@@ -134,6 +138,9 @@ void rt_system_scheduler_init(void)
 
     rt_current_priority = RT_THREAD_PRIORITY_MAX - 1;
     rt_current_thread = RT_NULL;
+#ifdef RT_USING_PROCESS
+    rt_current_module = RT_NULL;
+#endif
 
     /* initialize ready priority group */
     rt_thread_ready_priority_group = 0;
@@ -172,6 +179,13 @@ void rt_system_scheduler_start(void)
                               tlist);
 
     rt_current_thread = to_thread;
+#ifdef RT_USING_PROCESS
+    if (rt_current_module != rt_current_thread->module_id)
+    {
+        mmu_switchtls((rt_current_module==RT_NULL)?(0):(rt_current_module->pid));
+        rt_current_module = (rt_module_t)rt_current_thread->module_id;
+    }
+#endif
 
     /* switch to new thread */
     rt_hw_context_switch_to((rt_uint32_t)&to_thread->sp);
@@ -223,6 +237,13 @@ void rt_schedule(void)
             rt_current_priority = (rt_uint8_t)highest_ready_priority;
             from_thread         = rt_current_thread;
             rt_current_thread   = to_thread;
+#ifdef RT_USING_PROCESS
+            if (rt_current_module != rt_current_thread->module_id)
+            {
+                mmu_switchtls((rt_current_module==RT_NULL)?(0):(rt_current_module->pid));
+                rt_current_module = (rt_module_t)rt_current_thread->module_id;
+            }
+#endif
 
             RT_OBJECT_HOOK_CALL(rt_scheduler_hook, (from_thread, to_thread));
 

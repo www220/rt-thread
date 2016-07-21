@@ -305,6 +305,7 @@ typedef struct rt_list_node rt_list_t;                  /**< Type for lists. */
  * kernel object macros
  */
 #define RT_OBJECT_FLAG_MODULE           0x80            /**< is module object. */
+#define RT_OBJECT_FLAG_PROCESS          0x40            /**< is module object. */
 
 /**
  * Base structure of Kernel object
@@ -315,7 +316,7 @@ struct rt_object
     rt_uint8_t type;                                    /**< type of kernel object */
     rt_uint8_t flag;                                    /**< flag of kernel object */
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     void      *module_id;                               /**< id of application module */
 #endif
     rt_list_t  list;                                    /**< list node of kernel object */
@@ -367,7 +368,7 @@ enum rt_object_class_type
     RT_Object_Class_Device,                             /**< The object is a device */
 #endif
     RT_Object_Class_Timer,                              /**< The object is a timer. */
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     RT_Object_Class_Module,                             /**< The object is a module. */
 #endif
     RT_Object_Class_Unknown,                            /**< The object is unknown. */
@@ -484,7 +485,7 @@ struct rt_thread
     rt_uint8_t  type;                                   /**< type of object */
     rt_uint8_t  flags;                                  /**< thread's flags */
 
-#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
+#ifdef RT_USING_MODULE
     void       *module_id;                              /**< id of application module */
 #endif
 
@@ -946,7 +947,7 @@ struct rt_device_graphic_ops
 /*@}*/
 #endif
 
-#if defined(RT_USING_MODULE)
+#ifdef RT_USING_MODULE
 /**
  * @addtogroup Module
  */
@@ -967,10 +968,12 @@ struct rt_module
 {
     struct rt_object             parent;                /**< inherit from object */
 
-    rt_uint32_t                  vstart_addr;            /**< VMA base address for the
+    rt_uint32_t                  vstart_addr;           /**< VMA base address for the
                                                           first LOAD segment. */
     rt_uint8_t                  *module_space;          /**< module memory space */
-
+#ifdef RT_USING_PROCESS
+    rt_uint32_t                  module_size;           /**< module memory size */
+#endif
     void                        *module_entry;          /**< the entry address of module */
     rt_thread_t                  module_thread;         /**< the main thread of module */
 
@@ -982,51 +985,18 @@ struct rt_module
     void                        *mem_list;              /**< module's free memory list */
     void                        *page_array;            /**< module's using pages */
     rt_uint32_t                  page_cnt;              /**< module's using pages count */
+#ifdef RT_USING_PROCESS
+    rt_sem_t                     mod_sem;               /**< module's sem */
+#endif
 #endif
 
     rt_uint16_t                  nref;                  /**< reference count */
+#ifdef RT_USING_PROCESS
+    rt_uint16_t                  pid;                   /**< process pid */
+#endif
 
     rt_uint16_t                  nsym;                  /**< number of symbol in the module */
     struct rt_module_symtab     *symtab;                /**< module symbol table */
-
-    /* object in this module, module object is the last basic object type */
-    struct rt_object_information module_object[RT_Object_Class_Unknown];
-};
-typedef struct rt_module *rt_module_t;
-
-/*@}*/
-#elif defined(RT_USING_PROCESS)
-/**
- * @addtogroup Module
- */
-
-/*@{*/
-
-/**
- * Application Module structure
- */
-struct rt_module
-{
-    struct rt_object             parent;                /**< inherit from object */
-
-    rt_uint32_t                  vstart_addr;            /**< VMA base address for the
-                                                          first LOAD segment. */
-    rt_uint8_t                  *module_space;          /**< module memory space */
-
-    void                        *module_entry;          /**< the entry address of module */
-    rt_thread_t                  module_thread;         /**< the main thread of module */
-
-    rt_uint8_t*                  module_cmd_line;       /**< module command line */
-    rt_uint32_t                  module_cmd_size;       /**< the size of module command line */
-
-    /* module memory allocator */
-    void                        *mem_list;              /**< module's free memory list */
-    void                        *page_array;            /**< module's using pages */
-    rt_uint32_t                  page_cnt;              /**< module's using pages count */
-    struct rt_semaphore          mod_sem;               /**< module's using sem */
-
-    rt_uint16_t                  nref;                  /**< reference count */
-    rt_uint16_t                  pid;                   /**< pid */
 
     /* object in this module, module object is the last basic object type */
     struct rt_object_information module_object[RT_Object_Class_Unknown];
