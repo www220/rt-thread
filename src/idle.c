@@ -149,8 +149,8 @@ void rt_thread_idle_excute(void)
 #ifdef RT_USING_PROCESS
         else if (thread->flags & RT_OBJECT_FLAG_PROCESS)
         {
-            extern void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
-            mmu_userunmap(((rt_module_t)thread->module_id)->pid,(rt_uint32_t)thread->stack_addr,thread->stack_size);
+            extern void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
+            mmu_userunmap(((rt_module_t)thread->module_id)->pid,(rt_uint32_t)thread->stack_addr,thread->stack_size,0);
             rt_page_free(thread->stack_addr,thread->stack_size/RT_MM_PAGE_SIZE);
         }
 #endif

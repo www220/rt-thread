@@ -376,13 +376,38 @@ void abort(void)
 	while (1);
 }
 
+#ifdef RT_USING_PROCESS
+#include "linux-syscall.h"
+extern struct rt_module *rt_current_module;
 rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_uint32_t parm2, rt_uint32_t parm3,
         rt_uint32_t parm4, rt_uint32_t parm5,
         rt_uint32_t parm6)
 {
-    rt_kprintf("syscall %d %x %x %x %x %x %x\n",nbr,parm1,
-            parm2,parm3,parm4,parm5,parm6);
-    rt_thread_delay(2000);
-    return ENOTSUP;
+    RT_ASSERT(rt_current_module != RT_NULL);
+    RT_ASSERT((nbr&SYS_BASE) == SYS_BASE);
+
+    switch(nbr)
+    {
+    case SYS_exit:
+    {
+        _exit(parm1);
+        return -1;
+    }
+    case SYS_write:
+    {
+        void *buffer = (void *)parm2;
+        if (parm2>=rt_current_module->vstart_addr
+                && parm2<rt_current_module->vstart_addr+rt_current_module->module_size)
+            buffer = rt_current_module->module_space + parm2 - rt_current_module->vstart_addr;
+        return write(parm1, buffer, parm3);
+    }
+    case SYS_close:
+    {
+        return close(parm1);
+    }
+    }
+    rt_kprintf("syscall %x not supported\n",nbr);
+    return -1;
 }
+#endif

@@ -436,14 +436,22 @@ static int _rt_module_split_arg(char* cmd, rt_size_t length, char* argv[])
     return argc;
 }
 
+struct module_main_info
+{
+	rt_uint8_t*                  module_cmd_line;		/**< module command line */
+	rt_uint32_t                  module_cmd_size;		/**< the size of module command line */
+    void                        *module_entry;          /**< the entry address of module */
+};
+
 /* module main thread entry */
+SECTION(".module_fn")
 static void module_main_entry(void* parameter)
 {
     int argc;
     char *argv[RT_MODULE_ARG_MAX];
     typedef int (*main_func_t)(int argc, char** argv);
 
-    rt_module_t module = (rt_module_t) parameter;
+    struct module_main_info *module = (struct module_main_info*)parameter;
     if (module == RT_NULL)
         return;
 
@@ -462,7 +470,6 @@ static void module_main_entry(void* parameter)
         return;
     }
 
-    rt_memset(argv, 0x00, sizeof(argv));
     argc = _rt_module_split_arg((char*)module->module_cmd_line,
                                 module->module_cmd_size, argv+1);
     if (argc == 0)
@@ -537,13 +544,18 @@ rt_module_t rt_module_do_main(const char *name,
     if (line_size && cmd_line)
     {
         /* set module argument */
-        module->module_cmd_size = RT_ALIGN(line_size+1,RT_MM_PAGE_SIZE);
+        struct module_main_info main_info;
+        module->module_cmd_size = RT_ALIGN(sizeof(main_info)+line_size+10,RT_MM_PAGE_SIZE);
         module->module_cmd_line = (rt_uint8_t*)rt_page_alloc(module->module_cmd_size/RT_MM_PAGE_SIZE);
         if (module->module_cmd_line)
         {
-            rt_memcpy(module->module_cmd_line, cmd_line, line_size);
-            module->module_cmd_line[line_size] = '\0';
-            mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,module->module_cmd_size);
+            main_info.module_cmd_line = module->module_cmd_line+sizeof(main_info);
+            main_info.module_cmd_size = line_size+1;
+            main_info.module_entry = module->module_entry;
+            rt_memcpy(module->module_cmd_line, &main_info, sizeof(main_info));
+            rt_memcpy(module->module_cmd_line+sizeof(main_info), cmd_line, line_size);
+            module->module_cmd_line[sizeof(main_info)+line_size] = '\0';
+            mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,module->module_cmd_size,0);
         }
     }
     else
@@ -573,7 +585,7 @@ rt_module_t rt_module_do_main(const char *name,
 
         /* create module thread */
         module->module_thread = rt_thread_create(name,
-                                                 module_main_entry, module,
+                                                 module_main_entry, module->module_cmd_line,
                                                  RT_USING_MODULE_STKSZ,
                                                  RT_USING_MODULE_PRIO, ((0x80|module->pid)<<24)|20);
 
@@ -825,7 +837,7 @@ rt_err_t rt_module_destroy(rt_module_t module)
     /* check parameter */
     RT_ASSERT(module != RT_NULL);
     RT_ASSERT(module->nref == 0);
-    RT_ASSERT(module->pid == 0);
+    RT_ASSERT(module->pid != 0);
 
     RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_destroy: %8.*s\n",
                                    RT_NAME_MAX, module->parent.name));

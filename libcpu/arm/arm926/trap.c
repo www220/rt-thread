@@ -108,16 +108,16 @@ void rt_hw_trap_udef(struct rt_hw_register *regs)
  *
  * @note never invoke this function in application
  */
-inline void rt_hw_trap_swi(struct rt_hw_register *regs)
+inline void rt_hw_trap_swi(rt_uint32_t call, struct rt_hw_register *regs)
 {
     extern rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             rt_uint32_t parm2, rt_uint32_t parm3,
             rt_uint32_t parm4, rt_uint32_t parm5,
             rt_uint32_t parm6);
-    regs->r0 = sys_call_switch(regs->r0,regs->r1,
-            regs->r2,regs->r3,
-            regs->r4,regs->r5,
-            regs->r6);
+    regs->r0 = sys_call_switch(call&0xffffff,regs->r0,
+            regs->r1,regs->r2,
+            regs->r3,regs->r4,
+            regs->r5);
 }
 
 /**

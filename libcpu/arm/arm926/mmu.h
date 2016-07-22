@@ -59,10 +59,10 @@
 #define DOMAIN0_ATTR        (DOMAIN_CHK<<0)
 #define DOMAIN1_ATTR        (DOMAIN_FAULT<<2)
 
-#define RW_CB       (AP_NA|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
+#define RW_CBE      (AP_RO|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
+#define RW_CBD      (AP_NA|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
 #define RW_CNB      (AP_NA|DOMAIN0|CNB|DESC_SEC)    /* Read/Write, cache, write through */
 #define RW_NCNB     (AP_NA|DOMAIN0|NCNB|DESC_SEC)   /* Read/Write without cache and write buffer */
-#define RW_FAULT    (AP_NA|DOMAIN1|NCNB|DESC_SEC)   /* Read/Write without cache and write buffer */
 
 #define PET_RW_CB       (PET_RW|CB|DESC_SMALL)     /* Read/Write, cache, write back */
 #define PET_RW_CNB      (PET_RW|CNB|DESC_SMALL)    /* Read/Write, cache, write through */
@@ -82,7 +82,7 @@ void mmu_maketlb(rt_uint32_t pid);
 void mmu_freetlb(rt_uint32_t pid);
 void mmu_switchtlb(rt_uint32_t pid);
 void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size);
-void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
-void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
+void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
+void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
 
 #endif

@@ -448,12 +448,14 @@ void mmu_freetlb(rt_uint32_t pid)
 
 void mmu_switchtlb(rt_uint32_t pid)
 {
-    register rt_uint32_t value;
-
-    value = (rt_uint32_t)&_page_table[pid*4096];
-    asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(value));
-
-    mmu_invalidate_tlb();
+	register rt_uint32_t value = (rt_uint32_t)&_page_table[pid*4096];
+	asm volatile("	mov	ip, #0\n"
+				"1:	mrc	p15, 0, r15, c7, c14, 3 	@ test,clean,invalidate\n"
+				"	bne	1b\n"
+				"	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache\n"
+				"	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n"
+				"	mcr	p15, 0, %0, c2, c0, 0		@ load page table pointer\n"
+				"	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs"::"r"(value));
 }
 
 void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size)
@@ -478,7 +480,7 @@ void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t 
     }
 }
 
-void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
+void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush)
 {
     volatile rt_uint32_t *pTT,*pSS;
     volatile int nSec,i,base,j;
@@ -499,13 +501,24 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
             }
         }
         pTT = pSS+((map-HEAP_BEGIN)&0xfffff)/4096;
-        *pTT = PET_RW_CB|map;
+        if (pid == 0)
+            *pTT = PET_RO|CB|DESC_SMALL|map;
+        else
+            *pTT = PET_RW_CB|map;
         map += 4096;
     }
-    mmu_invalidate_tlb();
+	if (flush)
+	{
+		asm volatile("	mov	ip, #0\n"
+					"1:	mrc	p15, 0, r15, c7, c14, 3 	@ test,clean,invalidate\n"
+					"	bne	1b\n"
+					"	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache\n"
+					"	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n"
+					"	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs");
+	}
 }
 
-void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
+void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush)
 {
     volatile rt_uint32_t *pTT;
     volatile int nSec,i;
@@ -519,7 +532,15 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
         map += 4096;
         pTT++;
     }
-    mmu_invalidate_tlb();
+	if (flush)
+	{
+		asm volatile("	mov	ip, #0\n"
+					"1:	mrc	p15, 0, r15, c7, c14, 3 	@ test,clean,invalidate\n"
+					"	bne	1b\n"
+					"	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache\n"
+					"	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n"
+					"	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs");
+	}
 }
 
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
@@ -537,6 +558,8 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
                    mdesc->paddr_start, mdesc->attr);
         mdesc++;
     }
+    /* set moudule_fn table */
+    mmu_usermap(0,0x40000000,8192,0);
 
     /* set MMU table address */
     mmu_setttbase((rt_uint32_t)_page_table);

@@ -41,7 +41,6 @@
 #include "regs-ssp.h"
 #include "regs-usbphy.h"
 #include "pinctrl.h"
-#include "syscall.h"
 #include "mmu.h"
 #include <stdarg.h>
 

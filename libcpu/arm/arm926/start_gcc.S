@@ -251,7 +251,8 @@ SWI_Handler:
     STR     R6, [R4, #4]            @; Save SPSR
     MRS     R6, CPSR
     STR     R6, [R4, #8]            @; Save CPSR
-    MOV     R0, SP
+    LDR     R0, [LR, #-4]
+    MOV     R1, SP
     BL      rt_hw_trap_swi
     LDR     R0, [R4, #4]            @; Pop Save SPSR
     MSR     SPSR_cxsf, R0

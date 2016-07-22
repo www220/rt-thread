@@ -88,6 +88,15 @@ int close(int fd)
     int result;
     struct dfs_fd *d;
 
+#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
+    if (fd < 3)
+    {
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        return (console_device)?0:-1;
+    }
+#endif
+
     d = fd_get(fd);
     if (d == RT_NULL)
     {
