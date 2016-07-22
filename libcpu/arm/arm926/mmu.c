@@ -450,11 +450,10 @@ void mmu_switchtlb(rt_uint32_t pid)
 {
     register rt_uint32_t value;
 
-    value = 0;
-    asm volatile ("mcr p15, 0, %0, c8, c7, 0"::"r"(value));
-
     value = (rt_uint32_t)&_page_table[pid*4096];
     asm volatile ("mcr p15, 0, %0, c2, c0, 0"::"r"(value));
+
+    mmu_invalidate_tlb();
 }
 
 void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size)
@@ -462,7 +461,7 @@ void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t 
     volatile rt_uint32_t *pTT;
     volatile int nSec,i;
 
-    nSec = RT_ALIGN(size,0x10000)/0x10000;
+    nSec = RT_ALIGN(size,0x100000)/0x100000;
     pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
     for (i=0; i<nSec; i++)
     {
@@ -503,6 +502,7 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
         *pTT = PET_RW_CB|map;
         map += 4096;
     }
+    mmu_invalidate_tlb();
 }
 
 void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
@@ -519,6 +519,7 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
         map += 4096;
         pTT++;
     }
+    mmu_invalidate_tlb();
 }
 
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
