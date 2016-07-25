@@ -1,9 +1,7 @@
 #include <reent.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <rtthread.h>
-#include <rtdevice.h>
 
 #ifdef RT_USING_DFS
 #include <dfs_posix.h>
@@ -379,6 +377,16 @@ void abort(void)
 #ifdef RT_USING_PROCESS
 #include "linux-syscall.h"
 extern struct rt_module *rt_current_module;
+static inline int ret_err(int ret)
+{
+    if (ret < 0)
+    {
+        int err = errno;
+        return (err>=0)?(-err):(err);
+    }
+    return ret;
+}
+
 rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_uint32_t parm2, rt_uint32_t parm3,
         rt_uint32_t parm4, rt_uint32_t parm5,
@@ -392,7 +400,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_exit:
     {
         _exit(parm1);
-        return -1;
+        return -ENOTSUP;
     }
     case SYS_write:
     {
@@ -400,14 +408,14 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         if (parm2>=rt_current_module->vstart_addr
                 && parm2<rt_current_module->vstart_addr+rt_current_module->module_size)
             buffer = rt_current_module->module_space + parm2 - rt_current_module->vstart_addr;
-        return write(parm1, buffer, parm3);
+        return ret_err(write(parm1, buffer, parm3));
     }
     case SYS_close:
     {
-        return close(parm1);
+        return ret_err(close(parm1));
     }
     }
     rt_kprintf("syscall %x not supported\n",nbr);
-    return -1;
+    return -ENOTSUP;
 }
 #endif

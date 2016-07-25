@@ -182,10 +182,9 @@ void rt_hw_cpu_shutdown()
 
     level = rt_hw_interrupt_disable();
     machine_shutdown();
-    while (level)
-    {
-        RT_ASSERT(0);
-    }
+    while(1);    /* loop forever and wait for reset to happen */
+
+    /* NEVER REACHED */
 }
 
 #ifdef RT_USING_CPU_FFS
@@ -221,6 +220,7 @@ int __rt_ffs(int value)
 int __rt_ffs(int value)
 {
     register rt_uint32_t x;
+    register rt_uint32_t y __asm__("r1") = value;
 
     if (value == 0)
         return value;
@@ -232,7 +232,7 @@ int __rt_ffs(int value)
         "clz %[temp], %[temp]\n"
         "rsb %[temp], %[temp], #32\n"
         :[temp] "=r"(x)
-        :[val] "r"(value)
+        :[val] "r"(y)
     );
     return x;
 }

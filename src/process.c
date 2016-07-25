@@ -481,6 +481,7 @@ static void module_main_entry(void* parameter)
     /* do the main function */
     argv[0] = (char *)argc;
     argv[argc+1] = NULL;
+    argv[argc+2] = NULL;
     ((main_func_t)module->module_entry)(argc, argv);
     return;
 }
