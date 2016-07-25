@@ -13,9 +13,3 @@ int main(int argc, char **argv)
     }
     return 0;
 }
-
-int
-_isatty (int fd)
-{
-  return (fd <= 2) ? 1 : 0;
-}

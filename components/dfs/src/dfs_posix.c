@@ -247,6 +247,15 @@ off_t lseek(int fd, off_t offset, int whence)
     int result;
     struct dfs_fd *d;
 
+#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
+    if (fd < 3)
+    {
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        return (console_device)?0:-1;
+    }
+#endif
+
     d = fd_get(fd);
     if (d == RT_NULL)
     {
@@ -386,6 +395,15 @@ int fstat(int fildes, struct stat *buf)
 {
     struct dfs_fd *d;
 
+#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
+    if (fildes < 3)
+    {
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        return (console_device)?0:-1;
+    }
+#endif
+
     /* get the fd */
     d = fd_get(fildes);
     if (d == RT_NULL)
@@ -431,6 +449,15 @@ int fsync(int fildes)
     int ret;
     struct dfs_fd *d;
 
+#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
+    if (fildes < 3)
+    {
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        return (console_device)?0:-1;
+    }
+#endif
+
     /* get the fd */
     d = fd_get(fildes);
     if (d == RT_NULL)
@@ -462,6 +489,15 @@ int ioctl(int fildes, unsigned long cmd, void *data)
 {
 	int ret;
     struct dfs_fd *d;
+
+#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
+    if (fildes < 3)
+    {
+        rt_device_t console_device;
+        console_device = rt_console_get_device();
+        return (console_device)?0:-1;
+    }
+#endif
 
     /* get the fd */
     d = fd_get(fildes);

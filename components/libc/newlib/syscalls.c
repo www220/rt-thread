@@ -382,9 +382,19 @@ static inline int ret_err(int ret)
     if (ret < 0)
     {
         int err = errno;
-        return (err>=0)?(-err):(err);
+        if (err == 0)
+            err = rt_get_errno();
+        return (err>0)?(-err):(err);
     }
     return ret;
+}
+static inline void *conv_ptr(rt_uint32_t ptr)
+{
+    void *buffer = (void *)ptr;
+    if (ptr>=rt_current_module->vstart_addr
+            && ptr<rt_current_module->vstart_addr+rt_current_module->module_size)
+        buffer = rt_current_module->module_space + ptr - rt_current_module->vstart_addr;
+    return buffer;
 }
 
 rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
@@ -402,17 +412,66 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         _exit(parm1);
         return -ENOTSUP;
     }
+    case SYS_brk:
+    {
+        rt_kprintf("syscall brk %x\n",parm1);
+        return RT_NULL;
+    }
+    case SYS_lseek:
+    {
+        errno = 0;
+        return ret_err(lseek(parm1, parm2, parm3));
+    }
+    case SYS_stat:
+    case SYS_lstat:
+    {
+        errno = 0;
+        return ret_err(stat((const char *)conv_ptr(parm1), (struct stat *)conv_ptr(parm2)));
+    }
+    case SYS_fstat:
+    {
+        errno = 0;
+        return ret_err(fstat(parm1, (struct stat *)conv_ptr(parm2)));
+    }
+    case SYS_open:
+    {
+       errno = 0;
+       return ret_err(open((const char*)conv_ptr(parm1), parm2, parm3));
+    }
+    case SYS_read:
+    {
+       errno = 0;
+       return ret_err(read(parm1, conv_ptr(parm2), parm3));
+    }
     case SYS_write:
     {
-        void *buffer = (void *)parm2;
-        if (parm2>=rt_current_module->vstart_addr
-                && parm2<rt_current_module->vstart_addr+rt_current_module->module_size)
-            buffer = rt_current_module->module_space + parm2 - rt_current_module->vstart_addr;
-        return ret_err(write(parm1, buffer, parm3));
+       errno = 0;
+       return ret_err(write(parm1, conv_ptr(parm2), parm3));
     }
     case SYS_close:
     {
-        return ret_err(close(parm1));
+       errno = 0;
+       return ret_err(close(parm1));
+    }
+    case 0x900000+1001:
+    {
+        return (rt_uint32_t)rt_module_malloc(parm1);
+    }
+    case 0x900000+1002:
+    {
+        return (rt_uint32_t)rt_module_realloc(conv_ptr(parm1), parm2);
+    }
+    case 0x900000+1003:
+    {
+        void  *ret = rt_module_malloc(parm1*parm2);
+        if (ret != RT_NULL)
+            rt_memset(ret,0,parm1*parm2);
+        return (rt_uint32_t)ret;
+    }
+    case 0x900000+1004:
+    {
+        rt_module_free(rt_current_module,conv_ptr(parm1));
+        return 0;
     }
     }
     rt_kprintf("syscall %x not supported\n",nbr);

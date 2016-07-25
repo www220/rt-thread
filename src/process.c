@@ -46,6 +46,9 @@
 #define IS_AX(s)          ((s.sh_flags & SHF_ALLOC) && (s.sh_flags & SHF_EXECINSTR))
 #define IS_AW(s)          ((s.sh_flags & SHF_ALLOC) && (s.sh_flags & SHF_WRITE))
 
+#undef RT_DEBUG_MODULE
+#define RT_DEBUG_MODULE 1
+
 #ifdef RT_USING_MODULE_STKSZ
 #undef RT_USING_MODULE_STKSZ
 #endif
@@ -68,7 +71,7 @@
 #error "PROCESS_MAX <= 64"
 #endif
 
-#define PAGE_COUNT_MAX    256 * 16
+#define PAGE_COUNT_MAX    1024
 static volatile rt_uint32_t pids = 0;
 
 /* module memory allocator */
@@ -87,7 +90,8 @@ struct rt_page_info
 static void *rt_module_malloc_page(rt_size_t npages);
 static void rt_module_free_page(rt_module_t module,
                                 void       *page_ptr,
-                                rt_size_t   npages);
+                                rt_size_t   npages,
+                                rt_uint32_t mode);
 
 /**
  * @ingroup SystemInit
@@ -464,7 +468,7 @@ static void module_main_entry(void* parameter)
 
     if (module->module_cmd_line == RT_NULL)
     {
-        RT_DEBUG_LOG(RT_DEBUG_MODULE, ("run bare entry: 0x%p\n",
+        RT_DEBUG_LOG(0, ("run bare entry: 0x%p\n",
                                        module->module_entry));
         ((main_func_t)module->module_entry)(0, RT_NULL);
         return;
@@ -475,7 +479,7 @@ static void module_main_entry(void* parameter)
     if (argc == 0)
         return;
 
-    RT_DEBUG_LOG(RT_DEBUG_MODULE, ("run main entry: 0x%p with %s\n",
+    RT_DEBUG_LOG(0, ("run main entry: 0x%p with %s\n",
                                    module->module_entry,
                                    module->module_cmd_line));
     /* do the main function */
@@ -1003,7 +1007,7 @@ rt_err_t rt_module_destroy(rt_module_t module)
 
         while (module->page_cnt != 0)
         {
-            rt_module_free_page(module, page[0].page_ptr, page[0].npage);
+            rt_module_free_page(module, page[0].page_ptr, page[0].npage,0);
         }
     }
 #endif
@@ -1156,6 +1160,7 @@ static void *rt_module_malloc_page(rt_size_t npages)
     chunk = rt_page_alloc(npages);
     if (chunk == RT_NULL)
         return RT_NULL;
+    mmu_usermap(self_module->pid,(rt_uint32_t)chunk,npages*RT_MM_PAGE_SIZE,1);
 
     page = (struct rt_page_info *)self_module->page_array;
     page[self_module->page_cnt].page_ptr = chunk;
@@ -1180,17 +1185,19 @@ static void *rt_module_malloc_page(rt_size_t npages)
  */
 static void rt_module_free_page(rt_module_t module,
                                 void       *page_ptr,
-                                rt_size_t   npages)
+                                rt_size_t   npages,
+                                rt_uint32_t mode)
 {
     int i, index;
     struct rt_page_info *page;
     rt_module_t self_module;
 
-    self_module = rt_module_self();
-    RT_ASSERT(self_module != RT_NULL);
+    self_module = module;
+    RT_ASSERT(module != RT_NULL);
 
     RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_free_page 0x%x %d\n",
                                    page_ptr, npages));
+    mmu_userunmap(module->pid,(rt_uint32_t)page_ptr,npages*RT_MM_PAGE_SIZE,mode);
     rt_page_free(page_ptr, npages);
 
     page = (struct rt_page_info *)module->page_array;
@@ -1218,8 +1225,9 @@ static void rt_module_free_page(rt_module_t module,
                 module->page_cnt --;
             }
             else
+            {
                 RT_ASSERT(RT_FALSE);
-            self_module->page_cnt --;
+            }
 
             return;
         }
@@ -1244,6 +1252,9 @@ void *rt_module_malloc(rt_size_t size)
     RT_ASSERT(self_module != RT_NULL);
 
     RT_DEBUG_NOT_IN_INTERRUPT;
+
+    if (size == 0)
+        return RT_NULL;
 
     nunits = (size + sizeof(struct rt_mem_head) - 1) /
         sizeof(struct rt_mem_head)
@@ -1322,6 +1333,9 @@ void rt_module_free(rt_module_t module, void *addr)
 
     RT_DEBUG_NOT_IN_INTERRUPT;
 
+    if (addr == RT_NULL)
+        return;
+
     RT_ASSERT(addr);
     RT_ASSERT((((rt_uint32_t)addr) & (sizeof(struct rt_mem_head) -1)) == 0);
 
@@ -1369,7 +1383,7 @@ void rt_module_free(rt_module_t module, void *addr)
                         *prev = b->next;
                     }
 
-                    rt_module_free_page(module, b, npage);
+                    rt_module_free_page(module, b, npage, 1);
                 }
             }
 
@@ -1404,7 +1418,7 @@ void rt_module_free(rt_module_t module, void *addr)
                     else
                         *prev = n->next;
 
-                    rt_module_free_page(module, n, npage);
+                    rt_module_free_page(module, n, npage, 1);
                 }
             }
             else
@@ -1428,7 +1442,7 @@ void rt_module_free(rt_module_t module, void *addr)
         int npage = n->size * sizeof(struct rt_page_info) / RT_MM_PAGE_SIZE;
         if (npage > 0)
         {
-            rt_module_free_page(module, n, npage);
+            rt_module_free_page(module, n, npage, 1);
             if (n->size % RT_MM_PAGE_SIZE != 0)
             {
                 rt_size_t nunits =
@@ -1469,12 +1483,12 @@ void *rt_module_realloc(void *ptr, rt_size_t size)
 
     RT_DEBUG_NOT_IN_INTERRUPT;
 
-    if (!ptr)
+    if (ptr == RT_NULL)
         return rt_module_malloc(size);
+
     if (size == 0)
     {
         rt_module_free(self_module, ptr);
-
         return RT_NULL;
     }
 

@@ -510,9 +510,8 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t
 	if (flush)
 	{
 		asm volatile("	mov	ip, #0\n"
-					"1:	mrc	p15, 0, r15, c7, c14, 3 	@ test,clean,invalidate\n"
+					"1:	mrc	p15, 0, r15, c7, c10, 3 	@ test,clean\n"
 					"	bne	1b\n"
-					"	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache\n"
 					"	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n"
 					"	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs");
 	}
@@ -535,9 +534,8 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32
 	if (flush)
 	{
 		asm volatile("	mov	ip, #0\n"
-					"1:	mrc	p15, 0, r15, c7, c14, 3 	@ test,clean,invalidate\n"
+					"1:	mrc	p15, 0, r15, c7, c10, 3 	@ test,clean\n"
 					"	bne	1b\n"
-					"	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache\n"
 					"	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n"
 					"	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs");
 	}
