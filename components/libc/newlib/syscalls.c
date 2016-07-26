@@ -376,7 +376,8 @@ void abort(void)
 
 #ifdef RT_USING_PROCESS
 #include "linux-syscall.h"
-extern struct rt_module *rt_current_module;
+extern void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr);
+extern rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr);
 static inline int ret_err(int ret)
 {
     if (ret < 0)
@@ -388,21 +389,15 @@ static inline int ret_err(int ret)
     }
     return ret;
 }
-static inline void *conv_ptr(rt_uint32_t ptr)
-{
-    void *buffer = (void *)ptr;
-    if (ptr>=rt_current_module->vstart_addr
-            && ptr<rt_current_module->vstart_addr+rt_current_module->module_size)
-        buffer = rt_current_module->module_space + ptr - rt_current_module->vstart_addr;
-    return buffer;
-}
 
 rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_uint32_t parm2, rt_uint32_t parm3,
         rt_uint32_t parm4, rt_uint32_t parm5,
         rt_uint32_t parm6)
 {
-    RT_ASSERT(rt_current_module != RT_NULL);
+    rt_module_t module = rt_module_self();
+
+    RT_ASSERT(module != RT_NULL);
     RT_ASSERT((nbr&SYS_BASE) == SYS_BASE);
 
     switch(nbr)
@@ -415,7 +410,30 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_brk:
     {
         rt_kprintf("syscall brk %x\n",parm1);
-        return RT_NULL;
+        return rt_module_brk(module,parm1);
+    }
+    case SYS_link:
+    {
+        rt_kprintf("syscall link %s=>%s\n",rt_module_conv_ptr(module,parm1),
+                rt_module_conv_ptr(module,parm2));
+        return -ENOTSUP;
+    }
+    case SYS_unlink:
+    case SYS_rmdir:
+    {
+        errno = 0;
+        return ret_err(unlink((const char *)rt_module_conv_ptr(module,parm1)));
+    }
+    case SYS_rename:
+    {
+        errno = 0;
+        return ret_err(rename((const char *)rt_module_conv_ptr(module,parm1),
+                (const char *)rt_module_conv_ptr(module,parm2)));
+    }
+    case SYS_mkdir:
+    {
+        errno = 0;
+        return ret_err(mkdir((const char *)rt_module_conv_ptr(module,parm1),parm2));
     }
     case SYS_lseek:
     {
@@ -426,51 +444,48 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_lstat:
     {
         errno = 0;
-        return ret_err(stat((const char *)conv_ptr(parm1), (struct stat *)conv_ptr(parm2)));
+        return ret_err(stat((const char *)rt_module_conv_ptr(module,parm1),
+                (struct stat *)rt_module_conv_ptr(module,parm2)));
     }
     case SYS_fstat:
     {
         errno = 0;
-        return ret_err(fstat(parm1, (struct stat *)conv_ptr(parm2)));
+        return ret_err(fstat(parm1, (struct stat *)rt_module_conv_ptr(module,parm2)));
     }
     case SYS_open:
     {
        errno = 0;
-       return ret_err(open((const char*)conv_ptr(parm1), parm2, parm3));
+       return ret_err(open((const char*)rt_module_conv_ptr(module,parm1), parm2, parm3));
     }
     case SYS_read:
     {
        errno = 0;
-       return ret_err(read(parm1, conv_ptr(parm2), parm3));
+       return ret_err(read(parm1, rt_module_conv_ptr(module,parm2), parm3));
     }
     case SYS_write:
     {
        errno = 0;
-       return ret_err(write(parm1, conv_ptr(parm2), parm3));
+       return ret_err(write(parm1, rt_module_conv_ptr(module,parm2), parm3));
     }
     case SYS_close:
     {
        errno = 0;
        return ret_err(close(parm1));
     }
-    case 0x900000+1001:
+    case 0x900000+801:
     {
-        return (rt_uint32_t)rt_module_malloc(parm1);
+        return _isatty(parm1);
     }
-    case 0x900000+1002:
+    case 0x900000+901:
+    case 0x900000+903:
     {
-        return (rt_uint32_t)rt_module_realloc(conv_ptr(parm1), parm2);
+        rt_mutex_take(module->mod_mutex, RT_WAITING_FOREVER);
+        return 0;
     }
-    case 0x900000+1003:
+    case 0x900000+902:
+    case 0x900000+904:
     {
-        void  *ret = rt_module_malloc(parm1*parm2);
-        if (ret != RT_NULL)
-            rt_memset(ret,0,parm1*parm2);
-        return (rt_uint32_t)ret;
-    }
-    case 0x900000+1004:
-    {
-        rt_module_free(rt_current_module,conv_ptr(parm1));
+        rt_mutex_release(module->mod_mutex);
         return 0;
     }
     }

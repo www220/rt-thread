@@ -330,8 +330,8 @@ rt_thread_t rt_thread_create(const char *name,
         stack_start = (void *)rt_page_alloc(stack_size/RT_MM_PAGE_SIZE);
         if (stack_start != RT_NULL)
         {
-            extern void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
-            mmu_usermap(pid,(rt_uint32_t)stack_start,stack_size,thread->module_id!=RT_NULL);
+            extern void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
+            mmu_usermap(pid,(rt_uint32_t)stack_start,(rt_uint32_t)stack_start,stack_size,thread->module_id!=RT_NULL);
         }
     }
     else

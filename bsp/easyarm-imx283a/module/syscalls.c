@@ -2,6 +2,9 @@
 #include <sys/errno.h>
 #include <stdio.h>
 
+extern int _set_errno(int n);
+
+
 /* SWI with SYS_ call number and no parameters */
 
 static inline uintptr_t sys_call0(unsigned int nbr)
@@ -100,49 +103,29 @@ static inline uintptr_t sys_call4(unsigned int nbr, uintptr_t parm1,
 int
 _isatty(int fd)
 {
-	if (fd >=0 && fd < 3) return 1;
-
-	return 0;
+    return _set_errno(sys_call1(0x900000+801, fd));
 }
 
-void *
-_malloc_r (struct _reent *ptr, size_t size)
+void
+__malloc_lock (struct _reent *ptr)
 {
-	void* result;
-
-	result = (void*)sys_call1 (0x900000+1001, size);
-	if (result == NULL)
-		ptr->_errno = ENOMEM;
-
-	return result;
+    sys_call0(0x900000+901);
 }
 
-void *
-_realloc_r (struct _reent *ptr, void *old, size_t newlen)
+void
+__malloc_unlock (struct _reent *ptr)
 {
-	void* result;
-
-	result = (void*)sys_call2 (0x900000+1002, (uintptr_t)old, newlen);
-	if (result == NULL)
-		ptr->_errno = ENOMEM;
-
-	return result;
+    sys_call0(0x900000+902);
 }
 
-void *
-_calloc_r (struct _reent *ptr, size_t size, size_t len)
+void
+__env_lock (struct _reent *ptr)
 {
-	void* result;
-
-	result = (void*)sys_call2 (0x900000+1003, size, len);
-	if (result == NULL)
-		ptr->_errno = ENOMEM;
-
-	return result;
+    sys_call0(0x900000+903);
 }
 
-void 
-_free_r (struct _reent *ptr, void *addr)
+void
+__env_unlock (struct _reent *ptr)
 {
-	sys_call1 (0x900000+1004, (uintptr_t)addr);
+    sys_call0(0x900000+904);
 }

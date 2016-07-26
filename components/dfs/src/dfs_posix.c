@@ -400,6 +400,13 @@ int fstat(int fildes, struct stat *buf)
     {
         rt_device_t console_device;
         console_device = rt_console_get_device();
+        buf->st_dev = 0;
+
+        buf->st_mode = DFS_S_IFCHR | DFS_S_IRUSR | DFS_S_IRGRP | DFS_S_IROTH |
+            DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH;
+
+        buf->st_size  = 0;
+        buf->st_mtime = 0;
         return (console_device)?0:-1;
     }
 #endif

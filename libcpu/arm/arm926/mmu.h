@@ -26,11 +26,13 @@
 
 #include <rtthread.h>
 
-#define HEAP_BEGIN        0x40C00000
-#define HEAP_END          0x43F00000
+#define HEAP_BEGIN        0x40E00000
+#define HEAP_END          0x43E00000
 
 #define PROCESS_MAX       16
 #define MMU_L2_SIZE       ((HEAP_END-HEAP_BEGIN)/0x100000)
+#define PROCESS_BASE      0x10000000
+#define PROCESS_MEM       16
 
 #define CACHE_LINE_SIZE     32
 
@@ -81,8 +83,7 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size);
 void mmu_maketlb(rt_uint32_t pid);
 void mmu_freetlb(rt_uint32_t pid);
 void mmu_switchtlb(rt_uint32_t pid);
-void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size);
-void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
+void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
 void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
 
 #endif

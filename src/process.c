@@ -71,27 +71,8 @@
 #error "PROCESS_MAX <= 64"
 #endif
 
-#define PAGE_COUNT_MAX    1024
+#define PAGE_COUNT_MAX    (256 * PROCESS_MEM)
 static volatile rt_uint32_t pids = 0;
-
-/* module memory allocator */
-struct rt_mem_head
-{
-    rt_size_t size;                /* size of memory block */
-    struct rt_mem_head *next;      /* next valid memory block */
-};
-
-struct rt_page_info
-{
-    rt_uint32_t *page_ptr;
-    rt_uint32_t npage;
-};
-
-static void *rt_module_malloc_page(rt_size_t npages);
-static void rt_module_free_page(rt_module_t module,
-                                void       *page_ptr,
-                                rt_size_t   npages,
-                                rt_uint32_t mode);
 
 /**
  * @ingroup SystemInit
@@ -263,7 +244,7 @@ static struct rt_module *_load_exec_object(const char *name,
             vstart_addr = phdr[index].p_vaddr;
             vend_addr = phdr[index].p_vaddr + phdr[index].p_memsz;
             has_vstart = RT_TRUE;
-            if (vend_addr < vstart_addr || vstart_addr != 0x10000000)
+            if (vend_addr < vstart_addr || vstart_addr != PROCESS_BASE)
             {
                 rt_kprintf("invalid elf: segment %d: p_vaddr: %d, p_memsz: %d\n",
                            index, phdr[index].p_vaddr, phdr[index].p_memsz);
@@ -330,7 +311,7 @@ static struct rt_module *_load_exec_object(const char *name,
 
     /* zero all space */
     rt_memset(module->module_space, 0, module_size);
-    mmu_setmap(module->pid,(Elf32_Addr)module->module_space, vstart_addr, module_size);
+    mmu_usermap(module->pid,(Elf32_Addr)module->module_space,vstart_addr,module_size,0);
 
     for (index = 0; index < elf_module->e_phnum; index++)
     {
@@ -400,7 +381,7 @@ static struct rt_module *_load_exec_object(const char *name,
     return module;
 }
 
-#define RT_MODULE_ARG_MAX    12
+#define RT_MODULE_ARG_MAX    20
 static int _rt_module_split_arg(char* cmd, rt_size_t length, char* argv[])
 {
     int argc = 0;
@@ -442,8 +423,10 @@ static int _rt_module_split_arg(char* cmd, rt_size_t length, char* argv[])
 
 struct module_main_info
 {
-	rt_uint8_t*                  module_cmd_line;		/**< module command line */
-	rt_uint32_t                  module_cmd_size;		/**< the size of module command line */
+    rt_uint8_t*                  module_cmd_line;       /**< module command line */
+    rt_uint32_t                  module_cmd_size;       /**< the size of module command line */
+    rt_uint8_t*                  module_env_line;       /**< module env line */
+    rt_uint32_t                  module_env_size;       /**< the size of module env line */
     void                        *module_entry;          /**< the entry address of module */
 };
 
@@ -451,7 +434,7 @@ struct module_main_info
 SECTION(".module_fn")
 static void module_main_entry(void* parameter)
 {
-    int argc;
+    int argc,argc2;
     char *argv[RT_MODULE_ARG_MAX];
     typedef int (*main_func_t)(int argc, char** argv);
 
@@ -479,13 +462,17 @@ static void module_main_entry(void* parameter)
     if (argc == 0)
         return;
 
-    RT_DEBUG_LOG(0, ("run main entry: 0x%p with %s\n",
+    argc2 = _rt_module_split_arg((char*)module->module_env_line,
+                                module->module_env_size, argv+argc+2);
+
+    RT_DEBUG_LOG(0, ("run main entry: 0x%p with %s env %s\n",
                                    module->module_entry,
-                                   module->module_cmd_line));
+                                   module->module_cmd_line,
+                                   module->module_env_line));
     /* do the main function */
     argv[0] = (char *)argc;
     argv[argc+1] = NULL;
-    argv[argc+2] = NULL;
+    argv[argc+2+argc2] = NULL;
     ((main_func_t)module->module_entry)(argc, argv);
     return;
 }
@@ -556,11 +543,15 @@ rt_module_t rt_module_do_main(const char *name,
         {
             main_info.module_cmd_line = module->module_cmd_line+sizeof(main_info);
             main_info.module_cmd_size = line_size+1;
+            main_info.module_env_line = RT_NULL;
+            main_info.module_env_size = 0;
             main_info.module_entry = module->module_entry;
+
             rt_memcpy(module->module_cmd_line, &main_info, sizeof(main_info));
             rt_memcpy(module->module_cmd_line+sizeof(main_info), cmd_line, line_size);
             module->module_cmd_line[sizeof(main_info)+line_size] = '\0';
-            mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,module->module_cmd_size,0);
+            mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,
+                    (rt_uint32_t)module->module_cmd_line,module->module_cmd_size,0);
         }
     }
     else
@@ -580,12 +571,11 @@ rt_module_t rt_module_do_main(const char *name,
         module->mem_list = RT_NULL;
 
         /* create page array */
-        module->page_array =
-            (void *)rt_malloc(PAGE_COUNT_MAX * sizeof(struct rt_page_info));
+        module->page_array = (void *)rt_malloc(PAGE_COUNT_MAX*sizeof(rt_uint32_t));
         module->page_cnt = 0;
 
         /* initialize heap semaphore */
-        module->mod_sem = rt_sem_create(name, 1, RT_IPC_FLAG_FIFO);
+        module->mod_mutex = rt_mutex_create(name, RT_IPC_FLAG_FIFO);
 #endif
 
         /* create module thread */
@@ -1001,14 +991,10 @@ rt_err_t rt_module_destroy(rt_module_t module)
 #ifdef RT_USING_SLAB
     if (module->page_cnt > 0)
     {
-        struct rt_page_info *page = (struct rt_page_info *)module->page_array;
-
         rt_kprintf("Module: warning - memory still hasn't been free finished\n");
-
-        while (module->page_cnt != 0)
-        {
-            rt_module_free_page(module, page[0].page_ptr, page[0].npage,0);
-        }
+        for (i = 0; i < module->page_cnt; i ++)
+            rt_page_free(((void **)module->page_array)[i],1);
+        module->page_cnt = 0;
     }
 #endif
 
@@ -1017,17 +1003,15 @@ rt_err_t rt_module_destroy(rt_module_t module)
 
     /* release module symbol table */
     for (i = 0; i < module->nsym; i ++)
-    {
         rt_free((void *)module->symtab[i].name);
-    }
     if (module->symtab != RT_NULL)
         rt_free(module->symtab);
 
 #ifdef RT_USING_SLAB
     if (module->page_array != RT_NULL)
         rt_free(module->page_array);
-    if (module->mod_sem != RT_NULL)
-        rt_sem_delete(module->mod_sem);
+    if (module->mod_mutex != RT_NULL)
+        rt_mutex_delete(module->mod_mutex);
 #endif
 
     /* free tls */
@@ -1140,472 +1124,68 @@ rt_module_t rt_module_find(const char *name)
 }
 RTM_EXPORT(rt_module_find);
 
-#ifdef RT_USING_SLAB
-/*
- * This function will allocate the numbers page with specified size
- * in page memory.
- *
- * @param size the size of memory to be allocated.
- * @note this function is used for RT-Thread Application Module
- */
-static void *rt_module_malloc_page(rt_size_t npages)
+rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr)
 {
-    void *chunk;
-    struct rt_page_info *page;
-    rt_module_t self_module;
-
-    self_module = rt_module_self();
-    RT_ASSERT(self_module != RT_NULL);
-
-    chunk = rt_page_alloc(npages);
-    if (chunk == RT_NULL)
-        return RT_NULL;
-    mmu_usermap(self_module->pid,(rt_uint32_t)chunk,npages*RT_MM_PAGE_SIZE,1);
-
-    page = (struct rt_page_info *)self_module->page_array;
-    page[self_module->page_cnt].page_ptr = chunk;
-    page[self_module->page_cnt].npage    = npages;
-    self_module->page_cnt ++;
-
-    RT_ASSERT(self_module->page_cnt <= PAGE_COUNT_MAX);
-    RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_malloc_page 0x%x %d\n",
-                                   chunk, npages));
-
-    return chunk;
-}
-
-/*
- * This function will release the previously allocated memory page
- * by rt_malloc_page.
- *
- * @param page_ptr the page address to be released.
- * @param npages the number of page shall be released.
- *
- * @note this function is used for RT-Thread Application Module
- */
-static void rt_module_free_page(rt_module_t module,
-                                void       *page_ptr,
-                                rt_size_t   npages,
-                                rt_uint32_t mode)
-{
-    int i, index;
-    struct rt_page_info *page;
-    rt_module_t self_module;
-
-    self_module = module;
-    RT_ASSERT(module != RT_NULL);
-
-    RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_free_page 0x%x %d\n",
-                                   page_ptr, npages));
-    mmu_userunmap(module->pid,(rt_uint32_t)page_ptr,npages*RT_MM_PAGE_SIZE,mode);
-    rt_page_free(page_ptr, npages);
-
-    page = (struct rt_page_info *)module->page_array;
-
-    for (i = 0; i < module->page_cnt; i ++)
+    rt_uint32_t base = module->vstart_addr+module->module_size;
+    if(addr <= base + module->page_cnt*RT_MM_PAGE_SIZE)
     {
-        if (page[i].page_ptr == page_ptr)
+        int idx = (addr<=base)?(0):(RT_ALIGN(addr-base,RT_MM_PAGE_SIZE)/RT_MM_PAGE_SIZE);
+        int count = module->page_cnt-idx;
+        if (module->page_cnt > 0)
+            mmu_userunmap(module->pid,base+idx*RT_MM_PAGE_SIZE,
+                    count*RT_MM_PAGE_SIZE,1);
+        while (count --)
         {
-            if (page[i].npage == npages + 1)
-            {
-                page[i].page_ptr +=
-                    npages * RT_MM_PAGE_SIZE / sizeof(rt_uint32_t);
-                page[i].npage    -= npages;
-            }
-            else if (page[i].npage == npages)
-            {
-                for (index = i; index < module->page_cnt-1; index ++)
-                {
-                    page[index].page_ptr = page[index + 1].page_ptr;
-                    page[index].npage    = page[index + 1].npage;
-                }
-                page[module->page_cnt - 1].page_ptr = RT_NULL;
-                page[module->page_cnt - 1].npage    = 0;
-
-                module->page_cnt --;
-            }
-            else
-            {
-                RT_ASSERT(RT_FALSE);
-            }
-
-            return;
+            rt_page_free(((void **)module->page_array)[idx ++],1);
+            module->page_cnt --;
+        }
+        return addr;
+    }
+    else
+    {
+        int npage = addr-(base+module->page_cnt*RT_MM_PAGE_SIZE);
+        npage = RT_ALIGN(npage,RT_MM_PAGE_SIZE)/RT_MM_PAGE_SIZE;
+        void *ptr = rt_page_alloc(npage);
+        if (ptr == RT_NULL)
+            return base + module->page_cnt*RT_MM_PAGE_SIZE;
+        mmu_usermap(module->pid,(rt_uint32_t)ptr,
+                base+module->page_cnt*RT_MM_PAGE_SIZE,npage*RT_MM_PAGE_SIZE,1);
+        while (npage --)
+        {
+            ((void **)module->page_array)[module->page_cnt] = ptr;
+            module->page_cnt ++;
+            ptr += RT_MM_PAGE_SIZE;
         }
     }
-
-    /* should not get here */
-    RT_ASSERT(RT_FALSE);
+    return RT_NULL;
 }
 
-/**
- * rt_module_malloc - allocate memory block in free list
- */
-void *rt_module_malloc(rt_size_t size)
+void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr)
 {
-    struct rt_mem_head *b, *n, *up;
-    struct rt_mem_head **prev;
-    rt_uint32_t npage;
-    rt_size_t nunits;
-    rt_module_t self_module;
-
-    self_module = rt_module_self();
-    RT_ASSERT(self_module != RT_NULL);
-
-    RT_DEBUG_NOT_IN_INTERRUPT;
-
-    if (size == 0)
-        return RT_NULL;
-
-    nunits = (size + sizeof(struct rt_mem_head) - 1) /
-        sizeof(struct rt_mem_head)
-        + 1;
-
-    RT_ASSERT(size != 0);
-    RT_ASSERT(nunits != 0);
-
-    rt_sem_take(self_module->mod_sem, RT_WAITING_FOREVER);
-
-    for (prev = (struct rt_mem_head **)&self_module->mem_list;
-         (b = *prev) != RT_NULL;
-         prev = &(b->next))
+    void *buffer = (void *)ptr;
+    rt_uint32_t base = module->vstart_addr+module->module_size;
+    if(ptr <= base)
     {
-        if (b->size > nunits)
-        {
-            /* split memory */
-            n       = b + nunits;
-            n->next = b->next;
-            n->size = b->size - nunits;
-            b->size = nunits;
-            *prev   = n;
-
-            RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_malloc 0x%x, %d\n",
-                                           b + 1, size));
-            rt_sem_release(self_module->mod_sem);
-
-            return (void *)(b + 1);
-        }
-
-        if (b->size == nunits)
-        {
-            /* this node fit, remove this node */
-            *prev = b->next;
-
-            RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_malloc 0x%x, %d\n",
-                                           b + 1, size));
-
-            rt_sem_release(self_module->mod_sem);
-
-            return (void *)(b + 1);
-        }
+        buffer = module->module_space;
+        buffer += (ptr-module->vstart_addr);
     }
-
-    /* allocate pages from system heap */
-    npage = (size + sizeof(struct rt_mem_head) + RT_MM_PAGE_SIZE - 1) /
-        RT_MM_PAGE_SIZE;
-    if ((up = (struct rt_mem_head *)rt_module_malloc_page(npage)) == RT_NULL)
-        return RT_NULL;
-
-    up->size = npage * RT_MM_PAGE_SIZE / sizeof(struct rt_mem_head);
-
-    for (prev = (struct rt_mem_head **)&self_module->mem_list;
-         (b = *prev) != RT_NULL;
-         prev = &(b->next))
+    else if(ptr <= base + module->page_cnt*RT_MM_PAGE_SIZE)
     {
-        if (b > up + up->size)
-            break;
+        buffer = ((void **)module->page_array)[(ptr-base)/RT_MM_PAGE_SIZE];
+        buffer += (ptr-base)%RT_MM_PAGE_SIZE;
     }
-
-    up->next = b;
-    *prev    = up;
-
-    rt_sem_release(self_module->mod_sem);
-
-    return rt_module_malloc(size);
+    else
+    {
+        /* should not get here */
+        RT_ASSERT(0);
+    }
+    return buffer;
 }
 
-/**
- * rt_module_free - free memory block in free list
- */
 void rt_module_free(rt_module_t module, void *addr)
 {
-    struct rt_mem_head *b, *n, *r;
-    struct rt_mem_head **prev;
-
-    RT_DEBUG_NOT_IN_INTERRUPT;
-
-    if (addr == RT_NULL)
-        return;
-
-    RT_ASSERT(addr);
-    RT_ASSERT((((rt_uint32_t)addr) & (sizeof(struct rt_mem_head) -1)) == 0);
-
-    RT_DEBUG_LOG(RT_DEBUG_MODULE, ("rt_module_free 0x%x\n", addr));
-
-    rt_sem_take(module->mod_sem, RT_WAITING_FOREVER);
-
-    n = (struct rt_mem_head *)addr - 1;
-    prev = (struct rt_mem_head **)&module->mem_list;
-
-    while ((b = *prev) != RT_NULL)
-    {
-        RT_ASSERT(b->size > 0);
-        RT_ASSERT(b > n || b + b->size <= n);
-
-        if (b + b->size == n && ((rt_uint32_t)n % RT_MM_PAGE_SIZE != 0))
-        {
-            if (b + (b->size + n->size) == b->next)
-            {
-                b->size += b->next->size + n->size;
-                b->next = b->next->next;
-            }
-            else
-                b->size += n->size;
-
-            if ((rt_uint32_t)b % RT_MM_PAGE_SIZE == 0)
-            {
-                int npage =
-                    b->size * sizeof(struct rt_page_info) / RT_MM_PAGE_SIZE;
-                if (npage > 0)
-                {
-                    if ((b->size * sizeof(struct rt_page_info) % RT_MM_PAGE_SIZE) != 0)
-                    {
-                        rt_size_t nunits = npage *
-                            RT_MM_PAGE_SIZE /
-                            sizeof(struct rt_mem_head);
-                        /* split memory */
-                        r       = b + nunits;
-                        r->next = b->next;
-                        r->size = b->size - nunits;
-                        *prev   = r;
-                    }
-                    else
-                    {
-                        *prev = b->next;
-                    }
-
-                    rt_module_free_page(module, b, npage, 1);
-                }
-            }
-
-            /* unlock */
-            rt_sem_release(module->mod_sem);
-
-            return;
-        }
-
-        if (b == n + n->size)
-        {
-            n->size = b->size + n->size;
-            n->next = b->next;
-
-            if ((rt_uint32_t)n % RT_MM_PAGE_SIZE == 0)
-            {
-                int npage =
-                    n->size * sizeof(struct rt_page_info) / RT_MM_PAGE_SIZE;
-                if (npage > 0)
-                {
-                    if ((n->size * sizeof(struct rt_page_info) % RT_MM_PAGE_SIZE) != 0)
-                    {
-                        rt_size_t nunits = npage *
-                            RT_MM_PAGE_SIZE /
-                            sizeof(struct rt_mem_head);
-                        /* split memory */
-                        r       = n + nunits;
-                        r->next = n->next;
-                        r->size = n->size - nunits;
-                        *prev   = r;
-                    }
-                    else
-                        *prev = n->next;
-
-                    rt_module_free_page(module, n, npage, 1);
-                }
-            }
-            else
-            {
-                *prev = n;
-            }
-
-            /* unlock */
-            rt_sem_release(module->mod_sem);
-
-            return;
-        }
-        if (b > n + n->size)
-            break;
-
-        prev = &(b->next);
-    }
-
-    if ((rt_uint32_t)n % RT_MM_PAGE_SIZE == 0)
-    {
-        int npage = n->size * sizeof(struct rt_page_info) / RT_MM_PAGE_SIZE;
-        if (npage > 0)
-        {
-            rt_module_free_page(module, n, npage, 1);
-            if (n->size % RT_MM_PAGE_SIZE != 0)
-            {
-                rt_size_t nunits =
-                    npage * RT_MM_PAGE_SIZE / sizeof(struct rt_mem_head);
-                /* split memory */
-                r       = n + nunits;
-                r->next = b;
-                r->size = n->size - nunits;
-                *prev   = r;
-            }
-            else
-            {
-                *prev = b;
-            }
-        }
-    }
-    else
-    {
-        n->next = b;
-        *prev   = n;
-    }
-
-    /* unlock */
-    rt_sem_release(module->mod_sem);
+    /* should not get here */
+    RT_ASSERT(0);
 }
-
-/**
- * rt_module_realloc - realloc memory block in free list
- */
-void *rt_module_realloc(void *ptr, rt_size_t size)
-{
-    struct rt_mem_head *b, *p, *prev, *tmpp;
-    rt_size_t nunits;
-    rt_module_t self_module;
-
-    self_module = rt_module_self();
-    RT_ASSERT(self_module != RT_NULL);
-
-    RT_DEBUG_NOT_IN_INTERRUPT;
-
-    if (ptr == RT_NULL)
-        return rt_module_malloc(size);
-
-    if (size == 0)
-    {
-        rt_module_free(self_module, ptr);
-        return RT_NULL;
-    }
-
-    nunits = (size + sizeof(struct rt_mem_head) - 1) /
-        sizeof(struct rt_mem_head)
-        +1;
-    b = (struct rt_mem_head *)ptr - 1;
-
-    if (nunits <= b->size)
-    {
-        /* new size is smaller or equal then before */
-        if (nunits == b->size)
-            return ptr;
-        else
-        {
-            p       = b + nunits;
-            p->size = b->size - nunits;
-            b->size = nunits;
-            rt_module_free(self_module, (void *)(p + 1));
-
-            return (void *)(b + 1);
-        }
-    }
-    else
-    {
-        /* more space then required */
-        prev = (struct rt_mem_head *)self_module->mem_list;
-        for (p = prev->next;
-             p != (b->size + b) && p != RT_NULL;
-             prev = p, p = p->next)
-        {
-            break;
-        }
-
-        /* available block after ap in freelist */
-        if (p != RT_NULL &&
-            (p->size >= (nunits - (b->size))) &&
-            p == (b + b->size))
-        {
-            /* perfect match */
-            if (p->size == (nunits - (b->size)))
-            {
-                b->size    = nunits;
-                prev->next = p->next;
-            }
-            else  /* more space then required, split block */
-            {
-                /* pointer to old header */
-                tmpp = p;
-                p    = b + nunits;
-
-                /* restoring old pointer */
-                p->next = tmpp->next;
-
-                /* new size for p */
-                p->size    = tmpp->size + b->size - nunits;
-                b->size    = nunits;
-                prev->next = p;
-            }
-            self_module->mem_list = (void *)prev;
-
-            return (void *)(b + 1);
-        }
-        else /* allocate new memory and copy old data */
-        {
-            if ((p = rt_module_malloc(size)) == RT_NULL)
-                return RT_NULL;
-            rt_memmove(p, (b+1), ((b->size) * sizeof(struct rt_mem_head)));
-            rt_module_free(self_module, (void *)(b + 1));
-
-            return (void *)(p);
-        }
-    }
-}
-
-#ifdef RT_USING_FINSH
-#include <finsh.h>
-
-void list_memlist(const char *name)
-{
-    rt_module_t module;
-    struct rt_mem_head **prev;
-    struct rt_mem_head *b;
-
-    module = rt_module_find(name);
-    if (module == RT_NULL)
-        return;
-
-    for (prev = (struct rt_mem_head **)&module->mem_list;
-         (b = *prev) != RT_NULL;
-         prev = &(b->next))
-    {
-        rt_kprintf("0x%x--%d\n", b, b->size * sizeof(struct rt_mem_head));
-    }
-}
-FINSH_FUNCTION_EXPORT(list_memlist, list module free memory information)
-
-void list_mempage(const char *name)
-{
-    rt_module_t module;
-    struct rt_page_info *page;
-    int i;
-
-    module = rt_module_find(name);
-    if (module == RT_NULL)
-        return;
-
-    page = (struct rt_page_info *)module->page_array;
-
-    for (i = 0; i < module->page_cnt; i ++)
-    {
-        rt_kprintf("0x%x--%d\n", page[i].page_ptr, page[i].npage);
-    }
-}
-FINSH_FUNCTION_EXPORT(list_mempage, list module using memory page information)
-#endif /* RT_USING_FINSH */
-
-#endif /* RT_USING_SLAB */
 
 #endif

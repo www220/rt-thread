@@ -405,10 +405,8 @@ void mmu_invalidate_dcache_all()
 #pragma data_alignment=(16*1024)
 static volatile rt_uint32_t _page_table[4*1024];
 #else
-static volatile rt_uint32_t _page_table[(1+PROCESS_MAX)*4096] \
-    __attribute__((aligned(16*1024)));
-static volatile rt_uint32_t _small_table[(1+PROCESS_MAX)*(4+MMU_L2_SIZE)*256] \
-    __attribute__((aligned(1024)));
+static volatile rt_uint32_t *_page_table = (rt_uint32_t *)0x40400000;
+static volatile rt_uint32_t *_small_table = (rt_uint32_t *)0x40400000+(1+PROCESS_MAX)*4096;
 #endif
 
 void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
@@ -431,7 +429,7 @@ void mmu_maketlb(rt_uint32_t pid)
     rt_uint32_t i,size;
     for (i=0; i<4096; i++)
         _page_table[pid*4096+i] = _page_table[i];
-    size = (4+MMU_L2_SIZE)*256;
+    size = (PROCESS_MEM+MMU_L2_SIZE)*256;
     for (i=0; i<size; i++)
         _small_table[pid*size+i] = 0;
 }
@@ -441,7 +439,7 @@ void mmu_freetlb(rt_uint32_t pid)
     rt_uint32_t i,size;
     for (i=0; i<4096; i++)
         _page_table[pid*4096+i] = 0;
-    size = (4+MMU_L2_SIZE)*256;
+    size = (PROCESS_MEM+MMU_L2_SIZE)*256;
     for (i=0; i<size; i++)
         _small_table[pid*size+i] = 0;
 }
@@ -458,54 +456,38 @@ void mmu_switchtlb(rt_uint32_t pid)
 				"	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs"::"r"(value));
 }
 
-void mmu_setmap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size)
-{
-    volatile rt_uint32_t *pTT;
-    volatile int nSec,i;
-
-    nSec = RT_ALIGN(size,0x100000)/0x100000;
-    pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
-    for (i=0; i<nSec; i++)
-    {
-        *pTT = DESC_PET|DOMAIN0|(rt_uint32_t )&_small_table[pid*(4+MMU_L2_SIZE)*256+i*256];
-        pTT++;
-    }
-    nSec = size/4096;
-    pTT = &_small_table[pid*(4+MMU_L2_SIZE)*256];
-    for(i=0; i<nSec; i++)
-    {
-        *pTT = PET_RW_CB|base;
-        base += 4096;
-        pTT++;
-    }
-}
-
-void mmu_usermap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush)
+void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush)
 {
     volatile rt_uint32_t *pTT,*pSS;
-    volatile int nSec,i,base,j;
+    volatile int nSec,i,j;
 
     nSec = size/4096;
     for (i=0; i<nSec; i++)
     {
         pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
-        pSS=(rt_uint32_t *)_small_table+pid*(4+MMU_L2_SIZE)*256+(4+(map-HEAP_BEGIN)/0x100000)*256;
-        if ((*pTT & DESC_SEC) == DESC_SEC)
+        if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-PROCESS_BASE)/0x100000)*256;
+        else
+            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+(PROCESS_MEM+(map-HEAP_BEGIN)/0x100000)*256;
+        if ((*pTT & DESC_PET) != DESC_PET)
         {
-            base = map&0xfff00000;
+            volatile rt_uint32_t mbase = base&0xfff00000;
             *pTT = DESC_PET|DOMAIN0|(rt_uint32_t)pSS;
             for (j=0; j<256; j++)
             {
-                pSS[j] = PET_NA|CB|DESC_SMALL|base;
-                base += 4096;
+                pSS[j] = PET_NA|CB|DESC_SMALL|mbase;
+                mbase += 4096;
             }
         }
-        pTT = pSS+((map-HEAP_BEGIN)&0xfffff)/4096;
-        if (pid == 0)
-            *pTT = PET_RO|CB|DESC_SMALL|map;
+        if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+            j = ((map-PROCESS_BASE)&0xfffff)/4096;
         else
-            *pTT = PET_RW_CB|map;
-        map += 4096;
+            j = ((map-HEAP_BEGIN)&0xfffff)/4096;
+        if (pid == 0)
+            pSS[j] = PET_RO|CB|DESC_SMALL|base;
+        else
+            pSS[j] = PET_RW_CB|base;
+        base += 4096;
     }
 	if (flush)
 	{
@@ -523,12 +505,19 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32
     volatile int nSec,i;
 
     nSec = size/4096;
-    pTT = (rt_uint32_t *)_small_table+pid*(4+MMU_L2_SIZE)*256+(4+(map-HEAP_BEGIN)/0x100000)*256;
-    pTT += ((map-HEAP_BEGIN)&0xfffff)/4096;
+    if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+    {
+        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-PROCESS_BASE)/0x100000)*256;
+        pTT += ((map-PROCESS_BASE)&0xfffff)/4096;
+    }
+    else
+    {
+        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+(PROCESS_MEM+(map-HEAP_BEGIN)/0x100000)*256;
+        pTT += ((map-HEAP_BEGIN)&0xfffff)/4096;
+    }
     for (i=0; i<nSec; i++)
     {
-        *pTT = PET_NA|CB|DESC_SMALL|map;
-        map += 4096;
+        *pTT = ((*pTT)&(~PET_RW))|PET_NA;
         pTT++;
     }
 	if (flush)
@@ -549,6 +538,9 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
     mmu_disable();
     mmu_invalidate_tlb();
 
+    RT_ASSERT((1+PROCESS_MAX)*4096*4+(1+PROCESS_MAX)*(PROCESS_MEM+MMU_L2_SIZE)*256*4 <= 0x400000)
+    rt_memset((void *)_page_table,0,0x400000);
+
     /* set page table */
     for (; size > 0; size--)
     {
@@ -557,7 +549,7 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
         mdesc++;
     }
     /* set moudule_fn table */
-    mmu_usermap(0,0x40000000,8192,0);
+    mmu_usermap(0,0x40000000,0x40000000,8192,0);
 
     /* set MMU table address */
     mmu_setttbase((rt_uint32_t)_page_table);

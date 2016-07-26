@@ -986,7 +986,7 @@ struct rt_module
     void                        *page_array;            /**< module's using pages */
     rt_uint32_t                  page_cnt;              /**< module's using pages count */
 #ifdef RT_USING_PROCESS
-    rt_sem_t                     mod_sem;               /**< module's sem */
+    rt_mutex_t                   mod_mutex;             /**< module's mutex */
 #endif
 #endif
 
