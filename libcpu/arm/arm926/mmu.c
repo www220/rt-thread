@@ -405,8 +405,8 @@ void mmu_invalidate_dcache_all()
 #pragma data_alignment=(16*1024)
 static volatile rt_uint32_t _page_table[4*1024];
 #else
-static volatile rt_uint32_t *_page_table = (rt_uint32_t *)0x40400000;
-static volatile rt_uint32_t *_small_table = (rt_uint32_t *)0x40400000+(1+PROCESS_MAX)*4096;
+static volatile rt_uint32_t *_page_table = (rt_uint32_t *)0x40200000;
+static volatile rt_uint32_t *_small_table = (rt_uint32_t *)0x40200000+(1+PROCESS_MAX)*4096;
 #endif
 
 void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
@@ -467,6 +467,8 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t
         pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
         if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
             pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-PROCESS_BASE)/0x100000)*256;
+        else if ((map>=0x40000000) && (map<HEAP_BEGIN))
+            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-0x40000000)/0x100000)*256;
         else
             pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+(PROCESS_MEM+(map-HEAP_BEGIN)/0x100000)*256;
         if ((*pTT & DESC_PET) != DESC_PET)
@@ -481,6 +483,8 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t
         }
         if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
             j = ((map-PROCESS_BASE)&0xfffff)/4096;
+        else if ((map>=0x40000000) && (map<HEAP_BEGIN))
+            j = ((map-0x40000000)&0xfffff)/4096;
         else
             j = ((map-HEAP_BEGIN)&0xfffff)/4096;
         if (pid == 0)
@@ -488,6 +492,7 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t
         else
             pSS[j] = PET_RW_CB|base;
         base += 4096;
+        map += 4096;
     }
 	if (flush)
 	{
@@ -528,6 +533,11 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32
 					"	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n"
 					"	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs");
 	}
+}
+
+int mmu_check_ptr(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
+{
+    return 1;
 }
 
 void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)

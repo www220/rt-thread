@@ -85,5 +85,6 @@ void mmu_freetlb(rt_uint32_t pid);
 void mmu_switchtlb(rt_uint32_t pid);
 void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
 void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
+int mmu_check_ptr(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size);
 
 #endif

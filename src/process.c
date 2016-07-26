@@ -46,9 +46,6 @@
 #define IS_AX(s)          ((s.sh_flags & SHF_ALLOC) && (s.sh_flags & SHF_EXECINSTR))
 #define IS_AW(s)          ((s.sh_flags & SHF_ALLOC) && (s.sh_flags & SHF_WRITE))
 
-#undef RT_DEBUG_MODULE
-#define RT_DEBUG_MODULE 1
-
 #ifdef RT_USING_MODULE_STKSZ
 #undef RT_USING_MODULE_STKSZ
 #endif
@@ -73,6 +70,7 @@
 
 #define PAGE_COUNT_MAX    (256 * PROCESS_MEM)
 static volatile rt_uint32_t pids = 0;
+#define RT_MODULE_ARG_MAX    20
 
 /**
  * @ingroup SystemInit
@@ -381,7 +379,7 @@ static struct rt_module *_load_exec_object(const char *name,
     return module;
 }
 
-#define RT_MODULE_ARG_MAX    20
+SECTION(".module_fn")
 static int _rt_module_split_arg(char* cmd, rt_size_t length, char* argv[])
 {
     int argc = 0;
@@ -536,22 +534,54 @@ rt_module_t rt_module_do_main(const char *name,
     if (line_size && cmd_line)
     {
         /* set module argument */
+        extern char **environ;
         struct module_main_info main_info;
-        module->module_cmd_size = RT_ALIGN(sizeof(main_info)+line_size+10,RT_MM_PAGE_SIZE);
+        int env_size = 0;
+        char **env = environ;
+        while (*env)
+        {
+            env_size += ((env != environ)?3:2)+rt_strlen(*env);
+            env++;
+        }
+        module->module_cmd_size = RT_ALIGN(sizeof(main_info)+line_size+env_size+10,RT_MM_PAGE_SIZE);
         module->module_cmd_line = (rt_uint8_t*)rt_page_alloc(module->module_cmd_size/RT_MM_PAGE_SIZE);
         if (module->module_cmd_line)
         {
             main_info.module_cmd_line = module->module_cmd_line+sizeof(main_info);
-            main_info.module_cmd_size = line_size+1;
-            main_info.module_env_line = RT_NULL;
-            main_info.module_env_size = 0;
+            main_info.module_cmd_size = line_size;
+            main_info.module_env_line = main_info.module_cmd_line+main_info.module_cmd_size+1;
+            main_info.module_env_size = env_size;
             main_info.module_entry = module->module_entry;
 
             rt_memcpy(module->module_cmd_line, &main_info, sizeof(main_info));
-            rt_memcpy(module->module_cmd_line+sizeof(main_info), cmd_line, line_size);
-            module->module_cmd_line[sizeof(main_info)+line_size] = '\0';
+            rt_memcpy(main_info.module_cmd_line, cmd_line, line_size);
+            main_info.module_cmd_line[line_size] = '\0';
+
+            env = environ;
+            env_size = 0;
+            while (*env)
+            {
+                int strlen = rt_strlen(*env);
+                if(env != environ)
+                    main_info.module_env_line[env_size++] = ' ';
+                main_info.module_env_line[env_size++] = '"';
+                rt_memcpy(&main_info.module_env_line[env_size], *env, strlen);env_size += strlen;
+                main_info.module_env_line[env_size++] = '"';
+                env++;
+            }
+            main_info.module_env_line[env_size] = '\0';
             mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,
                     (rt_uint32_t)module->module_cmd_line,module->module_cmd_size,0);
+        }
+        else
+        {
+            module->mem_list = RT_NULL;
+            module->page_array = RT_NULL;
+            module->page_cnt = 0;
+            module->mod_mutex = RT_NULL;
+            rt_kprintf("Module: allocate cmd buffer failed.\n");
+            rt_module_destroy(module);
+            return RT_NULL;
         }
     }
     else
@@ -576,6 +606,13 @@ rt_module_t rt_module_do_main(const char *name,
 
         /* initialize heap semaphore */
         module->mod_mutex = rt_mutex_create(name, RT_IPC_FLAG_FIFO);
+
+        if (!module->page_array || !module->mod_mutex)
+        {
+            rt_kprintf("Module: allocate mem manager failed.\n");
+            rt_module_destroy(module);
+            return RT_NULL;
+        }
 #endif
 
         /* create module thread */
@@ -583,6 +620,12 @@ rt_module_t rt_module_do_main(const char *name,
                                                  module_main_entry, module->module_cmd_line,
                                                  RT_USING_MODULE_STKSZ,
                                                  RT_USING_MODULE_PRIO, ((0x80|module->pid)<<24)|20);
+        if (!module->module_thread)
+        {
+            rt_kprintf("Module: allocate thread failed.\n");
+            rt_module_destroy(module);
+            return RT_NULL;
+        }
 
         RT_DEBUG_LOG(RT_DEBUG_MODULE, ("thread entry 0x%x\n",
                                        module->module_entry));
@@ -1139,12 +1182,17 @@ rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr)
             rt_page_free(((void **)module->page_array)[idx ++],1);
             module->page_cnt --;
         }
-        return addr;
     }
     else
     {
+        //limit memory
         int npage = addr-(base+module->page_cnt*RT_MM_PAGE_SIZE);
         npage = RT_ALIGN(npage,RT_MM_PAGE_SIZE)/RT_MM_PAGE_SIZE;
+        if (module->page_cnt >= PAGE_COUNT_MAX)
+            return base + module->page_cnt*RT_MM_PAGE_SIZE;
+        else if (module->page_cnt + npage > PAGE_COUNT_MAX)
+            npage = PAGE_COUNT_MAX-module->page_cnt;
+        //
         void *ptr = rt_page_alloc(npage);
         if (ptr == RT_NULL)
             return base + module->page_cnt*RT_MM_PAGE_SIZE;
@@ -1157,29 +1205,17 @@ rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr)
             ptr += RT_MM_PAGE_SIZE;
         }
     }
-    return RT_NULL;
+    return addr;
 }
 
 void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr)
 {
-    void *buffer = (void *)ptr;
-    rt_uint32_t base = module->vstart_addr+module->module_size;
-    if(ptr <= base)
-    {
-        buffer = module->module_space;
-        buffer += (ptr-module->vstart_addr);
-    }
-    else if(ptr <= base + module->page_cnt*RT_MM_PAGE_SIZE)
-    {
-        buffer = ((void **)module->page_array)[(ptr-base)/RT_MM_PAGE_SIZE];
-        buffer += (ptr-base)%RT_MM_PAGE_SIZE;
-    }
-    else
+    if(!mmu_check_ptr(module->pid,ptr,0))
     {
         /* should not get here */
         RT_ASSERT(0);
     }
-    return buffer;
+    return (void *)ptr;
 }
 
 void rt_module_free(rt_module_t module, void *addr)

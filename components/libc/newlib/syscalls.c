@@ -409,7 +409,6 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_brk:
     {
-        rt_kprintf("syscall brk %x\n",parm1);
         return rt_module_brk(module,parm1);
     }
     case SYS_link:
