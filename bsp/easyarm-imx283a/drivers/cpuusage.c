@@ -15,8 +15,20 @@ void cpu_usage_idle_hook()
 
 void thread_switch_hook(struct rt_thread *from, struct rt_thread *to)
 {
+    //leave idle
+    if (from->init_priority == RT_THREAD_PRIORITY_MAX - 1)
+    {
+        run_begin = jiffies;
+        idle_count += jiffies-idle_begin;
+    }
+    //enter idle
+    if (to->init_priority == RT_THREAD_PRIORITY_MAX - 1)
+    {
+        idle_begin = jiffies;
+        run_count += jiffies-run_begin;
+    }
     //enter main once 500ms
-    if (to->init_priority == 2)
+    else if (to->init_priority == 2)
     {
         register rt_uint32_t total_count;
         run_count += jiffies-run_begin;
@@ -26,18 +38,6 @@ void thread_switch_hook(struct rt_thread *from, struct rt_thread *to)
         cpu_usage_minor = ((run_count * 100) % total_count) * 100 / total_count;
         idle_count = run_count = 0;
         update_tick = rt_tick_get();
-    }
-    //enter idle
-    else if (to->init_priority == RT_THREAD_PRIORITY_MAX - 1)
-    {
-        idle_begin = jiffies;
-        run_count += jiffies-run_begin;
-    }
-    //leave idle
-    else if (from->init_priority == RT_THREAD_PRIORITY_MAX - 1)
-    {
-        run_begin = jiffies;
-        idle_count += jiffies-idle_begin;
     }
 }
 
