@@ -213,12 +213,6 @@ static void rt_thread_entry_wtdog(void* parameter)
             //
             rt_thread_delay(300000);
         }
-        //这个代码没有任何的意义只是为了能在代码中使用float而已
-        if (fdata++ > 10e20)
-        {
-            fdata = 0;
-            rt_kprintf("wtdog_fdata\n");
-        }
     }
 }
 

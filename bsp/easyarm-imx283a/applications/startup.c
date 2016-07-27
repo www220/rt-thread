@@ -28,6 +28,7 @@
 
 extern int  rt_application_init(void);
 extern void cpu_usage_idle_hook(void);
+extern void thread_switch_hook(struct rt_thread *from, struct rt_thread *to);
 #ifdef RT_USING_FINSH
 extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
@@ -80,6 +81,7 @@ void rtthread_startup(void)
     /* init idle thread */
     rt_thread_idle_init();
     rt_thread_idle_sethook(cpu_usage_idle_hook);
+    rt_scheduler_sethook(thread_switch_hook);
 
     /* start scheduler */
     rt_system_scheduler_start();
