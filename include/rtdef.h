@@ -37,6 +37,10 @@
 
 /* include rtconfig header to import configuration */
 #include <rtconfig.h>
+#ifdef RT_USING_PROCESS
+#include <stdlib.h>
+#include <string.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -519,6 +523,10 @@ struct rt_thread
     rt_uint8_t  event_info;
 #endif
 
+#ifdef RT_USING_PROCESS
+    struct _reent lib_reent;
+#endif
+
     rt_ubase_t  init_tick;                              /**< thread's initialized tick */
     rt_ubase_t  remaining_tick;                         /**< remaining tick */
 
@@ -993,6 +1001,7 @@ struct rt_module
     rt_uint16_t                  nref;                  /**< reference count */
 #ifdef RT_USING_PROCESS
     rt_uint16_t                  pid;                   /**< process pid */
+    struct _reent               *impure_ptr;            /**< newlibc reent */
 #endif
 
     rt_uint16_t                  nsym;                  /**< number of symbol in the module */

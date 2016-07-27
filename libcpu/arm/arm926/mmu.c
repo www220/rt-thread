@@ -537,6 +537,26 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32
 
 int mmu_check_ptr(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
 {
+    volatile rt_uint32_t *pTT;
+    volatile int nSec,i;
+
+    nSec = size/4096;
+    if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+    {
+        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-PROCESS_BASE)/0x100000)*256;
+        pTT += ((map-PROCESS_BASE)&0xfffff)/4096;
+    }
+    else
+    {
+        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+(PROCESS_MEM+(map-HEAP_BEGIN)/0x100000)*256;
+        pTT += ((map-HEAP_BEGIN)&0xfffff)/4096;
+    }
+    for (i=0; i<nSec; i++)
+    {
+        if ((*pTT & PET_RW_CB) != PET_RW_CB)
+            return 0;
+        pTT++;
+    }
     return 1;
 }
 

@@ -45,6 +45,7 @@ rt_uint32_t rt_thread_switch_interrupt_flag;
 
 rt_isr_handler_t rt_hw_interrupt_handle(rt_uint32_t vector, void *param)
 {
+    rt_hw_interrupt_mask(vector);
     rt_kprintf("UN-handled interrupt %d occurred!!!\n", vector);
     return RT_NULL;
 }

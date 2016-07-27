@@ -182,9 +182,17 @@ void rt_system_scheduler_start(void)
 #ifdef RT_USING_PROCESS
     if (rt_current_module != rt_current_thread->module_id)
     {
-        rt_current_module = (rt_module_t)rt_current_thread->module_id;
-        mmu_switchtlb((rt_current_module==RT_NULL)?(0):(rt_current_module->pid));
+        if (rt_current_thread->module_id
+                || rt_current_module->module_thread == RT_NULL
+                || rt_current_module->module_thread->stat == RT_THREAD_CLOSE)
+        {
+            rt_current_module = (rt_module_t)rt_current_thread->module_id;
+            mmu_switchtlb((rt_current_module==RT_NULL)?(0):(rt_current_module->pid));
+        }
     }
+    if (rt_current_thread->module_id)
+        ((rt_module_t)rt_current_thread->module_id)->impure_ptr = &rt_current_thread->lib_reent;
+    _impure_ptr = &rt_current_thread->lib_reent;
 #endif
 
     /* switch to new thread */
@@ -240,9 +248,17 @@ void rt_schedule(void)
 #ifdef RT_USING_PROCESS
             if (rt_current_module != rt_current_thread->module_id)
             {
-                rt_current_module = (rt_module_t)rt_current_thread->module_id;
-                mmu_switchtlb((rt_current_module==RT_NULL)?(0):(rt_current_module->pid));
+                if (rt_current_thread->module_id
+                        || rt_current_module->module_thread == RT_NULL
+                        || rt_current_module->module_thread->stat == RT_THREAD_CLOSE)
+                {
+                    rt_current_module = (rt_module_t)rt_current_thread->module_id;
+                    mmu_switchtlb((rt_current_module==RT_NULL)?(0):(rt_current_module->pid));
+                }
             }
+            if (rt_current_thread->module_id)
+                ((rt_module_t)rt_current_thread->module_id)->impure_ptr = &rt_current_thread->lib_reent;
+            _impure_ptr = &rt_current_thread->lib_reent;
 #endif
 
             RT_OBJECT_HOOK_CALL(rt_scheduler_hook, (from_thread, to_thread));

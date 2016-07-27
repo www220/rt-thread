@@ -134,8 +134,13 @@ void rt_hw_trap_pabt(struct rt_hw_register *regs)
     rt_hw_show_register(regs);
 
     __asm volatile("mrc p15, 0, %0, c5, c0, 1":"=r" (rest));
-    rt_kprintf("prefetch abort %x %d%d%d%d\n",regs->lr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
+    rt_kprintf("prefetch abort call:%x type:%d%d%d%d\n",regs->lr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
+
+#ifdef RT_USING_MODULE
+    if (rt_module_self() != RT_NULL)
+        RT_ASSERT(0);
+#endif
 
 #ifdef RT_USING_FINSH
     list_thread();
@@ -158,8 +163,13 @@ void rt_hw_trap_dabt(struct rt_hw_register *regs)
 
     __asm volatile("mrc p15, 0, %0, c6, c0, 0":"=r" (addr));
     __asm volatile("mrc p15, 0, %0, c5, c0, 0":"=r" (rest));
-    rt_kprintf("data abort %x %d%d%d%d\n",addr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
+    rt_kprintf("data abort call:%x addr:%x type:%d%d%d%d\n",regs->lr,addr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
+
+#ifdef RT_USING_MODULE
+    if (rt_module_self() != RT_NULL)
+        RT_ASSERT(0);
+#endif
 
 #ifdef RT_USING_FINSH
     list_thread();

@@ -71,6 +71,7 @@
 #define PAGE_COUNT_MAX    (256 * PROCESS_MEM)
 static volatile rt_uint32_t pids = 0;
 #define RT_MODULE_ARG_MAX    20
+extern struct rt_thread *rt_current_thread;
 
 /**
  * @ingroup SystemInit
@@ -282,6 +283,11 @@ static struct rt_module *_load_exec_object(const char *name,
     module->nref = 0;
     module->symtab = RT_NULL;
     module->nsym = 0;
+    module->mem_list = RT_NULL;
+    module->page_array = RT_NULL;
+    module->page_cnt = 0;
+    module->mod_mutex = RT_NULL;
+    module->impure_ptr = RT_NULL;
 
     extern int __rt_ffs(int value);
     module->pid = __rt_ffs(pids);
@@ -336,7 +342,7 @@ static struct rt_module *_load_exec_object(const char *name,
     }
 
     /* found .dynsym section */
-    if (0 && (index != elf_module->e_shnum))
+    if (index != elf_module->e_shnum)
     {
         int i, count = 0;
         Elf32_Sym  *symtab = RT_NULL;
@@ -345,34 +351,14 @@ static struct rt_module *_load_exec_object(const char *name,
         symtab =(Elf32_Sym *)((rt_uint8_t *)module_ptr + shdr[index].sh_offset);
         strtab = (rt_uint8_t *)module_ptr + shdr[shdr[index].sh_link].sh_offset;
 
-        for (i = 0; i < shdr[index].sh_size/sizeof(Elf32_Sym); i++)
-        {
-            if ((ELF_ST_BIND(symtab[i].st_info) == STB_GLOBAL) &&
-                (ELF_ST_TYPE(symtab[i].st_info) == STT_FUNC))
-                count ++;
-        }
-
-        module->symtab = (struct rt_module_symtab *)rt_malloc
-            (count * sizeof(struct rt_module_symtab));
-        module->nsym = count;
         for (i = 0, count = 0; i < shdr[index].sh_size/sizeof(Elf32_Sym); i++)
         {
-            rt_size_t length;
-
             if ((ELF_ST_BIND(symtab[i].st_info) != STB_GLOBAL) ||
                 (ELF_ST_TYPE(symtab[i].st_info) != STT_FUNC))
                 continue;
 
-            length = rt_strlen((const char *)(strtab + symtab[i].st_name)) + 1;
-
-            module->symtab[count].addr =
-                (void *)(module->module_space + symtab[i].st_value);
-            module->symtab[count].name = rt_malloc(length);
-            rt_memset((void *)module->symtab[count].name, 0, length);
-            rt_memcpy((void *)module->symtab[count].name,
-                      strtab + symtab[i].st_name,
-                      length);
-            count ++;
+            if (rt_strcmp((const char *)(strtab + symtab[i].st_name), "_impure_ptr") == 0)
+                module->impure_ptr = (struct _reent *)(module->module_space + symtab[i].st_value);
         }
     }
 
@@ -575,10 +561,6 @@ rt_module_t rt_module_do_main(const char *name,
         }
         else
         {
-            module->mem_list = RT_NULL;
-            module->page_array = RT_NULL;
-            module->page_cnt = 0;
-            module->mod_mutex = RT_NULL;
             rt_kprintf("Module: allocate cmd buffer failed.\n");
             rt_module_destroy(module);
             return RT_NULL;
@@ -1208,14 +1190,68 @@ rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr)
     return addr;
 }
 
-void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr)
+void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size)
 {
-    if(!mmu_check_ptr(module->pid,ptr,0))
+    rt_uint32_t inmem = module->vstart_addr+module->module_size+module->page_cnt*RT_MM_PAGE_SIZE;
+    rt_uint32_t base = RT_ALIGN_DOWN(ptr,RT_MM_PAGE_SIZE);
+    do
     {
-        /* should not get here */
-        RT_ASSERT(0);
-    }
-    return (void *)ptr;
+        if (base < module->vstart_addr)
+            break;
+        if (base > inmem && base < HEAP_BEGIN)
+            break;
+        if (base > HEAP_END)
+            break;
+        //calc strlen
+        if (size == 0)
+        {
+            char *buf = (char *)ptr;
+            if ((rt_uint32_t)buf <= inmem)
+            {
+                while (*buf)
+                {
+                    if ((rt_uint32_t)buf > inmem)
+                    {
+                        buf = RT_NULL;
+                        break;
+                    }
+                    buf++;
+                    size++;
+                }
+            }
+            else
+            {
+                while (*buf)
+                {
+                    if ((rt_uint32_t)buf > HEAP_END)
+                    {
+                        buf = RT_NULL;
+                        break;
+                    }
+                    buf++;
+                    size++;
+                }
+            }
+            if (buf == RT_NULL)
+                break;
+            size++;
+        }
+        //
+        rt_uint32_t end = RT_ALIGN(ptr+size,RT_MM_PAGE_SIZE);
+        if (end < module->vstart_addr)
+            break;
+        if (end > inmem && end < HEAP_BEGIN)
+            break;
+        if (end > HEAP_END)
+            break;
+        if(mmu_check_ptr(module->pid,base,end-base))
+            return (void *)ptr;
+    } while (0);
+
+    rt_kprintf("data abort addr:%x size:%x\n",ptr,size);
+    rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
+    RT_ASSERT(0);
+    return RT_NULL;
 }
 
 void rt_module_free(rt_module_t module, void *addr)

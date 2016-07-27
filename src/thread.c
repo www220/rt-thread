@@ -112,6 +112,7 @@ static rt_err_t _rt_thread_init(struct rt_thread *thread,
         extern void rt_hw_stack_swiuser(void *stack_addr);
         rt_hw_stack_swiuser(thread->sp);
     }
+    _REENT_INIT_PTR(&thread->lib_reent);
 #endif
 
     /* priority init */
