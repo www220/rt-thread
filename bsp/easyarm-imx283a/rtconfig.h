@@ -93,6 +93,7 @@
 #define FINSH_USING_MSH
 #define FINSH_USING_MSH_DEFAULT
 //#define FINSH_USING_MSH_ONLY
+#define RT_USING_RYM
 
 /* Using symbol table */
 #define FINSH_USING_SYMTAB

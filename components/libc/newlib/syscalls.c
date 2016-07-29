@@ -471,9 +471,22 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
        errno = 0;
        return ret_err(close(parm1));
     }
-    case 0x900000+801:
+    case SYS_getdents:
     {
-        return _isatty(parm1);
+        errno = 0;
+        extern int getdents(int file, struct dirent *dirp, rt_size_t nbytes);
+        return ret_err(getdents(parm1, (struct dirent*)rt_module_conv_ptr(module,parm2,parm3), parm3));
+    }
+    case SYS_gettimeofday:
+    {
+        errno = 0;
+        return ret_err(_gettimeofday_r(0, (struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)), (void *)parm2));
+    }
+    case SYS_ioctl:
+    {
+        errno = 0;
+        rt_kprintf("ioctl %d %x %x\n",parm1,parm2,parm3);
+        return -ENOTSUP;
     }
     case 0x900000+901:
     case 0x900000+903:
@@ -488,7 +501,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         return 0;
     }
     }
-    rt_kprintf("syscall %x not supported\n",nbr);
+    rt_kprintf("syscall %d not supported\n",nbr-0x900000);
     return -ENOTSUP;
 }
 #endif

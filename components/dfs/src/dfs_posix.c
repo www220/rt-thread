@@ -731,6 +731,32 @@ struct dirent *readdir(DIR *d)
 }
 RTM_EXPORT(readdir);
 
+int getdents(int file, struct dirent *dirp, rt_size_t nbytes)
+{
+    int result;
+    struct dfs_fd *fd;
+
+    fd = fd_get(file);
+    if (fd == RT_NULL)
+    {
+        rt_set_errno(-DFS_STATUS_EBADF);
+        return -1;
+    }
+
+	/* get a new entry */
+	result = dfs_file_getdents(fd,dirp,nbytes);
+	if (result <= 0)
+	{
+		fd_put(fd);
+		rt_set_errno(result);
+
+		return -1;
+	}
+	fd_put(fd);
+	return result;
+}
+RTM_EXPORT(getdents);
+
 /**
  * this function is a POSIX compliant version, which will return current
  * location in directory stream.

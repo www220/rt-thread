@@ -421,6 +421,7 @@ int cmd_uptime(int argc, char** argv)
         rt_kprintf("%u min\n", upminutes);
     return 0;
 }
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_uptime, __cmd_uptime, system uptime);
 
 char *getsave_loginfo(const char* file, int length)
 {
@@ -503,7 +504,92 @@ int cmd_tail(int argc, char **argv)
     return 0;
 }
 
-FINSH_FUNCTION_EXPORT_ALIAS(cmd_uptime, __cmd_uptime, system uptime);
+#ifdef RT_USING_RYM
+#include <ymodem.h>
+
+struct custom_ctx
+{
+    struct rym_ctx parent;
+    int fd,flen;
+    char fpath[100];
+};
+
+static enum rym_code _rym_bg(
+        struct rym_ctx *ctx,
+        rt_uint8_t *buf,
+        rt_size_t len)
+{
+    struct custom_ctx *cctx = (struct custom_ctx*)ctx;
+    /* the buf should be the file name */
+    sprintf(cctx->fpath, "/mmc/%s", (const char*)buf);
+    cctx->fd = open(cctx->fpath, O_CREAT | O_WRONLY | O_TRUNC, 0);
+    if (cctx->fd < 0)
+    {
+        rt_err_t err = rt_get_errno();
+        rt_kprintf("error creating file: %d\n", err);
+        rt_kprintf("abort transmission\n");
+        return RYM_CODE_CAN;
+    }
+
+    cctx->flen = atoi((const char*)buf+strlen((const char*)buf)+1);
+    if (cctx->flen == 0)
+        cctx->flen = -1;
+    return RYM_CODE_ACK;
+}
+
+static enum rym_code _rym_tof(
+        struct rym_ctx *ctx,
+        rt_uint8_t *buf,
+        rt_size_t len)
+{
+    struct custom_ctx *cctx = (struct custom_ctx*)ctx;
+    RT_ASSERT(cctx->fd >= 0);
+    if (cctx->flen == -1)
+    {
+        write(cctx->fd, buf, len);
+    }
+    else
+    {
+        int wlen = len > cctx->flen ? cctx->flen : len;
+        write(cctx->fd, buf, wlen);
+        cctx->flen -= wlen;
+    }
+    return RYM_CODE_ACK;
+}
+
+static enum rym_code _rym_end(
+        struct rym_ctx *ctx,
+        rt_uint8_t *buf,
+        rt_size_t len)
+{
+    struct custom_ctx *cctx = (struct custom_ctx*)ctx;
+
+    RT_ASSERT(cctx->fd >= 0);
+    close(cctx->fd);
+    cctx->fd = -1;
+
+    return RYM_CODE_ACK;
+}
+
+int cmd_ym(int argc, char **argv)
+{
+    int ret;
+    struct custom_ctx ym;
+    rt_device_t dev = rt_console_get_device();
+    rt_uint16_t oflag = dev->open_flag;
+
+    rt_kprintf("entering RYM mode\n");
+    ret = rym_recv_on_device(&ym.parent,dev,RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX,
+                                _rym_bg,_rym_tof,_rym_end,10);
+    rt_thread_delay(500);
+    dev->open_flag = oflag;
+    if (ret != 0)
+        rt_kprintf("\nleaving RYM mode with code %d\n", ret);
+    rt_kprintf("file %s has been created.\n", ym.fpath);
+    return 0;
+}
+FINSH_FUNCTION_EXPORT_ALIAS(cmd_ym, __cmd_ym, ymodem recv file);
+#endif
 
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_df, __cmd_df, get disk free);
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_unmount, __cmd_unmount, unmount path);

@@ -4,6 +4,8 @@
 #include <reent.h>
 #include <errno.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 extern int _set_errno(int n);
 
@@ -106,7 +108,10 @@ static inline uintptr_t sys_call4(unsigned int nbr, uintptr_t parm1,
 int
 _isatty(int fd)
 {
-    return _set_errno(sys_call1(0x900000+801, fd));
+    struct stat buf;
+    if (fstat(fd, &buf) == 0 && S_ISCHR(buf.st_mode))
+        return 1;
+    return 0;
 }
 
 void
@@ -132,6 +137,7 @@ __env_unlock (struct _reent *ptr)
 {
     sys_call0(0x900000+904);
 }
+
 //#include<string.h>
 
 /* states: S_N: normal, S_I: comparing integral part, S_F: comparing
@@ -232,17 +238,65 @@ struct group *getgrgid (gid_t gid)
 
 //#include<dirent.h>
 
+#define O_DIRECTORY     0x0200000
 DIR *opendir(const char *name)
 {
-	return NULL;
+	register DIR *dirp;
+	register int fd;
+	int rc = 0;
+
+	if ((fd = open(name, O_RDONLY|O_DIRECTORY)) == -1)
+		return NULL;
+	if (rc == -1 ||
+	    (dirp = (DIR *)malloc(sizeof(DIR))) == NULL) {
+		close (fd);
+		return NULL;
+	}
+    memset(dirp, 0, sizeof(DIR));
+    dirp->fd = fd;
+	return dirp;
 }
 
 struct dirent *readdir(DIR *d)
 {
-	return NULL;
+	register struct dirent *dp;
+	int rc = 0;
+
+	if (d->fd == -1)
+		return NULL;
+
+    if (d->num)
+    {
+        struct dirent* dirent_ptr;
+        dirent_ptr = (struct dirent*)&d->buf[d->cur];
+        d->cur += dirent_ptr->d_reclen;
+    }
+
+    if (!d->num || d->cur >= d->num)
+    {
+        /* get a new entry */
+        rc = sys_call3(0x900000+141,d->fd,(uint32_t)d->buf,sizeof(d->buf)-1);
+        if (rc <= 0)
+        {
+            _set_errno(rc);
+            return NULL;
+        }
+
+        d->num = rc;
+        d->cur = 0; /* current entry index */
+    }
+
+    return (struct dirent *)(d->buf+d->cur);
 }
 
 int closedir(DIR *d)
 {
-	return -1;
+	int rc = 0;
+
+	if (d->fd == -1)
+		return -1;
+
+    rc = close(d->fd);
+    free(d);
+	return rc;
 }
