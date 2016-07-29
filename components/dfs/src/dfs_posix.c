@@ -371,6 +371,7 @@ int stat(const char *file, struct stat *buf)
 {
     int result;
 
+    rt_memset(buf, 0, sizeof(struct stat));
     result = dfs_file_stat(file, buf);
     if (result < 0)
     {
@@ -395,6 +396,7 @@ int fstat(int fildes, struct stat *buf)
 {
     struct dfs_fd *d;
 
+    rt_memset(buf, 0, sizeof(struct stat));
 #if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
     if (fildes < 3)
     {
@@ -539,6 +541,7 @@ int statfs(const char *path, struct statfs *buf)
 {
     int result;
 
+    rt_memset(buf, 0, sizeof(struct statfs));
     result = dfs_statfs(path, buf);
     if (result < 0)
     {

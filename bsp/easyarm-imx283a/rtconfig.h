@@ -157,6 +157,8 @@
 #define LWIP_RAW 1
 #define MPPE_SUPPORT 1
 #define LWIP_TCP_KEEPALIVE 1
+#define SA_FAMILY_T_DEFINED 1
+#define LWIP_IPV6 1
 
 #define RT_LWIP_DHCP
 #define RT_LWIP_PPP

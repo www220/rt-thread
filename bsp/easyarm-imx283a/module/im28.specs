@@ -1,0 +1,23 @@
+%rename lib lib_old
+%rename link link_old
+%rename cc1 cc1_old
+%rename cc1plus cc1plus_old
+
+*libgloss:
+-lgloss-linux %R/../usr/lib/syscalls.o
+
+*lib:
+%(libgloss) %(lib_old)
+
+*link:
+--gc-sections -n --section-start=.init=0x10000000 %(link_old)
+
+*cc1:
+%{!mcpu=:-mcpu=arm926ej-s} -isystem%R/../usr/include %(cc1_old)
+
+*cc1plus:
+%{!mcpu=:-mcpu=arm926ej-s} -isystem%R/../usr/include %(cc1plus_old)
+
+*startfile:
+linux-crt0%O%s crti%O%s crtbegin%O%s
+
