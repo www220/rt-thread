@@ -14,8 +14,6 @@
 #define SA_FAMILY_T_DEFINED 1
 #define LWIP_IPV6 1
 
-#define ERRNO                       1
-
 #define NO_SYS                      0
 #define LWIP_SOCKET                 1
 #define LWIP_NETCONN                1

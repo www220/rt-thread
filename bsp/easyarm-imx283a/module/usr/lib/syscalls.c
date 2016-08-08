@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 extern int _set_errno(int n);
+extern int _getdents(int file, struct dirent *dirp, size_t nbytes);
 
 
 /* SWI with SYS_ call number and no parameters */
@@ -275,7 +276,7 @@ struct dirent *readdir(DIR *d)
     if (!d->num || d->cur >= d->num)
     {
         /* get a new entry */
-        rc = sys_call3(0x900000+141,d->fd,(uint32_t)d->buf,sizeof(d->buf)-1);
+        rc = _getdents(d->fd,(struct dirent*)&d->buf,sizeof(d->buf)-1);
         if (rc <= 0)
         {
             _set_errno(rc);
