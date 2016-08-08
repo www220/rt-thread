@@ -33,6 +33,11 @@ int _EXFUN(setegid, (gid_t __gid ));
 int _EXFUN(seteuid, (uid_t __uid ));
 int _EXFUN(fchdir, (int __fildes));
 int _EXFUN(chroot, (const char *__path ));
-int _EXFUN(ttyname_r, (int, char *, size_t)); 
+int _EXFUN(ttyname_r, (int, char *, size_t));
+extern long int syscall (long int __sysno, ...) __THROW;
+
+//#include<time.h>
+extern int stime (__const time_t *__when) __THROW;
+extern int nanosleep (__const struct timespec *__requested_time, struct timespec *__remaining);
 
 #endif //_NODEFFUNC

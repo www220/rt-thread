@@ -485,7 +485,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_ioctl:
     {
         errno = 0;
-        rt_kprintf("ioctl %d %x %x\n",parm1,parm2,parm3);
+        rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
         return -ENOTSUP;
     }
     case 0x900000+901:

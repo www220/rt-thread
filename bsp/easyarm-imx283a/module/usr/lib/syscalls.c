@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 #include <reent.h>
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <regex.h>
+#include <fnmatch.h>
 
 extern int _set_errno(int n);
 extern int _getdents(int file, struct dirent *dirp, size_t nbytes);
@@ -301,3 +304,247 @@ int closedir(DIR *d)
     free(d);
 	return rc;
 }
+
+//#include<libgen.h>
+
+char *dirname(char *path)
+{
+	char *p;
+	if( path == NULL || *path == '\0' )
+		return ".";
+	p = path + strlen(path) - 1;
+	while( *p == '/' ) {
+		if( p == path )
+			return path;
+		*p-- = '\0';
+	}
+	while( p >= path && *p != '/' )
+		p--;
+	return
+		p < path ? "." :
+		p == path ? "/" :
+		(*p = '\0', path);
+}
+
+//#include<time.h>
+
+int utimes(const char *path, const struct timeval *tvp)
+{
+	return 0;	
+}
+int lutimes(const char *path, const struct timeval *tvp)
+{
+	return 0;	
+}
+
+//#include<sendfile.h>
+
+ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
+{
+	return 0;
+}
+
+//#include<regex.h>
+
+int regcomp (regex_t *__restrict __preg, const char *__restrict __pattern, int __cflags)
+{
+	return 0;
+}
+
+size_t regerror (int __errcode, const regex_t *__restrict __preg, char *__restrict __errbuf, size_t __errbuf_size)
+{
+	return 0;
+}
+
+int regexec(const regex_t *__restrict __preg, const char *__restrict __string, size_t __nmatch, regmatch_t __pmatch[__restrict], int __eflags)
+{
+	return 0;
+}
+
+void regfree(regex_t *__preg)
+{
+}
+
+//#include<fnmatch.h>
+
+#undef	EOS
+#define	EOS	'\0'
+
+/* Macros to set/clear/test flags. */
+#undef SET
+#define SET(t, f)	((t) |= (f))
+#undef CLR
+#define CLR(t, f)	((t) &= ~(f))
+#undef ISSET
+#define ISSET(t, f)	((t) & (f))
+
+#define	RANGE_MATCH	1
+#define	RANGE_NOMATCH	0
+#define	RANGE_ERROR	(-1)
+
+static int rangematch __P((const char *, char, int, char **));
+
+int
+fnmatch(pattern, string, flags)
+	const char *pattern, *string;
+	int flags;
+{
+	const char *stringstart;
+	char *newp;
+	char c, test;
+
+	for (stringstart = string;;)
+		switch (c = *pattern++) {
+		case EOS:
+			if (ISSET(flags, FNM_LEADING_DIR) && *string == '/')
+				return (0);
+			return (*string == EOS ? 0 : FNM_NOMATCH);
+		case '?':
+			if (*string == EOS)
+				return (FNM_NOMATCH);
+			if (*string == '/' && ISSET(flags, FNM_PATHNAME))
+				return (FNM_NOMATCH);
+			if (*string == '.' && ISSET(flags, FNM_PERIOD) &&
+			    (string == stringstart ||
+			    (ISSET(flags, FNM_PATHNAME) && *(string - 1) == '/')))
+				return (FNM_NOMATCH);
+			++string;
+			break;
+		case '*':
+			c = *pattern;
+			/* Collapse multiple stars. */
+			while (c == '*')
+				c = *++pattern;
+
+			if (*string == '.' && ISSET(flags, FNM_PERIOD) &&
+			    (string == stringstart ||
+			    (ISSET(flags, FNM_PATHNAME) && *(string - 1) == '/')))
+				return (FNM_NOMATCH);
+
+			/* Optimize for pattern with * at end or before /. */
+			if (c == EOS) {
+				if (ISSET(flags, FNM_PATHNAME))
+					return (ISSET(flags, FNM_LEADING_DIR) ||
+					    strchr(string, '/') == NULL ?
+					    0 : FNM_NOMATCH);
+				else
+					return (0);
+			} else if (c == '/' && ISSET(flags, FNM_PATHNAME)) {
+				if ((string = strchr(string, '/')) == NULL)
+					return (FNM_NOMATCH);
+				break;
+			}
+
+			/* General case, use recursion. */
+			while ((test = *string) != EOS) {
+				if (!fnmatch(pattern, string, flags & ~FNM_PERIOD))
+					return (0);
+				if (test == '/' && ISSET(flags, FNM_PATHNAME))
+					break;
+				++string;
+			}
+			return (FNM_NOMATCH);
+		case '[':
+			if (*string == EOS)
+				return (FNM_NOMATCH);
+			if (*string == '/' && ISSET(flags, FNM_PATHNAME))
+				return (FNM_NOMATCH);
+			if (*string == '.' && ISSET(flags, FNM_PERIOD) &&
+			    (string == stringstart ||
+			    (ISSET(flags, FNM_PATHNAME) && *(string - 1) == '/')))
+				return (FNM_NOMATCH);
+
+			switch (rangematch(pattern, *string, flags, &newp)) {
+			case RANGE_ERROR:
+				/* not a good range, treat as normal text */
+				goto normal;
+			case RANGE_MATCH:
+				pattern = newp;
+				break;
+			case RANGE_NOMATCH:
+				return (FNM_NOMATCH);
+			}
+			++string;
+			break;
+		case '\\':
+			if (!ISSET(flags, FNM_NOESCAPE)) {
+				if ((c = *pattern++) == EOS) {
+					c = '\\';
+					--pattern;
+				}
+			}
+			/* FALLTHROUGH */
+		default:
+		normal:
+			if (c != *string && !(ISSET(flags, FNM_CASEFOLD) &&
+				 (tolower((unsigned char)c) ==
+				 tolower((unsigned char)*string))))
+				return (FNM_NOMATCH);
+			++string;
+			break;
+		}
+	/* NOTREACHED */
+}
+
+static int
+#ifdef __STDC__
+rangematch(const char *pattern, char test, int flags, char **newp)
+#else
+rangematch(pattern, test, flags, newp)
+	const char *pattern;
+	char test;
+	int flags;
+	char **newp;
+#endif
+{
+	int negate, ok;
+	char c, c2;
+
+	/*
+	 * A bracket expression starting with an unquoted circumflex
+	 * character produces unspecified results (IEEE 1003.2-1992,
+	 * 3.13.2).  This implementation treats it like '!', for
+	 * consistency with the regular expression syntax.
+	 * J.T. Conklin (conklin@ngai.kaleida.com)
+	 */
+	if ((negate = (*pattern == '!' || *pattern == '^')))
+		++pattern;
+
+	if (ISSET(flags, FNM_CASEFOLD))
+		test = tolower((unsigned char)test);
+
+	/*
+	 * A right bracket shall lose its special meaning and represent
+	 * itself in a bracket expression if it occurs first in the list.
+	 * -- POSIX.2 2.8.3.2
+	 */
+	ok = 0;
+	c = *pattern++;
+	do {
+		if (c == '\\' && !ISSET(flags, FNM_NOESCAPE))
+			c = *pattern++;
+		if (c == EOS)
+			return (RANGE_ERROR);
+		if (c == '/' && ISSET(flags, FNM_PATHNAME))
+			return (RANGE_NOMATCH);
+		if (ISSET(flags, FNM_CASEFOLD))
+			c = tolower((unsigned char)c);
+		if (*pattern == '-'
+		    && (c2 = *(pattern+1)) != EOS && c2 != ']') {
+			pattern += 2;
+			if (c2 == '\\' && !ISSET(flags, FNM_NOESCAPE))
+				c2 = *pattern++;
+			if (c2 == EOS)
+				return (RANGE_ERROR);
+			if (ISSET(flags, FNM_CASEFOLD))
+				c2 = tolower((unsigned char)c2);
+			if (c <= test && test <= c2)
+				ok = 1;
+		} else if (c == test)
+			ok = 1;
+	} while ((c = *pattern++) != ']');
+
+	*newp = (char *)pattern;
+	return (ok == negate ? RANGE_NOMATCH : RANGE_MATCH);
+}
+

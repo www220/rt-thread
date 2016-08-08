@@ -5,8 +5,13 @@ LIBS = -Wl,--gc-sections,-n,--section-start=.init=0x10000000 --specs=linux.specs
 OBJS = main.o \
 	syscalls.o
 
+%.o:%.c
+	@$(CC) $(CFLAGS) -c -o $@ $< 
+	@echo CC $<
+
 test:$(OBJS)
-	$(CC) -o test $(CFLAGS) $(LIBS) $(OBJS)
+	@$(CC) -o test $(CFLAGS) $(LIBS) $(OBJS)
+	@echo LD test
 
 release:test
 	$(STRIP) test

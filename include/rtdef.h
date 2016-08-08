@@ -38,6 +38,7 @@
 /* include rtconfig header to import configuration */
 #include <rtconfig.h>
 #ifdef RT_USING_PROCESS
+#include <string.h>
 #include <sys/reent.h>
 #endif
 

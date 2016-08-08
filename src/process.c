@@ -632,6 +632,7 @@ rt_module_t rt_module_do_main(const char *name,
     }
 #endif
 
+    rt_thread_delay(500);
     return module;
 }
 
