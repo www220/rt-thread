@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <sys/poll.h>
 #include <grp.h>
+#include <pwd.h>
 
 extern int _set_errno(int n);
 extern int _getdents(int file, struct dirent *dirp, size_t nbytes);
@@ -233,10 +234,17 @@ int strverscmp (__const char *s1, __const char *s2)
 
 //#include<pwd.h>
 
+#define duser "rtt"
+#define dgroup "system"
+static struct passwd defpass = {duser, "", 0, 0, duser, duser, "", ""};
 struct passwd *getpwuid (uid_t pid)
 {
-	errno = ENOSYS;
-	return NULL;
+	if (pid != defpass.pw_uid)
+	{
+		errno = EINTR;
+		return NULL;
+	}
+	return &defpass;
 }
 
 int getpwuid_r (__uid_t __uid,
@@ -244,16 +252,27 @@ int getpwuid_r (__uid_t __uid,
        char *__restrict __buffer, size_t __buflen,
        struct passwd **__restrict __result)
 {
-	errno = ENOSYS;
+	if (__resultbuf == NULL || __uid != defpass.pw_uid)
+	{
+		errno = EINTR;
+		if (__result)
+			*__result = NULL;
+		return -1;
+	}
+	*__resultbuf = defpass;
 	if (__result)
-		*__result = NULL;
-	return -1;
+		*__result = __resultbuf;
+	return 0;
 }
 
 struct passwd *getpwnam (const char *name)
 {
-	errno = ENOSYS;
-	return NULL;
+	if (name == NULL || strcmp(name,defpass.pw_name) != 0)
+	{
+		errno = EINTR;
+		return NULL;
+	}
+	return &defpass;
 }
 
 int getpwnam_r (__const char *__restrict __name,
@@ -261,10 +280,17 @@ int getpwnam_r (__const char *__restrict __name,
        char *__restrict __buffer, size_t __buflen,
        struct passwd **__restrict __result)
 {
-	errno = ENOSYS;
+	if (__resultbuf == NULL || __name == NULL || strcmp(__name,defpass.pw_name) != 0)
+	{
+		errno = EINTR;
+		if (__result)
+			*__result = NULL;
+		return -1;
+	}
+	*__resultbuf = defpass;
 	if (__result)
-		*__result = NULL;
-	return -1;
+		*__result = __resultbuf;
+	return 0;
 }
 
 int fchmod (int filedes, mode_t mode)
@@ -272,26 +298,25 @@ int fchmod (int filedes, mode_t mode)
 	return 0;
 }
 
-static char* defuser = "root";
 char *getlogin (void)
 {
-	return defuser;
+	return defpass.pw_name;
 }
 
 int getlogin_r (char *__name, size_t __name_len)
 {
-	if (__name == NULL || __name_len == 0)
+	if (__name == NULL || __name_len <= strlen(defpass.pw_name))
 	{
 		errno = ERANGE;
 		return -1;
 	}
-	strncpy(__name,defuser,__name_len);
+	strcpy(__name,defpass.pw_name);
 	return 0;
 }
 
 //#include<grp.h>
-static char *defgroupuser[] = {"root", NULL};
-static struct group defgroup = {"root", "", 1, defgroupuser};
+static char *defgroupuser[] = {duser, NULL};
+static struct group defgroup = {dgroup, "", 0, defgroupuser};
 struct group *getgrgid (gid_t gid)
 {
 	if (gid != defgroup.gr_gid)
@@ -464,28 +489,33 @@ char *dirname(char *path)
 
 int utimes(const char *path, const struct timeval *tvp)
 {
-	return 0;	
+	return 0;
 }
 int lutimes(const char *path, const struct timeval *tvp)
 {
-	return 0;	
+	return 0;
 }
 
 unsigned sleep(unsigned int __seconds)
 {
-	return 0;
+	return alarm(__seconds);
 }
 
 int usleep(useconds_t __useconds)
 {
-	return 0;
+    const struct timespec ts = {
+        .tv_sec = (long int) (__useconds / 1000000),
+        .tv_nsec = (long int) (__useconds % 1000000) * 1000ul
+    };
+    return nanosleep(&ts, NULL);
 }
 
 //#include<sendfile.h>
 
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
 {
-	return 0;
+	int rc = sys_call4(0x900000+187, out_fd, in_fd, (uintptr_t)offset, count);
+	return _set_errno(rc);
 }
 
 //#include<regex.h>

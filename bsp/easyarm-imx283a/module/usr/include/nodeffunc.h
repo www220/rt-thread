@@ -16,7 +16,7 @@ int strverscmp (__const char *__s1, __const char *__s2);
 
 //#include<grp.h>
 int initgroups (__const char *__user, __gid_t __group);
-int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
+int getgrouplist (const char *user, gid_t group, gid_t *groups, int *ngroups);
 
 //#include<signal.h>
 #define SA_RESTART	0x10000000

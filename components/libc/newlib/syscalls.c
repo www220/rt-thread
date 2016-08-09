@@ -411,6 +411,56 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         return rt_module_brk(module,parm1);
     }
+    case SYS_chmod:
+    case SYS_fchmod:
+    {
+        return 0;
+    }
+    case SYS_chown:
+    case SYS_fchown:
+    case SYS_lchown:
+    {
+        return -EPERM;
+    }
+    case SYS_alarm:
+    {
+        rt_thread_delay(parm1*1000);
+        return 0;
+    }
+    case SYS_nanosleep:
+    {
+        struct timespec *tim1 = (parm1)?(rt_module_conv_ptr(module,parm1,sizeof(struct timespec))):(0);
+        struct timespec *tim2 = (parm2)?(rt_module_conv_ptr(module,parm2,sizeof(struct timespec))):(0);
+        if (tim1 == RT_NULL)
+            return -EINVAL;
+        extern void __udelay(unsigned long usecs);
+        int ms = tim1->tv_sec*1000+tim1->tv_nsec/1000000l;
+        if (ms <= 0)
+            __udelay(tim1->tv_nsec/1000l+1);
+        else
+            rt_thread_delay(ms);
+        if (tim2)
+        {
+            tim2->tv_sec = 0;
+            tim2->tv_nsec = 0;
+        }
+        return 0;
+    }
+    case SYS_getuid:
+    case SYS_getgid:
+    case SYS_geteuid:
+    case SYS_getegid:
+    {
+        return 0;
+    }
+    case SYS_getgroups:
+    {
+        if (parm1 == 0 || parm2 == 0)
+            return 1;
+        gid_t *groups = rt_module_conv_ptr(module,parm2,parm1*sizeof(gid_t));
+        groups[0] = 0;
+        return 1;
+    }
     case SYS_link:
     {
         rt_kprintf("syscall link %s=>%s\n",(const char *)rt_module_conv_ptr(module,parm1,0),
@@ -476,6 +526,36 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         errno = 0;
         extern int getdents(int file, struct dirent *dirp, rt_size_t nbytes);
         return ret_err(getdents(parm1, (struct dirent*)rt_module_conv_ptr(module,parm2,parm3), parm3));
+    }
+    case SYS_sendfile:
+    {
+        char buf[4096];
+        int rc,readlen = 0;
+        off_t *off = (parm3)?(rt_module_conv_ptr(module,parm3,sizeof(off_t))):(0);
+        if (off)
+        {
+            errno = 0;
+            rc = lseek(parm2,*off,0);
+            if (rc < 0)
+                return ret_err(rc);
+        }
+        while (parm4)
+        {
+            errno = 0;
+            rc = read(parm2,buf,sizeof(buf));
+            if (rc < 0)
+                return ret_err(rc);
+            rc = write(parm1,buf,rc);
+            if (rc < 0)
+                return ret_err(rc);
+            readlen += rc;
+            if (rc < sizeof(buf))
+                break;
+            parm4 -= rc;
+        }
+        if (off)
+            *off += readlen;
+        return readlen;
     }
     case SYS_gettimeofday:
     {

@@ -131,10 +131,9 @@ inline void rt_hw_trap_swi(rt_uint32_t call, struct rt_hw_register *regs)
 void rt_hw_trap_pabt(struct rt_hw_register *regs)
 {
     rt_uint32_t rest;
-    rt_hw_show_register(regs);
 
     __asm volatile("mrc p15, 0, %0, c5, c0, 1":"=r" (rest));
-    rt_kprintf("prefetch abort call:%x type:%d%d%d%d\n",regs->lr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
+    rt_kprintf("prefetch abort call:%x type:%d%d%d%d\n\n",regs->lr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_MODULE
@@ -159,11 +158,10 @@ void rt_hw_trap_pabt(struct rt_hw_register *regs)
 void rt_hw_trap_dabt(struct rt_hw_register *regs)
 {
     rt_uint32_t addr,rest;
-    rt_hw_show_register(regs);
 
     __asm volatile("mrc p15, 0, %0, c6, c0, 0":"=r" (addr));
     __asm volatile("mrc p15, 0, %0, c5, c0, 0":"=r" (rest));
-    rt_kprintf("data abort call:%x addr:%x type:%d%d%d%d\n",regs->lr,addr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
+    rt_kprintf("data abort call:%x addr:%x type:%d%d%d%d\n\n",regs->lr,addr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_MODULE
