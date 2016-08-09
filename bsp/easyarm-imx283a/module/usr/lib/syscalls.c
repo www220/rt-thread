@@ -9,6 +9,11 @@
 #include <unistd.h>
 #include <regex.h>
 #include <fnmatch.h>
+#include <sys/socket.h>
+#include <sys/termios.h>
+#include <signal.h>
+#include <sys/poll.h>
+#include <grp.h>
 
 extern int _set_errno(int n);
 extern int _getdents(int file, struct dirent *dirp, size_t nbytes);
@@ -230,14 +235,143 @@ int strverscmp (__const char *s1, __const char *s2)
 
 struct passwd *getpwuid (uid_t pid)
 {
+	errno = ENOSYS;
 	return NULL;
 }
 
-//#include<grp.h>
+int getpwuid_r (__uid_t __uid,
+       struct passwd *__restrict __resultbuf,
+       char *__restrict __buffer, size_t __buflen,
+       struct passwd **__restrict __result)
+{
+	errno = ENOSYS;
+	if (__result)
+		*__result = NULL;
+	return -1;
+}
 
+struct passwd *getpwnam (const char *name)
+{
+	errno = ENOSYS;
+	return NULL;
+}
+
+int getpwnam_r (__const char *__restrict __name,
+       struct passwd *__restrict __resultbuf,
+       char *__restrict __buffer, size_t __buflen,
+       struct passwd **__restrict __result)
+{
+	errno = ENOSYS;
+	if (__result)
+		*__result = NULL;
+	return -1;
+}
+
+int fchmod (int filedes, mode_t mode)
+{
+	return 0;
+}
+
+static char* defuser = "root";
+char *getlogin (void)
+{
+	return defuser;
+}
+
+int getlogin_r (char *__name, size_t __name_len)
+{
+	if (__name == NULL || __name_len == 0)
+	{
+		errno = ERANGE;
+		return -1;
+	}
+	strncpy(__name,defuser,__name_len);
+	return 0;
+}
+
+//#include<grp.h>
+static char *defgroupuser[] = {"root", NULL};
+static struct group defgroup = {"root", "", 1, defgroupuser};
 struct group *getgrgid (gid_t gid)
 {
-	return NULL;
+	if (gid != defgroup.gr_gid)
+	{
+		errno = EINTR;
+		return NULL;
+	}
+	return &defgroup;
+}
+
+struct group *getgrnam (const char *name)
+{
+	if (name == NULL || strcmp(name,defgroup.gr_name) != 0)
+	{
+		errno = EINTR;
+		return NULL;
+	}
+	return &defgroup;
+}
+
+int getgrgid_r (__gid_t __gid, struct group *__restrict __resultbuf,
+       char *__restrict __buffer, size_t __buflen,
+       struct group **__restrict __result)
+{
+	if (__resultbuf == NULL || __gid != defgroup.gr_gid)
+	{
+		errno = EINTR;
+		if (__result)
+			*__result = NULL;
+		return -1;
+	}
+	*__resultbuf = defgroup;
+	if (__result)
+		*__result = __resultbuf;
+	return 0;
+}
+
+int getgrnam_r (__const char *__restrict __name,
+       struct group *__restrict __resultbuf,
+       char *__restrict __buffer, size_t __buflen,
+       struct group **__restrict __result)
+{
+	if (__resultbuf == NULL || __name == NULL || strcmp(__name,defgroup.gr_name) != 0)
+	{
+		errno = EINTR;
+		if (__result)
+			*__result = NULL;
+		return -1;
+	}
+	*__resultbuf = defgroup;
+	if (__result)
+		*__result = __resultbuf;
+	return 0;
+}
+
+int initgroups (__const char *__user, __gid_t __group)
+{
+	return 0;
+}
+
+int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups)
+{
+	if (groups == NULL || ngroups == NULL 
+		|| user == NULL || strcmp(user,defgroup.gr_name) != 0
+		|| group != defgroup.gr_gid)
+	{
+		errno = EINTR;
+		if (ngroups)
+			*ngroups = 0;
+		return -1;
+	}
+	groups[0] = defgroup.gr_gid;
+	*ngroups = 1;
+	return 0;
+}
+
+int fchown (int __filedes, uid_t __owner, gid_t __group)
+{
+	errno = EPERM;
+	return -1;
 }
 
 //#include<dirent.h>
@@ -335,6 +469,16 @@ int utimes(const char *path, const struct timeval *tvp)
 int lutimes(const char *path, const struct timeval *tvp)
 {
 	return 0;	
+}
+
+unsigned sleep(unsigned int __seconds)
+{
+	return 0;
+}
+
+int usleep(useconds_t __useconds)
+{
+	return 0;
 }
 
 //#include<sendfile.h>
@@ -547,4 +691,222 @@ rangematch(pattern, test, flags, newp)
 	*newp = (char *)pattern;
 	return (ok == negate ? RANGE_NOMATCH : RANGE_MATCH);
 }
+//#include<lwip.h>
 
+/**
+ * Convert an u16_t from host- to network byte order.
+ *
+ * @param n u16_t in host byte order
+ * @return n in network byte order
+ */
+u16_t
+lwip_htons(u16_t n)
+{
+  return ((n & 0xff) << 8) | ((n & 0xff00) >> 8);
+}
+
+/**
+ * Convert an u16_t from network- to host byte order.
+ *
+ * @param n u16_t in network byte order
+ * @return n in host byte order
+ */
+u16_t
+lwip_ntohs(u16_t n)
+{
+  return lwip_htons(n);
+}
+
+/**
+ * Convert an u32_t from host- to network byte order.
+ *
+ * @param n u32_t in host byte order
+ * @return n in network byte order
+ */
+u32_t
+lwip_htonl(u32_t n)
+{
+  return ((n & 0xff) << 24) |
+    ((n & 0xff00) << 8) |
+    ((n & 0xff0000UL) >> 8) |
+    ((n & 0xff000000UL) >> 24);
+}
+
+/**
+ * Convert an u32_t from network- to host byte order.
+ *
+ * @param n u32_t in network byte order
+ * @return n in host byte order
+ */
+u32_t
+lwip_ntohl(u32_t n)
+{
+  return lwip_htonl(n);
+}
+
+//#include<unistd.h>
+
+int execl(const char *__path, const char *__arg, ... )
+{
+	return -1;
+}
+
+int execle(const char *__path, const char *__arg, ... )
+{
+	return -1;
+}
+
+int execlp(const char *__file, const char *__arg, ... )
+{
+	return -1;
+}
+
+int execv(const char *__file ,char * const __argv [])
+{
+	return -1;
+}
+
+int execve(const char *__path ,char * const __argv [] ,char * const __envp[])
+{
+	return -1;
+}
+
+int execvp(const char *__file ,char * const __argv [])
+{
+	return -1;
+}
+
+int _fork(void)
+{
+    return -1;
+}
+
+long int sysconf (int name)
+{
+	return -1;
+}
+
+long int syscall (long int __sysno, ...)
+{
+	return -1;
+}
+
+//#include<stdlib.h>
+
+char *getcwd (char *pt, size_t size)
+{
+	return pt;
+}
+
+static int resolve_path(char *path,char *result,char *pos)
+{
+    if (*path == '/') {
+	*result = '/';
+	pos = result+1;
+	path++;
+    }
+    *pos = 0;
+    if (!*path) return 0;
+    while (1) {
+	char *slash;
+	struct stat st;
+
+	slash = *path ? strchr(path,'/') : NULL;
+	if (slash) *slash = 0;
+	if (!path[0] || (path[0] == '.' &&
+	  (!path[1] || (path[1] == '.' && !path[2])))) {
+	    pos--;
+	    if (pos != result && path[0] && path[1])
+		while (*--pos != '/');
+	}
+	else {
+	    strcpy(pos,path);
+	    if (lstat(result,&st) < 0) return -1;
+	    if (S_ISLNK(st.st_mode)) {
+		char buf[PATH_MAX];
+
+		if (readlink(result,buf,sizeof(buf)) < 0) return -1;
+		*pos = 0;
+		if (slash) {
+		    *slash = '/';
+		    strcat(buf,slash);
+		}
+		strcpy(path,buf);
+		if (*path == '/') result[1] = 0;
+		pos = strchr(result,0);
+		continue;
+	    }
+	    pos = strchr(result,0);
+	}
+	if (slash) {
+	    *pos++ = '/';
+	    path = slash+1;
+	}
+	*pos = 0;
+	if (!slash) break;
+    }
+    return 0;
+}
+
+char *realpath(const char *__restrict path,char *__restrict resolved_path)
+{
+    char cwd[PATH_MAX];
+    char *path_copy;
+    int res;
+
+    if (!*path) {
+	errno = ENOENT; /* SUSv2 */
+	return NULL;
+    }
+    if (!getcwd(cwd,sizeof(cwd))) return NULL;
+    strcpy(resolved_path,"/");
+    if (resolve_path(cwd,resolved_path,resolved_path)) return NULL;
+    strcat(resolved_path,"/");
+    path_copy = strdup(path);
+    if (!path_copy) return NULL;
+    res = resolve_path(path_copy,resolved_path,strchr(resolved_path,0));
+    free(path_copy);
+    if (res) return NULL;
+    return resolved_path;
+}
+
+int clearenv (void)
+{
+	return -1;
+}
+
+int fsync(int fd)
+{
+	return -1;
+}
+
+int creat(const char *__file, mode_t mod)
+{
+	return -1;
+}
+
+//#include<sys/termios.h>
+
+int tcgetattr (int __fd, struct termios *__termios_p) __THROW
+{
+	return -1;
+}
+
+int tcsetattr (int __fd, int __optional_actions, __const struct termios *__termios_p) __THROW
+{
+	return -1;
+}
+
+//#include<signal.h>
+
+int sigaction(int a, const struct sigaction * b, struct sigaction * c)
+{
+	return -1;
+}
+
+//#include<sys/poll.h>
+
+int poll (struct pollfd *__fds, nfds_t __nfds, int __timeout)
+{
+	return -1;
+}

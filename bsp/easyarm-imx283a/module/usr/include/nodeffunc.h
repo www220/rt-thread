@@ -16,6 +16,7 @@ int strverscmp (__const char *__s1, __const char *__s2);
 
 //#include<grp.h>
 int initgroups (__const char *__user, __gid_t __group);
+int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups);
 
 //#include<signal.h>
 #define SA_RESTART	0x10000000
@@ -35,9 +36,15 @@ int _EXFUN(fchdir, (int __fildes));
 int _EXFUN(chroot, (const char *__path ));
 int _EXFUN(ttyname_r, (int, char *, size_t));
 extern long int syscall (long int __sysno, ...) __THROW;
+extern char *getlogin (void);
+extern int getlogin_r (char *__name, size_t __name_len) __nonnull ((1));
 
 //#include<time.h>
 extern int stime (__const time_t *__when) __THROW;
 extern int nanosleep (__const struct timespec *__requested_time, struct timespec *__remaining);
+
+//#include<limit.h>
+#define NAME_MAX         255	/* # chars in a file name */
+#define	PATH_MAX		 1024	/* max bytes in pathname */
 
 #endif //_NODEFFUNC
