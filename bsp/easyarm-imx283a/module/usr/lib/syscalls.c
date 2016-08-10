@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdarg.h>
+#include <sys/syscall.h>
 #include <reent.h>
 #include <errno.h>
 #include <dirent.h>
@@ -15,10 +17,11 @@
 #include <sys/poll.h>
 #include <grp.h>
 #include <pwd.h>
+#include <utime.h>
 
 extern int _set_errno(int n);
 extern int _getdents(int file, struct dirent *dirp, size_t nbytes);
-
+extern int _utime(__const char *__file, __const struct utimbuf *__file_times);
 
 /* SWI with SYS_ call number and no parameters */
 
@@ -151,7 +154,7 @@ __env_unlock (struct _reent *ptr)
 //#include<string.h>
 
 /* states: S_N: normal, S_I: comparing integral part, S_F: comparing
-           fractional parts, S_Z: idem but with leading Zeroes only */
+           fractionnal parts, S_Z: idem but with leading Zeroes only */
 #define  S_N    0x0
 #define  S_I    0x4
 #define  S_F    0x8
@@ -161,9 +164,16 @@ __env_unlock (struct _reent *ptr)
 #define  CMP    2
 #define  LEN    3
 
-#define ISDIGIT(c) ((unsigned int) (c) - '0' <= 9)
 
-int strverscmp (__const char *s1, __const char *s2)
+/* Compare S1 and S2 as strings holding indices/version numbers,
+   returning less than, equal to or greater than zero if S1 is less than,
+   equal to or greater than S2 (for more info, see the texinfo doc).
+*/
+
+int
+strverscmp (s1, s2)
+     const char *s1;
+     const char *s2;
 {
   const unsigned char *p1 = (const unsigned char *) s1;
   const unsigned char *p2 = (const unsigned char *) s2;
@@ -174,16 +184,16 @@ int strverscmp (__const char *s1, __const char *s2)
   /* Symbol(s)    0       [1-9]   others  (padding)
      Transition   (10) 0  (01) d  (00) x  (11) -   */
   static const unsigned int next_state[] =
-    {
+  {
       /* state    x    d    0    - */
       /* S_N */  S_N, S_I, S_Z, S_N,
       /* S_I */  S_N, S_I, S_I, S_I,
       /* S_F */  S_N, S_F, S_F, S_F,
       /* S_Z */  S_N, S_F, S_Z, S_Z
-    };
+  };
 
   static const int result_type[] =
-    {
+  {
       /* state   x/x  x/d  x/0  x/-  d/x  d/d  d/0  d/-
                  0/x  0/d  0/0  0/-  -/x  -/d  -/0  -/- */
 
@@ -195,7 +205,7 @@ int strverscmp (__const char *s1, __const char *s2)
                  CMP, CMP, CMP, CMP, CMP, CMP, CMP, CMP,
       /* S_Z */  CMP, +1,  +1,  CMP, -1,  CMP, CMP, CMP,
                  -1,  CMP, CMP, CMP
-    };
+  };
 
   if (p1 == p2)
     return 0;
@@ -203,45 +213,45 @@ int strverscmp (__const char *s1, __const char *s2)
   c1 = *p1++;
   c2 = *p2++;
   /* Hint: '0' is a digit too.  */
-  state = S_N | ((c1 == '0') + (ISDIGIT (c1) != 0));
+  state = S_N | ((c1 == '0') + (isdigit (c1) != 0));
 
   while ((diff = c1 - c2) == 0 && c1 != '\0')
     {
       state = next_state[state];
       c1 = *p1++;
       c2 = *p2++;
-      state |= (c1 == '0') + (ISDIGIT (c1) != 0);
+      state |= (c1 == '0') + (isdigit (c1) != 0);
     }
 
-  state = result_type[state << 2 | (((c2 == '0') + (ISDIGIT (c2) != 0)))];
+  state = result_type[state << 2 | (((c2 == '0') + (isdigit (c2) != 0)))];
 
   switch (state)
-    {
+  {
     case CMP:
       return diff;
-      
+
     case LEN:
-      while (ISDIGIT (*p1++))
-	if (!ISDIGIT (*p2++))
+      while (isdigit (*p1++))
+	if (!isdigit (*p2++))
 	  return 1;
-      
-      return ISDIGIT (*p2) ? -1 : diff;
-      
+
+      return isdigit (*p2) ? -1 : diff;
+
     default:
       return state;
-    }
+  }
 }
 
 //#include<pwd.h>
 
-#define duser "rtt"
+#define duser "root"
 #define dgroup "system"
-static struct passwd defpass = {duser, "", 0, 0, duser, duser, "", ""};
+static struct passwd defpass = {duser, "", 0, 0, "", duser, "/root", "/bin/sh"};
 struct passwd *getpwuid (uid_t pid)
 {
 	if (pid != defpass.pw_uid)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		return NULL;
 	}
 	return &defpass;
@@ -254,7 +264,7 @@ int getpwuid_r (__uid_t __uid,
 {
 	if (__resultbuf == NULL || __uid != defpass.pw_uid)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		if (__result)
 			*__result = NULL;
 		return -1;
@@ -269,7 +279,7 @@ struct passwd *getpwnam (const char *name)
 {
 	if (name == NULL || strcmp(name,defpass.pw_name) != 0)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		return NULL;
 	}
 	return &defpass;
@@ -282,7 +292,7 @@ int getpwnam_r (__const char *__restrict __name,
 {
 	if (__resultbuf == NULL || __name == NULL || strcmp(__name,defpass.pw_name) != 0)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		if (__result)
 			*__result = NULL;
 		return -1;
@@ -321,7 +331,7 @@ struct group *getgrgid (gid_t gid)
 {
 	if (gid != defgroup.gr_gid)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		return NULL;
 	}
 	return &defgroup;
@@ -331,7 +341,7 @@ struct group *getgrnam (const char *name)
 {
 	if (name == NULL || strcmp(name,defgroup.gr_name) != 0)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		return NULL;
 	}
 	return &defgroup;
@@ -343,7 +353,7 @@ int getgrgid_r (__gid_t __gid, struct group *__restrict __resultbuf,
 {
 	if (__resultbuf == NULL || __gid != defgroup.gr_gid)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		if (__result)
 			*__result = NULL;
 		return -1;
@@ -361,7 +371,7 @@ int getgrnam_r (__const char *__restrict __name,
 {
 	if (__resultbuf == NULL || __name == NULL || strcmp(__name,defgroup.gr_name) != 0)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		if (__result)
 			*__result = NULL;
 		return -1;
@@ -377,7 +387,7 @@ int initgroups (__const char *__user, __gid_t __group)
 	return 0;
 }
 
-int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups)
+int getgrouplist (const char *user, gid_t group, gid_t *groups, int *ngroups)
 {
 	if (groups == NULL || ngroups == NULL 
 		|| user == NULL || strcmp(user,defgroup.gr_name) != 0
@@ -466,7 +476,8 @@ int closedir(DIR *d)
 
 //#include<libgen.h>
 
-char *dirname(char *path)
+char *
+dirname (char *path)
 {
 	char *p;
 	if( path == NULL || *path == '\0' )
@@ -487,76 +498,81 @@ char *dirname(char *path)
 
 //#include<time.h>
 
-int utimes(const char *path, const struct timeval *tvp)
+int
+utimes (const char *file, const struct timeval tvp[2])
 {
-	return 0;
-}
-int lutimes(const char *path, const struct timeval *tvp)
-{
-	return 0;
+  struct utimbuf buf, *times;
+
+  if (tvp)
+    {
+      times = &buf;
+      times->actime = tvp[0].tv_sec + tvp[0].tv_usec / 1000000;
+      times->modtime = tvp[1].tv_sec + tvp[1].tv_usec / 1000000;
+    }
+  else
+    times = NULL;
+
+  return _utime(file, times);
 }
 
-unsigned sleep(unsigned int __seconds)
+int lutimes (const char *path, const struct timeval tvp[2])
 {
-	return alarm(__seconds);
+  struct utimbuf buf, *times;
+
+  if (tvp)
+    {
+      times = &buf;
+      times->actime = tvp[0].tv_sec + tvp[0].tv_usec / 1000000;
+      times->modtime = tvp[1].tv_sec + tvp[1].tv_usec / 1000000;
+    }
+  else
+    times = NULL;
+
+  return _utime(path, times);
 }
 
-int usleep(useconds_t __useconds)
+unsigned sleep(unsigned int seconds)
 {
-    const struct timespec ts = {
-        .tv_sec = (long int) (__useconds / 1000000),
-        .tv_nsec = (long int) (__useconds % 1000000) * 1000ul
-    };
-    return nanosleep(&ts, NULL);
+    struct timespec ts;
+
+    ts.tv_sec = seconds;
+    ts.tv_nsec = 0;
+    if (!nanosleep(&ts,&ts)) return 0;
+    if (errno == EINTR) return ts.tv_sec;
+    return -1;
+}
+
+int usleep(useconds_t useconds)
+{
+    struct timespec ts;
+
+    ts.tv_sec = (long int)useconds / 1000000;
+    ts.tv_nsec = ((long int)useconds % 1000000) * 1000;
+    if (!nanosleep(&ts,&ts)) return 0;
+    if (errno == EINTR) return ts.tv_sec;
+    return -1;
 }
 
 //#include<sendfile.h>
 
-ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
+ssize_t sendfile (int out_fd, int in_fd, off_t *offset, size_t count)
 {
-	int rc = sys_call4(0x900000+187, out_fd, in_fd, (uintptr_t)offset, count);
+	int rc = sys_call4(__NR_sendfile, out_fd, in_fd, (uintptr_t)offset, count);
 	return _set_errno(rc);
-}
-
-//#include<regex.h>
-
-int regcomp (regex_t *__restrict __preg, const char *__restrict __pattern, int __cflags)
-{
-	return 0;
-}
-
-size_t regerror (int __errcode, const regex_t *__restrict __preg, char *__restrict __errbuf, size_t __errbuf_size)
-{
-	return 0;
-}
-
-int regexec(const regex_t *__restrict __preg, const char *__restrict __string, size_t __nmatch, regmatch_t __pmatch[__restrict], int __eflags)
-{
-	return 0;
-}
-
-void regfree(regex_t *__preg)
-{
 }
 
 //#include<fnmatch.h>
 
-#undef	EOS
+#include "collate.h"
+int __collate_load_error = 1;
+
 #define	EOS	'\0'
 
-/* Macros to set/clear/test flags. */
-#undef SET
-#define SET(t, f)	((t) |= (f))
-#undef CLR
-#define CLR(t, f)	((t) &= ~(f))
-#undef ISSET
-#define ISSET(t, f)	((t) & (f))
+#define RANGE_MATCH     1
+#define RANGE_NOMATCH   0
+#define RANGE_ERROR     (-1)
 
-#define	RANGE_MATCH	1
-#define	RANGE_NOMATCH	0
-#define	RANGE_ERROR	(-1)
-
-static int rangematch __P((const char *, char, int, char **));
+static int rangematch(const char *, char, int, char **);
 
 int
 fnmatch(pattern, string, flags)
@@ -570,17 +586,17 @@ fnmatch(pattern, string, flags)
 	for (stringstart = string;;)
 		switch (c = *pattern++) {
 		case EOS:
-			if (ISSET(flags, FNM_LEADING_DIR) && *string == '/')
+			if ((flags & FNM_LEADING_DIR) && *string == '/')
 				return (0);
 			return (*string == EOS ? 0 : FNM_NOMATCH);
 		case '?':
 			if (*string == EOS)
 				return (FNM_NOMATCH);
-			if (*string == '/' && ISSET(flags, FNM_PATHNAME))
+			if (*string == '/' && (flags & FNM_PATHNAME))
 				return (FNM_NOMATCH);
-			if (*string == '.' && ISSET(flags, FNM_PERIOD) &&
+			if (*string == '.' && (flags & FNM_PERIOD) &&
 			    (string == stringstart ||
-			    (ISSET(flags, FNM_PATHNAME) && *(string - 1) == '/')))
+			    ((flags & FNM_PATHNAME) && *(string - 1) == '/')))
 				return (FNM_NOMATCH);
 			++string;
 			break;
@@ -590,20 +606,20 @@ fnmatch(pattern, string, flags)
 			while (c == '*')
 				c = *++pattern;
 
-			if (*string == '.' && ISSET(flags, FNM_PERIOD) &&
+			if (*string == '.' && (flags & FNM_PERIOD) &&
 			    (string == stringstart ||
-			    (ISSET(flags, FNM_PATHNAME) && *(string - 1) == '/')))
+			    ((flags & FNM_PATHNAME) && *(string - 1) == '/')))
 				return (FNM_NOMATCH);
 
 			/* Optimize for pattern with * at end or before /. */
-			if (c == EOS) {
-				if (ISSET(flags, FNM_PATHNAME))
-					return (ISSET(flags, FNM_LEADING_DIR) ||
+			if (c == EOS)
+				if (flags & FNM_PATHNAME)
+					return ((flags & FNM_LEADING_DIR) ||
 					    strchr(string, '/') == NULL ?
 					    0 : FNM_NOMATCH);
 				else
 					return (0);
-			} else if (c == '/' && ISSET(flags, FNM_PATHNAME)) {
+			else if (c == '/' && flags & FNM_PATHNAME) {
 				if ((string = strchr(string, '/')) == NULL)
 					return (FNM_NOMATCH);
 				break;
@@ -613,7 +629,7 @@ fnmatch(pattern, string, flags)
 			while ((test = *string) != EOS) {
 				if (!fnmatch(pattern, string, flags & ~FNM_PERIOD))
 					return (0);
-				if (test == '/' && ISSET(flags, FNM_PATHNAME))
+				if (test == '/' && flags & FNM_PATHNAME)
 					break;
 				++string;
 			}
@@ -621,17 +637,16 @@ fnmatch(pattern, string, flags)
 		case '[':
 			if (*string == EOS)
 				return (FNM_NOMATCH);
-			if (*string == '/' && ISSET(flags, FNM_PATHNAME))
+			if (*string == '/' && (flags & FNM_PATHNAME))
 				return (FNM_NOMATCH);
-			if (*string == '.' && ISSET(flags, FNM_PERIOD) &&
+			if (*string == '.' && (flags & FNM_PERIOD) &&
 			    (string == stringstart ||
-			    (ISSET(flags, FNM_PATHNAME) && *(string - 1) == '/')))
+			    ((flags & FNM_PATHNAME) && *(string - 1) == '/')))
 				return (FNM_NOMATCH);
 
 			switch (rangematch(pattern, *string, flags, &newp)) {
 			case RANGE_ERROR:
-				/* not a good range, treat as normal text */
-				goto normal;
+				goto norm;
 			case RANGE_MATCH:
 				pattern = newp;
 				break;
@@ -641,7 +656,7 @@ fnmatch(pattern, string, flags)
 			++string;
 			break;
 		case '\\':
-			if (!ISSET(flags, FNM_NOESCAPE)) {
+			if (!(flags & FNM_NOESCAPE)) {
 				if ((c = *pattern++) == EOS) {
 					c = '\\';
 					--pattern;
@@ -649,27 +664,27 @@ fnmatch(pattern, string, flags)
 			}
 			/* FALLTHROUGH */
 		default:
-		normal:
-			if (c != *string && !(ISSET(flags, FNM_CASEFOLD) &&
+		norm:
+			if (c == *string)
+				;
+			else if ((flags & FNM_CASEFOLD) &&
 				 (tolower((unsigned char)c) ==
-				 tolower((unsigned char)*string))))
+				  tolower((unsigned char)*string)))
+				;
+			else
 				return (FNM_NOMATCH);
-			++string;
+			string++;
 			break;
 		}
 	/* NOTREACHED */
 }
 
 static int
-#ifdef __STDC__
-rangematch(const char *pattern, char test, int flags, char **newp)
-#else
 rangematch(pattern, test, flags, newp)
 	const char *pattern;
 	char test;
 	int flags;
 	char **newp;
-#endif
 {
 	int negate, ok;
 	char c, c2;
@@ -681,10 +696,10 @@ rangematch(pattern, test, flags, newp)
 	 * consistency with the regular expression syntax.
 	 * J.T. Conklin (conklin@ngai.kaleida.com)
 	 */
-	if ((negate = (*pattern == '!' || *pattern == '^')))
+	if ( (negate = (*pattern == '!' || *pattern == '^')) )
 		++pattern;
 
-	if (ISSET(flags, FNM_CASEFOLD))
+	if (flags & FNM_CASEFOLD)
 		test = tolower((unsigned char)test);
 
 	/*
@@ -695,24 +710,33 @@ rangematch(pattern, test, flags, newp)
 	ok = 0;
 	c = *pattern++;
 	do {
-		if (c == '\\' && !ISSET(flags, FNM_NOESCAPE))
+		if (c == '\\' && !(flags & FNM_NOESCAPE))
 			c = *pattern++;
 		if (c == EOS)
 			return (RANGE_ERROR);
-		if (c == '/' && ISSET(flags, FNM_PATHNAME))
+
+		if (c == '/' && (flags & FNM_PATHNAME))
 			return (RANGE_NOMATCH);
-		if (ISSET(flags, FNM_CASEFOLD))
+
+		if (flags & FNM_CASEFOLD)
 			c = tolower((unsigned char)c);
+
 		if (*pattern == '-'
 		    && (c2 = *(pattern+1)) != EOS && c2 != ']') {
 			pattern += 2;
-			if (c2 == '\\' && !ISSET(flags, FNM_NOESCAPE))
+			if (c2 == '\\' && !(flags & FNM_NOESCAPE))
 				c2 = *pattern++;
 			if (c2 == EOS)
 				return (RANGE_ERROR);
-			if (ISSET(flags, FNM_CASEFOLD))
+
+			if (flags & FNM_CASEFOLD)
 				c2 = tolower((unsigned char)c2);
-			if (c <= test && test <= c2)
+
+			if (__collate_load_error ?
+			    c <= test && test <= c2 :
+			       __collate_range_cmp(c, test) <= 0
+			    && __collate_range_cmp(test, c2) <= 0
+			   )
 				ok = 1;
 		} else if (c == test)
 			ok = 1;
@@ -720,6 +744,49 @@ rangematch(pattern, test, flags, newp)
 
 	*newp = (char *)pattern;
 	return (ok == negate ? RANGE_NOMATCH : RANGE_MATCH);
+}
+
+int __collate_range_cmp (c1, c2)
+	int c1, c2;
+{
+	static char s1[2], s2[2];
+	int ret;
+#ifndef ASCII_COMPATIBLE_COLLATE
+	int as1, as2, al1, al2;
+#endif
+
+	c1 &= UCHAR_MAX;
+	c2 &= UCHAR_MAX;
+	if (c1 == c2)
+		return (0);
+
+#ifndef ASCII_COMPATIBLE_COLLATE
+	as1 = isascii(c1);
+	as2 = isascii(c2);
+	al1 = isalpha(c1);
+	al2 = isalpha(c2);
+
+	if (as1 || as2 || al1 || al2) {
+		if ((as1 && as2) || (!al1 && !al2))
+			return (c1 - c2);
+		if (al1 && !al2) {
+			if (isupper(c1))
+				return ('A' - c2);
+			else
+				return ('a' - c2);
+		} else if (al2 && !al1) {
+			if (isupper(c2))
+				return (c1 - 'A');
+			else
+				return (c1 - 'a');
+		}
+	}
+#endif
+	s1[0] = c1;
+	s2[0] = c2;
+	if ((ret = strcoll(s1, s2)) != 0)
+		return (ret);
+	return (c1 - c2);
 }
 //#include<lwip.h>
 
@@ -778,54 +845,77 @@ lwip_ntohl(u32_t n)
 
 int execl(const char *__path, const char *__arg, ... )
 {
+	printf("\n\ncall execl failed.\n\n");
 	return -1;
 }
 
 int execle(const char *__path, const char *__arg, ... )
 {
+	printf("\n\ncall execle failed.\n\n");
 	return -1;
 }
 
 int execlp(const char *__file, const char *__arg, ... )
 {
+	printf("\n\ncall execlp failed.\n\n");
 	return -1;
 }
 
 int execv(const char *__file ,char * const __argv [])
 {
+	printf("\n\ncall execv failed.\n\n");
 	return -1;
 }
 
 int execve(const char *__path ,char * const __argv [] ,char * const __envp[])
 {
+	printf("\n\ncall execve failed.\n\n");
 	return -1;
 }
 
 int execvp(const char *__file ,char * const __argv [])
 {
+	printf("\n\ncall execvp failed.\n\n");
 	return -1;
 }
 
 int _fork(void)
 {
-    return -1;
+	printf("\n\ncall _fork failed.\n\n");
+	return -1;
 }
 
 long int sysconf (int name)
 {
+	printf("\n\ncall sysconf:%d failed.\n\n",name);
 	return -1;
 }
 
 long int syscall (long int __sysno, ...)
 {
-	return -1;
+	int rc,parm[4] = {0};
+	va_list ap;
+
+	va_start(ap, __sysno);
+	switch(__sysno)
+	{
+	case __NR_clock_gettime:
+		parm[0] = va_arg(ap, int);
+		parm[1] = va_arg(ap, int);
+	default:
+		printf("syscall %d not supported\n",(int)__sysno-__NR_SYSCALL_BASE);
+		errno = ENOTSUP;
+		return -1;
+	}
+	rc = sys_call4(__NR_clock_gettime,parm[0],parm[1],parm[2],parm[3]);
+	return _set_errno(rc);
 }
 
 //#include<stdlib.h>
 
 char *getcwd (char *pt, size_t size)
 {
-	return pt;
+	return (char *)sys_call2(__NR_getcwd, (uintptr_t)pt, size);
 }
 
 static int resolve_path(char *path,char *result,char *pos)
@@ -902,35 +992,46 @@ char *realpath(const char *__restrict path,char *__restrict resolved_path)
 
 int clearenv (void)
 {
-	return -1;
+	extern char **environ;
+	//make environ alloc
+	setenv("CLEAR","PASS",0);
+	//
+	free(environ);
+	environ = NULL;
+	return 0;
 }
 
-int fsync(int fd)
+int fsync (int fd)
 {
-	return -1;
+	int rc = sys_call1(__NR_fsync, fd);
+	return _set_errno(rc);
 }
 
-int creat(const char *__file, mode_t mod)
+int creat (const char *__file, mode_t mod)
 {
-	return -1;
+	int rc = sys_call2(__NR_creat, (uintptr_t)__file, mod);
+	return _set_errno(rc);
 }
 
 //#include<sys/termios.h>
 
 int tcgetattr (int __fd, struct termios *__termios_p) __THROW
 {
+	printf("\n\ncall tcgetattr failed.\n\n");
 	return -1;
 }
 
 int tcsetattr (int __fd, int __optional_actions, __const struct termios *__termios_p) __THROW
 {
+	printf("\n\ncall tcsetattr failed.\n\n");
 	return -1;
 }
 
 //#include<signal.h>
 
-int sigaction(int a, const struct sigaction * b, struct sigaction * c)
+int sigaction (int a, const struct sigaction * b, struct sigaction * c)
 {
+	printf("\n\ncall sigaction failed.\n\n");
 	return -1;
 }
 
@@ -938,5 +1039,6 @@ int sigaction(int a, const struct sigaction * b, struct sigaction * c)
 
 int poll (struct pollfd *__fds, nfds_t __nfds, int __timeout)
 {
+	printf("\n\ncall poll failed.\n\n");
 	return -1;
 }

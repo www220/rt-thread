@@ -237,6 +237,7 @@ _gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
 	static uint16_t sysms = 0;
 	time_t nownow = time(NULL);
 	uint16_t nowms = rt_tick_get() % 1000;
+	struct timezone *zone = (struct timezone*)__tzp;
 	if (sysnow == 0 && sysms == 0)
 	{
 		sysnow = nownow;
@@ -254,6 +255,11 @@ _gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
 	}
 	__tp->tv_sec = sysnow;
 	__tp->tv_usec = sysms * 1000l;
+	if (zone)
+	{
+		zone->tz_dsttime = 0;
+		zone->tz_minuteswest = -480;
+	}
 	return 0;
 #endif
 }
@@ -467,6 +473,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
                 (const char *)rt_module_conv_ptr(module,parm2,0));
         return -ENOTSUP;
     }
+    case SYS_symlink:
+    {
+        rt_kprintf("syscall symlink %s=>%s\n",(const char *)rt_module_conv_ptr(module,parm1,0),
+                (const char *)rt_module_conv_ptr(module,parm2,0));
+        return -ENOTSUP;
+    }
     case SYS_unlink:
     case SYS_rmdir:
     {
@@ -501,6 +513,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         errno = 0;
         return ret_err(fstat(parm1, (struct stat *)rt_module_conv_ptr(module,parm2,sizeof(struct stat))));
     }
+    case SYS_creat:
+    {
+        errno = 0;
+        return ret_err(open((const char*)rt_module_conv_ptr(module,parm1,0), O_TRUNC|O_WRONLY|O_CREAT, parm2));
+    }
     case SYS_open:
     {
        errno = 0;
@@ -530,7 +547,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_sendfile:
     {
         char buf[4096];
-        int rc,readlen = 0;
+        int rc,len,readlen = 0;
         off_t *off = (parm3)?(rt_module_conv_ptr(module,parm3,sizeof(off_t))):(0);
         if (off)
         {
@@ -542,14 +559,15 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         while (parm4)
         {
             errno = 0;
-            rc = read(parm2,buf,sizeof(buf));
+            len = (parm4>sizeof(buf))?(sizeof(buf)):(parm4);
+            rc = read(parm2,buf,len);
             if (rc < 0)
                 return ret_err(rc);
             rc = write(parm1,buf,rc);
             if (rc < 0)
                 return ret_err(rc);
             readlen += rc;
-            if (rc < sizeof(buf))
+            if (rc < len)
                 break;
             parm4 -= rc;
         }
@@ -557,10 +575,21 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             *off += readlen;
         return readlen;
     }
+    case SYS_getcwd:
+    {
+        char *buf = rt_module_conv_ptr(module,parm1,parm2);
+        return (rt_uint32_t)getcwd(buf,parm2);
+    }
+    case SYS_fsync:
+    {
+        errno = 0;
+        return ret_err(parm1);
+    }
     case SYS_gettimeofday:
     {
         errno = 0;
-        return ret_err(_gettimeofday_r(0, (struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)), (void *)parm2));
+        struct timezone *zone = (parm2)?((struct timezone *)rt_module_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
+        return ret_err(_gettimeofday_r(RT_NULL, (struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
     }
     case SYS_ioctl:
     {

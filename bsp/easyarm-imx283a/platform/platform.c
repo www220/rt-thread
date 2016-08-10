@@ -9,7 +9,6 @@
 void inittmppath(void)
 {
     mkdir(rttCfgFileDir, 666);
-    mkdir(rttLibFileDir, 666);
     mkdir(rttLogFileDir, 666);
     cleartmppath();
 }

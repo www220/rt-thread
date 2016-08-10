@@ -55,12 +55,6 @@ typedef rt_uint32_t	mem_ptr_t;
 
 #ifdef RT_USING_NEWLIB
 #include <errno.h>
-/* some errno not defined in newlib */
-#define ENSRNOTFOUND 163  /* Domain name not found */
-/* WARNING: ESHUTDOWN also not defined in newlib. We chose
-			180 here because the number "108" which is used
-			in arch.h has been assigned to another error code. */
-#define ESHUTDOWN 180
 #elif RT_USING_MINILIBC
 #include <errno.h>
 #define  EADDRNOTAVAIL  99  /* Cannot assign requested address */

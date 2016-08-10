@@ -137,7 +137,6 @@
 #define rttTempFileDir "/tmp"
 #define rttLogFileDir "/tmp/log"
 #define rttCfgFileDir "/etc"
-#define rttLibFileDir "/usr"
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
 //#define RT_USING_LWIP_HEAD

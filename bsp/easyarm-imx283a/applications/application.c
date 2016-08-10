@@ -261,6 +261,15 @@ static void rt_thread_entry_main(void* parameter)
         mkdir("/dev", 666);
         mkdir("/mmc", 666);
         mkdir("/usb", 666);
+
+        mkdir("/root", 666);
+        mkdir("/bin", 666);
+        mkdir("/sbin", 666);
+        mkdir("/lib", 666);
+        mkdir("/usr", 666);
+        mkdir("/usr/bin", 666);
+        mkdir("/usr/sbin", 666);
+        mkdir("/usr/lib", 666);
         rt_kprintf("File System initialized!\n");
     } else {
         rt_kprintf("File System failed!\n");

@@ -35,6 +35,8 @@ int _EXFUN(seteuid, (uid_t __uid ));
 int _EXFUN(fchdir, (int __fildes));
 int _EXFUN(chroot, (const char *__path ));
 int _EXFUN(ttyname_r, (int, char *, size_t));
+void _EXFUN(sync, (void));
+pid_t _EXFUN(getsid, (pid_t));
 extern long int syscall (long int __sysno, ...) __THROW;
 extern char *getlogin (void);
 extern int getlogin_r (char *__name, size_t __name_len) __nonnull ((1));

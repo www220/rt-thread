@@ -4,7 +4,7 @@
 %rename cc1plus cc1plus_old
 
 *libgloss:
--lgloss-linux %R/../usr/lib/syscalls.o
+-lgloss-linux %R/../usr/lib/syscalls.o %R/../usr/lib/regcomp.o %R/../usr/lib/regerror.o %R/../usr/lib/regexec.o %R/../usr/lib/regfree.o
 
 *lib:
 %(libgloss) %(lib_old)
