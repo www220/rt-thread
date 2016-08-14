@@ -75,8 +75,8 @@ static struct mem_desc hw_mem_desc[] =
 {
 	{ 0x80000000, 0xFFFFFFFF, 0x80000000, RW_NCNB },     /* None cached for io memory */
 	{ 0x40000000, 0x401FFFFF, 0x40000000, RW_CBD },      /* 2M .exe SDRAM memory */
-	{ 0x40200000, 0x405FFFFF, 0x40200000, RW_CBD },      /* 4M .tlb SDRAM memory */
-	{ 0x40600000, HEAP_BEGIN-1, 0x40600000, RW_CBE },    /* 8M .dll SDRAM memory */
+	{ 0x40200000, 0x403FFFFF, 0x40200000, RW_CBD },      /* 2M .tlb SDRAM memory */
+	{ 0x40400000, HEAP_BEGIN-1, 0x40600000, RW_CBE },    /* 10M .dll SDRAM memory */
 	{ HEAP_BEGIN, HEAP_END-1, HEAP_BEGIN, RW_CBD },      /* 48M data SDRAM memory */
 	{ HEAP_END,   HEAP_END+0x1FFFFF, HEAP_END, RW_NCNB },/* 2M none-cached SDRAM */
 	{ 0x00000000, 0x00020000, 0x00000000, RW_NCNB },     /* isr vector table */
@@ -84,7 +84,7 @@ static struct mem_desc hw_mem_desc[] =
 /* None-cached RAM DMA */
 unsigned char * dma_align_mem = (unsigned char *)0x00000100;
 unsigned char * dma_align_max = (unsigned char *)HEAP_END;
-unsigned char * mod_align_max = (unsigned char *)0x40600000;
+unsigned char * mod_align_max = (unsigned char *)0x40400000;
 
 static struct pin_desc led_pins_desc[] = {
 	{ PIN_WDT, PIN_GPIO, PAD_8MA, PAD_3V3, 1 },

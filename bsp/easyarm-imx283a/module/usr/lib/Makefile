@@ -1,25 +1,28 @@
 CC = ../../bin/arm-none-eabi-gcc
+AR = ../../bin/arm-none-eabi-ar
 CFLAGS = -mcpu=arm926ej-s -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable -Os
 CFLAGS += -isystem../include
 LIBS = -Wl,--gc-sections,-n,--section-start=.init=0x10000000 --specs=linux.specs
 OBJS = main.o \
 	syscalls.o \
-	regcomp.o \
-	regerror.o \
-	regexec.o \
-	regfree.o
+	posix/regcomp.o \
+	posix/regerror.o \
+	posix/regexec.o \
+	posix/regfree.o
 
 %.o:%.c
-	@$(CC) $(CFLAGS) -c -o $@ $< 
 	@echo CC $<
+	@$(CC) $(CFLAGS) -c -o $@ $< 
 
-test:$(OBJS)
-	@$(CC) -o test $(CFLAGS) $(LIBS) $(OBJS)
-	@echo LD test
+rtt_syscall.a:$(OBJS)
+	@echo AR rtt_syscall.a
+	@$(AR) rc rtt_syscall.a $(OBJS)
 
-release:test
-	$(STRIP) test
+rtt_do:$(OBJS)
+	@echo LD rtt_do
+	@$(CC) -o rtt_do $(CFLAGS) $(LIBS) $(OBJS)
 
 clean:
 	rm -f *.o
-	rm -f test
+	rm -f rtt_syscall.a rtt_do
+

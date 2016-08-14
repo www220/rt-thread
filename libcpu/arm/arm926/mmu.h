@@ -30,8 +30,8 @@
 #define HEAP_END          0x43E00000
 
 #define PROCESS_MAX       16
-#define MMU_L2_SIZE       ((HEAP_END-HEAP_BEGIN)/0x100000)
 #define PROCESS_BASE      0x10000000
+#define PROCESS_IN        2
 #define PROCESS_MEM       16
 
 #define CACHE_LINE_SIZE     32
@@ -69,7 +69,6 @@
 #define PET_RW_CB       (PET_RW|CB|DESC_SMALL)     /* Read/Write, cache, write back */
 #define PET_RW_CNB      (PET_RW|CNB|DESC_SMALL)    /* Read/Write, cache, write through */
 #define PET_RW_NCNB     (PET_RW|NCNB|DESC_SMALL)   /* Read/Write without cache and write buffer */
-#define PET_RW_FAULT    (PET_RW|NCNB|DESC_SMALL)   /* Read/Write without cache and write buffer */
 
 struct mem_desc
 {

@@ -563,7 +563,7 @@ ssize_t sendfile (int out_fd, int in_fd, off_t *offset, size_t count)
 
 //#include<fnmatch.h>
 
-#include "collate.h"
+#include "posix/collate.h"
 int __collate_load_error = 1;
 
 #define	EOS	'\0'

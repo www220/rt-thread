@@ -429,7 +429,7 @@ void mmu_maketlb(rt_uint32_t pid)
     rt_uint32_t i,size;
     for (i=0; i<4096; i++)
         _page_table[pid*4096+i] = _page_table[i];
-    size = (PROCESS_MEM+MMU_L2_SIZE)*256;
+    size = (PROCESS_IN+PROCESS_MEM)*256;
     for (i=0; i<size; i++)
         _small_table[pid*size+i] = 0;
 }
@@ -439,7 +439,7 @@ void mmu_freetlb(rt_uint32_t pid)
     rt_uint32_t i,size;
     for (i=0; i<4096; i++)
         _page_table[pid*4096+i] = 0;
-    size = (PROCESS_MEM+MMU_L2_SIZE)*256;
+    size = (PROCESS_IN+PROCESS_MEM)*256;
     for (i=0; i<size; i++)
         _small_table[pid*size+i] = 0;
 }
@@ -458,19 +458,19 @@ void mmu_switchtlb(rt_uint32_t pid)
 
 void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush)
 {
-    volatile rt_uint32_t *pTT,*pSS;
-    volatile int nSec,i,j;
+    volatile rt_uint32_t *pTT,*pSS = RT_NULL;
+    volatile int nSec,i,j = 0;
 
     nSec = size/4096;
     for (i=0; i<nSec; i++)
     {
         pTT=(rt_uint32_t *)_page_table+(pid*4096)+(map>>20);
-        if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
-            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-PROCESS_BASE)/0x100000)*256;
+        if ((map>=PROCESS_BASE-PROCESS_IN*0x100000) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_IN+PROCESS_MEM)*256+((map+PROCESS_IN*0x100000-PROCESS_BASE)/0x100000)*256;
         else if ((map>=0x40000000) && (map<HEAP_BEGIN))
-            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-0x40000000)/0x100000)*256;
+            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_IN+PROCESS_MEM)*256+((map-0x40000000)/0x100000)*256;
         else
-            pSS=(rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+(PROCESS_MEM+(map-HEAP_BEGIN)/0x100000)*256;
+            RT_ASSERT(0);
         if ((*pTT & DESC_PET) != DESC_PET)
         {
             volatile rt_uint32_t mbase = base&0xfff00000;
@@ -481,12 +481,12 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t
                 mbase += 4096;
             }
         }
-        if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
-            j = ((map-PROCESS_BASE)&0xfffff)/4096;
+        if ((map>=PROCESS_BASE-PROCESS_IN*0x100000) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+            j = ((map+PROCESS_IN*0x100000-PROCESS_BASE)&0xfffff)/4096;
         else if ((map>=0x40000000) && (map<HEAP_BEGIN))
             j = ((map-0x40000000)&0xfffff)/4096;
         else
-            j = ((map-HEAP_BEGIN)&0xfffff)/4096;
+            RT_ASSERT(0);
         if (pid == 0)
             pSS[j] = PET_RO|CB|DESC_SMALL|base;
         else
@@ -510,15 +510,15 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32
     volatile int nSec,i;
 
     nSec = size/4096;
-    if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+    if ((map>=PROCESS_BASE-PROCESS_IN*0x100000) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
     {
-        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-PROCESS_BASE)/0x100000)*256;
-        pTT += ((map-PROCESS_BASE)&0xfffff)/4096;
+        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_IN+PROCESS_MEM)*256+((map+PROCESS_IN*0x100000-PROCESS_BASE)/0x100000)*256;
+        pTT += ((map+PROCESS_IN*0x100000-PROCESS_BASE)&0xfffff)/4096;
     }
     else
     {
-        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+(PROCESS_MEM+(map-HEAP_BEGIN)/0x100000)*256;
-        pTT += ((map-HEAP_BEGIN)&0xfffff)/4096;
+        RT_ASSERT(0);
+        return;
     }
     for (i=0; i<nSec; i++)
     {
@@ -541,15 +541,15 @@ int mmu_check_ptr(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size)
     volatile int nSec,i;
 
     nSec = size/4096;
-    if ((map>=PROCESS_BASE) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
+    if ((map>=PROCESS_BASE-PROCESS_IN*0x100000) && (map<PROCESS_BASE+PROCESS_MEM*0x100000))
     {
-        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+((map-PROCESS_BASE)/0x100000)*256;
-        pTT += ((map-PROCESS_BASE)&0xfffff)/4096;
+        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_IN+PROCESS_MEM)*256+((map+PROCESS_IN*0x100000-PROCESS_BASE)/0x100000)*256;
+        pTT += ((map+PROCESS_IN*0x100000-PROCESS_BASE)&0xfffff)/4096;
     }
     else
     {
-        pTT = (rt_uint32_t *)_small_table+pid*(PROCESS_MEM+MMU_L2_SIZE)*256+(PROCESS_MEM+(map-HEAP_BEGIN)/0x100000)*256;
-        pTT += ((map-HEAP_BEGIN)&0xfffff)/4096;
+        RT_ASSERT(0);
+        return 0;
     }
     for (i=0; i<nSec; i++)
     {
@@ -568,8 +568,8 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
     mmu_disable();
     mmu_invalidate_tlb();
 
-    RT_ASSERT((1+PROCESS_MAX)*4096*4+(1+PROCESS_MAX)*(PROCESS_MEM+MMU_L2_SIZE)*256*4 <= 0x400000)
-    rt_memset((void *)_page_table,0,0x400000);
+    RT_ASSERT((1+PROCESS_MAX)*4096*4+(1+PROCESS_MAX)*(PROCESS_IN+PROCESS_MEM)*256*4 <= 0x200000)
+    rt_memset((void *)_page_table,0,0x200000);
 
     /* set page table */
     for (; size > 0; size--)

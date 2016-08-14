@@ -529,7 +529,7 @@ rt_module_t rt_module_do_main(const char *name,
             env_size += ((env != environ)?3:2)+rt_strlen(*env);
             env++;
         }
-        module->module_cmd_size = RT_ALIGN(sizeof(main_info)+line_size+env_size+10,RT_MM_PAGE_SIZE);
+        module->module_cmd_size = RT_ALIGN(32*1024+RT_USING_MODULE_STKSZ,RT_MM_PAGE_SIZE);
         module->module_cmd_line = (rt_uint8_t*)rt_page_alloc(module->module_cmd_size/RT_MM_PAGE_SIZE);
         if (module->module_cmd_line)
         {
