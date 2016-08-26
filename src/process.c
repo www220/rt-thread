@@ -566,6 +566,8 @@ rt_module_t rt_module_do_main(const char *name,
             main_info.module_env_line[env_size] = '\0';
             mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,
                     module->vstart_addr-module->module_cmd_size,module->module_cmd_size,0);
+            /* hold thread stack */
+            mmu_userunmap(module->pid,module->vstart_addr-RT_USING_MODULE_STKSZ,RT_MM_PAGE_SIZE,0);
         }
         else
         {
@@ -1056,6 +1058,8 @@ rt_err_t rt_module_destroy(rt_module_t module)
         rt_mutex_delete(module->mod_mutex);
 #endif
 
+    /* switch tls */
+    mmu_switchtlb(0);
     /* free tls */
     pids |= (1<<(module->pid-1));
     mmu_freetlb(module->pid);
@@ -1215,7 +1219,7 @@ void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size)
     {
         if (base < module->vstart_addr - RT_MODULE_MEMMAKE - RT_USING_MODULE_STKSZ)
             break;
-        if (base >= inmem)
+        if (base > inmem)
             break;
         //calc strlen
         if (size == 0)
@@ -1237,14 +1241,13 @@ void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size)
         }
         //--calc strlen
         rt_uint32_t end = RT_ALIGN(ptr+size,RT_MM_PAGE_SIZE);
-        if (end >= inmem)
+        if (end > inmem)
             break;
         if(mmu_check_ptr(module->pid,base,end-base))
             return (void *)ptr;
     } while (0);
 
-    rt_kprintf("\ndata abort addr:%x size:%x\n",ptr,size);
-    rt_kprintf("thread - %.*s - stack:\n", RT_NAME_MAX, rt_current_thread->name);
+    rt_kprintf("\nthread - %.*s - abort addr:%x size:%x\n", RT_NAME_MAX, rt_current_thread->name, ptr, size);
     RT_ASSERT(0);
     return RT_NULL;
 }

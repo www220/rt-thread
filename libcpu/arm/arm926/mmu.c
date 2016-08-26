@@ -431,7 +431,7 @@ void mmu_maketlb(rt_uint32_t pid)
         _page_table[pid*4096+i] = _page_table[i];
     size = (PROCESS_IN+PROCESS_MEM)*256;
     for (i=0; i<size; i++)
-        _small_table[pid*size+i] = 0;
+        _small_table[pid*size+i] = _small_table[i];
 }
 
 void mmu_freetlb(rt_uint32_t pid)

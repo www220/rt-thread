@@ -129,6 +129,18 @@ static long _list_thread(struct rt_list_node *list)
         else if (thread->stat == RT_THREAD_INIT)    rt_kprintf(" init   ");
         else if (thread->stat == RT_THREAD_CLOSE)   rt_kprintf(" close  ");
 
+#ifdef RT_USING_PROCESS
+        if (thread->module_id)
+        {
+            rt_kprintf(" 0x%08x 0x%08x    --%%   0x%08x %03d\n",
+                       thread->stack_size + ((rt_uint32_t)thread->stack_addr - (rt_uint32_t)thread->sp),
+                       thread->stack_size,
+                       thread->remaining_tick,
+                       thread->error);
+            continue;
+        }
+#endif
+
         ptr = (rt_uint8_t *)thread->stack_addr;
         while (*ptr == '#')ptr ++;
 

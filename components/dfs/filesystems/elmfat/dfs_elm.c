@@ -940,6 +940,9 @@ rt_time_t get_fattime(void)
     struct tm t;
     time_t n = time(0);
     localtime_r(&n,&t);
+    //check file year
+    if (t.tm_year<80) t.tm_year = 80;
+    //--check file year
     return (DWORD)((((t.tm_year+1900-1980) & 0x7F) << 25)
         | (((t.tm_mon+1) & 0x0F) << 21)
         | ((t.tm_mday & 0x1F) << 16)
