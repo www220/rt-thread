@@ -142,8 +142,14 @@ static rt_err_t _rt_thread_init(struct rt_thread *thread,
     {
         extern void rt_hw_stack_swiuser(void *stack_addr);
         rt_hw_stack_swiuser(thread->sp);
+        _REENT_INIT_PTR(thread->plib_reent);
+        _REENT_INIT_PTR(&thread->lib_reent);
     }
-    _REENT_INIT_PTR(&thread->lib_reent);
+    else
+    {
+        thread->plib_reent = RT_NULL;
+        _REENT_INIT_PTR(&thread->lib_reent);
+    }
 #endif
 
     /* priority init */
@@ -341,33 +347,12 @@ rt_thread_t rt_thread_create(const char *name,
 {
     struct rt_thread *thread;
     void *stack_start;
-    rt_uint32_t usermode = 0;
 
     thread = (struct rt_thread *)rt_object_allocate(RT_Object_Class_Thread,
                                                     name);
     if (thread == RT_NULL)
         return RT_NULL;
 
-#ifdef RT_USING_PROCESS
-    if (thread->module_id != RT_NULL || (tick & 0x80000000) == 0x80000000)
-    {
-        rt_uint16_t pid = (tick>>24)&0x7f;
-        if (thread->module_id != RT_NULL)
-            pid = ((rt_module_t)(thread->module_id))->pid;
-        tick &= 0xffffff;
-        usermode = 1;
-        thread->flags |= RT_OBJECT_FLAG_PROCESS;
-
-        stack_size = RT_ALIGN(stack_size,RT_MM_PAGE_SIZE);
-        stack_start = (void *)rt_page_alloc(stack_size/RT_MM_PAGE_SIZE);
-        if (stack_start != RT_NULL)
-        {
-            extern void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t size, rt_uint32_t flush);
-            mmu_usermap(pid,(rt_uint32_t)stack_start,(rt_uint32_t)stack_start,stack_size,thread->module_id!=RT_NULL);
-        }
-    }
-    else
-#endif
     stack_start = (void *)RT_KERNEL_MALLOC(stack_size);
     if (stack_start == RT_NULL)
     {
@@ -384,11 +369,42 @@ rt_thread_t rt_thread_create(const char *name,
                     stack_start,
                     stack_size,
                     priority,
-                    tick,usermode);
+                    tick,0);
 
     return thread;
 }
 RTM_EXPORT(rt_thread_create);
+
+rt_thread_t rt_thread_create2(const char *name,
+                             void (*entry)(void *parameter),
+                             void       *parameter,
+                             void       *stack_start,
+                             rt_uint32_t stack_size,
+                             rt_uint8_t  priority,
+                             rt_uint32_t tick)
+{
+    struct rt_thread *thread;
+
+    thread = (struct rt_thread *)rt_object_allocate(RT_Object_Class_Thread,
+                                                    name);
+    if (thread == RT_NULL)
+        return RT_NULL;
+
+    thread->flags |= RT_OBJECT_FLAG_PROCESS;
+    thread->plib_reent = stack_start-RT_ALIGN(sizeof(struct _reent), 1024);
+
+    _rt_thread_init(thread,
+                    name,
+                    entry,
+                    parameter,
+                    stack_start,
+                    stack_size,
+                    priority,
+                    tick,1);
+
+    return thread;
+}
+RTM_EXPORT(rt_thread_create2);
 
 /**
  * This function will delete a thread. The thread object will be removed from

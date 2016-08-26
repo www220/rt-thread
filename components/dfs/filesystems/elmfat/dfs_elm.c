@@ -937,7 +937,15 @@ DRESULT disk_ioctl(BYTE drv, BYTE ctrl, void *buff)
 
 rt_time_t get_fattime(void)
 {
-    return time(0);
+    struct tm t;
+    time_t n = time(0);
+    localtime_r(&n,&t);
+    return (DWORD)((((t.tm_year+1900-1980) & 0x7F) << 25)
+        | (((t.tm_mon+1) & 0x0F) << 21)
+        | ((t.tm_mday & 0x1F) << 16)
+        | ((t.tm_hour & 0x1F) << 11)
+        | ((t.tm_min & 0x3F) << 5)
+        | ((t.tm_sec/2) & 0x1F));
 }
 
 #if _FS_REENTRANT

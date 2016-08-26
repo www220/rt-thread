@@ -191,8 +191,14 @@ void rt_system_scheduler_start(void)
         }
     }
     if (rt_current_thread->module_id)
-        ((rt_module_t)rt_current_thread->module_id)->impure_ptr = &rt_current_thread->lib_reent;
-    _impure_ptr = &rt_current_thread->lib_reent;
+    {
+        _impure_ptr = rt_current_thread->plib_reent;
+        ((rt_module_t)rt_current_thread->module_id)->impure_ptr = rt_current_thread->plib_reent;
+    }
+    else
+    {
+        _impure_ptr = &rt_current_thread->lib_reent;
+    }
 #endif
 
     /* switch to new thread */
@@ -257,8 +263,14 @@ void rt_schedule(void)
                 }
             }
             if (rt_current_thread->module_id)
-                ((rt_module_t)rt_current_thread->module_id)->impure_ptr = &rt_current_thread->lib_reent;
-            _impure_ptr = &rt_current_thread->lib_reent;
+            {
+                _impure_ptr = rt_current_thread->plib_reent;
+                ((rt_module_t)rt_current_thread->module_id)->impure_ptr = rt_current_thread->plib_reent;
+            }
+            else
+            {
+                _impure_ptr = &rt_current_thread->lib_reent;
+            }
 #endif
 
             RT_OBJECT_HOOK_CALL(rt_scheduler_hook, (from_thread, to_thread));

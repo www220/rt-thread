@@ -525,6 +525,7 @@ struct rt_thread
 
 #ifdef RT_USING_PROCESS
     struct _reent lib_reent;
+    struct _reent *plib_reent;
 #endif
 
     rt_ubase_t  init_tick;                              /**< thread's initialized tick */

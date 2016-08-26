@@ -72,6 +72,14 @@
 static volatile rt_uint32_t pids = 0;
 #define RT_MODULE_ARG_MAX    20
 extern struct rt_thread *rt_current_thread;
+#define RT_MODULE_MEMMAKE (32 * 1024)
+extern rt_thread_t rt_thread_create2(const char *name,
+                             void (*entry)(void *parameter),
+                             void       *parameter,
+                             void       *stack_start,
+                             rt_uint32_t stack_size,
+                             rt_uint8_t  priority,
+                             rt_uint32_t tick);
 
 /**
  * @ingroup SystemInit
@@ -529,7 +537,7 @@ rt_module_t rt_module_do_main(const char *name,
             env_size += ((env != environ)?3:2)+rt_strlen(*env);
             env++;
         }
-        module->module_cmd_size = RT_ALIGN(32*1024+RT_USING_MODULE_STKSZ,RT_MM_PAGE_SIZE);
+        module->module_cmd_size = RT_ALIGN(RT_MODULE_MEMMAKE+RT_USING_MODULE_STKSZ,RT_MM_PAGE_SIZE);
         module->module_cmd_line = (rt_uint8_t*)rt_page_alloc(module->module_cmd_size/RT_MM_PAGE_SIZE);
         if (module->module_cmd_line)
         {
@@ -557,7 +565,7 @@ rt_module_t rt_module_do_main(const char *name,
             }
             main_info.module_env_line[env_size] = '\0';
             mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,
-                    (rt_uint32_t)module->module_cmd_line,module->module_cmd_size,0);
+                    module->vstart_addr-module->module_cmd_size,module->module_cmd_size,0);
         }
         else
         {
@@ -598,10 +606,12 @@ rt_module_t rt_module_do_main(const char *name,
 #endif
 
         /* create module thread */
-        module->module_thread = rt_thread_create(name,
-                                                 module_main_entry, module->module_cmd_line,
+        module->module_thread = rt_thread_create2(name,
+                                                 module_main_entry,
+                                                 (void *)(module->vstart_addr-RT_MODULE_MEMMAKE-RT_USING_MODULE_STKSZ),
+                                                 module->module_cmd_line+RT_MODULE_MEMMAKE,
                                                  RT_USING_MODULE_STKSZ,
-                                                 RT_USING_MODULE_PRIO, ((0x80|module->pid)<<24)|20);
+                                                 RT_USING_MODULE_PRIO, 20);
         if (!module->module_thread)
         {
             rt_kprintf("Module: allocate thread failed.\n");
@@ -614,6 +624,12 @@ rt_module_t rt_module_do_main(const char *name,
 
         /* set module id */
         module->module_thread->module_id = (void *)module;
+        module->module_thread->sp = (void *)(module->vstart_addr-(rt_uint32_t)(module->module_cmd_line+module->module_cmd_size-(rt_uint8_t *)module->module_thread->sp));
+        module->module_thread->stack_addr = (void *)(module->vstart_addr-RT_USING_MODULE_STKSZ);
+        module->module_thread->plib_reent = (struct _reent *)(module->vstart_addr-RT_USING_MODULE_STKSZ-RT_ALIGN(sizeof(struct _reent),1024));
+        struct module_main_info *main_info = (struct module_main_info*)module->module_cmd_line;
+        main_info->module_cmd_line = module->module_thread->parameter+sizeof(struct module_main_info);
+        main_info->module_env_line = main_info->module_cmd_line+main_info->module_cmd_size+1;
         module->parent.flag |= RT_MODULE_FLAG_WITHENTRY;
 
         /* startup module thread */
@@ -1175,7 +1191,7 @@ rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr)
             return base + module->page_cnt*RT_MM_PAGE_SIZE;
         else if (module->page_cnt + npage > PAGE_COUNT_MAX)
             npage = PAGE_COUNT_MAX-module->page_cnt;
-        //
+        //--limit memory
         void *ptr = rt_page_alloc(npage);
         if (ptr == RT_NULL)
             return base + module->page_cnt*RT_MM_PAGE_SIZE;
@@ -1197,60 +1213,38 @@ void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size)
     rt_uint32_t base = RT_ALIGN_DOWN(ptr,RT_MM_PAGE_SIZE);
     do
     {
-        if (base < module->vstart_addr)
+        if (base < module->vstart_addr - RT_MODULE_MEMMAKE - RT_USING_MODULE_STKSZ)
             break;
-        if (base > inmem && base < HEAP_BEGIN)
-            break;
-        if (base > HEAP_END)
+        if (base >= inmem)
             break;
         //calc strlen
         if (size == 0)
         {
             char *buf = (char *)ptr;
-            if ((rt_uint32_t)buf <= inmem)
+            while (*buf)
             {
-                while (*buf)
+                if ((rt_uint32_t)buf > inmem)
                 {
-                    if ((rt_uint32_t)buf > inmem)
-                    {
-                        buf = RT_NULL;
-                        break;
-                    }
-                    buf++;
-                    size++;
+                    buf = RT_NULL;
+                    break;
                 }
-            }
-            else
-            {
-                while (*buf)
-                {
-                    if ((rt_uint32_t)buf > HEAP_END)
-                    {
-                        buf = RT_NULL;
-                        break;
-                    }
-                    buf++;
-                    size++;
-                }
+                buf++;
+                size++;
             }
             if (buf == RT_NULL)
                 break;
             size++;
         }
-        //
+        //--calc strlen
         rt_uint32_t end = RT_ALIGN(ptr+size,RT_MM_PAGE_SIZE);
-        if (end < module->vstart_addr)
-            break;
-        if (end > inmem && end < HEAP_BEGIN)
-            break;
-        if (end > HEAP_END)
+        if (end >= inmem)
             break;
         if(mmu_check_ptr(module->pid,base,end-base))
             return (void *)ptr;
     } while (0);
 
-    rt_kprintf("data abort addr:%x size:%x\n",ptr,size);
-    rt_kprintf("thread - %.*s stack:\n", RT_NAME_MAX, rt_current_thread->name);
+    rt_kprintf("\ndata abort addr:%x size:%x\n",ptr,size);
+    rt_kprintf("thread - %.*s - stack:\n", RT_NAME_MAX, rt_current_thread->name);
     RT_ASSERT(0);
     return RT_NULL;
 }
