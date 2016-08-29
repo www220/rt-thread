@@ -396,6 +396,52 @@ static inline int ret_err(int ret)
     return ret;
 }
 
+#define _UTSNAME_LENGTH 65
+#define _UTSNAME_DOMAIN_LENGTH _UTSNAME_LENGTH
+
+#ifndef _UTSNAME_SYSNAME_LENGTH
+# define _UTSNAME_SYSNAME_LENGTH _UTSNAME_LENGTH
+#endif
+#ifndef _UTSNAME_NODENAME_LENGTH
+# define _UTSNAME_NODENAME_LENGTH _UTSNAME_LENGTH
+#endif
+#ifndef _UTSNAME_RELEASE_LENGTH
+# define _UTSNAME_RELEASE_LENGTH _UTSNAME_LENGTH
+#endif
+#ifndef _UTSNAME_VERSION_LENGTH
+# define _UTSNAME_VERSION_LENGTH _UTSNAME_LENGTH
+#endif
+#ifndef _UTSNAME_MACHINE_LENGTH
+# define _UTSNAME_MACHINE_LENGTH _UTSNAME_LENGTH
+#endif
+
+/* Structure describing the system and machine.  */
+struct utsname
+{
+    /* Name of the implementation of the operating system.  */
+    char sysname[_UTSNAME_SYSNAME_LENGTH];
+
+    /* Name of this node on the network.  */
+    char nodename[_UTSNAME_NODENAME_LENGTH];
+
+    /* Current release level of this implementation.  */
+    char release[_UTSNAME_RELEASE_LENGTH];
+    /* Current version level of this release.  */
+    char version[_UTSNAME_VERSION_LENGTH];
+
+    /* Name of the hardware type the system is running on.  */
+    char machine[_UTSNAME_MACHINE_LENGTH];
+
+#if _UTSNAME_DOMAIN_LENGTH - 0
+    /* Name of the domain of this node on the network.  */
+# ifdef __USE_GNU
+    char domainname[_UTSNAME_DOMAIN_LENGTH];
+# else
+    char __domainname[_UTSNAME_DOMAIN_LENGTH];
+# endif
+#endif
+};
+
 rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_uint32_t parm2, rt_uint32_t parm3,
         rt_uint32_t parm4, rt_uint32_t parm5,
@@ -405,6 +451,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
 
     RT_ASSERT(module != RT_NULL);
     RT_ASSERT((nbr&SYS_BASE) == SYS_BASE);
+    //rt_kprintf("syscall %d in\n",nbr-SYS_BASE);
 
     switch(nbr)
     {
@@ -478,6 +525,17 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_kprintf("syscall symlink %s=>%s\n",(const char *)rt_module_conv_ptr(module,parm1,0),
                 (const char *)rt_module_conv_ptr(module,parm2,0));
         return -ENOTSUP;
+    }
+    case SYS_uname:
+    {
+        struct utsname* uname = (struct utsname*)rt_module_conv_ptr(module,parm1,sizeof(struct utsname));
+        strcpy(uname->sysname,"Linux");
+        strcpy(uname->nodename,"root");
+        strcpy(uname->release,"2.6.35");
+        strcpy(uname->version,"7/12/2014");
+        strcpy(uname->machine,"ARM9");
+        strcpy(uname->__domainname,"root");
+        return 0;
     }
     case SYS_unlink:
     case SYS_rmdir:
@@ -597,20 +655,20 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
         return -ENOTSUP;
     }
-    case 0x900000+901:
-    case 0x900000+903:
+    case SYS_BASE+901:
+    case SYS_BASE+903:
     {
         rt_mutex_take(module->mod_mutex, RT_WAITING_FOREVER);
         return 0;
     }
-    case 0x900000+902:
-    case 0x900000+904:
+    case SYS_BASE+902:
+    case SYS_BASE+904:
     {
         rt_mutex_release(module->mod_mutex);
         return 0;
     }
     }
-    rt_kprintf("syscall %d not supported\n",nbr-0x900000);
+    rt_kprintf("syscall %d not supported\n",nbr-SYS_BASE);
     return -ENOTSUP;
 }
 #endif
