@@ -14,15 +14,16 @@ OBJS = main.o \
 	@echo CC $<
 	@$(CC) $(CFLAGS) -c -o $@ $< 
 
-rtt_syscall.a:$(OBJS)
+rtt_syscall:$(OBJS)
 	@echo AR rtt_syscall.a
 	@$(AR) rc rtt_syscall.a $(OBJS)
 
 rtt_do:$(OBJS)
-	@echo LD rtt_do
-	@$(CC) -o rtt_do $(CFLAGS) $(LIBS) $(OBJS)
+	@echo LD rtt_do.mo
+	@$(CC) -o rtt_do.mo $(CFLAGS) $(LIBS) $(OBJS)
 
 clean:
 	rm -f *.o
-	rm -f rtt_syscall.a rtt_do
+	rm -f posix/*.o
+	rm -f rtt_syscall.a rtt_do.mo
 

@@ -181,10 +181,13 @@ void rt_system_scheduler_start(void)
     rt_current_thread = to_thread;
 #ifdef RT_USING_PROCESS
     if (rt_current_module != rt_current_thread->module_id)
+    {
         rt_current_module = (rt_module_t)rt_current_thread->module_id;
+        if (rt_current_module)
+            mmu_switchtlb(rt_current_module->pid);
+    }
     if (rt_current_module)
     {
-        mmu_switchtlb(rt_current_module->pid);
         _impure_ptr = rt_current_thread->plib_reent;
         rt_current_module->impure_ptr = rt_current_thread->plib_reent;
     }
@@ -246,10 +249,13 @@ void rt_schedule(void)
             rt_current_thread   = to_thread;
 #ifdef RT_USING_PROCESS
             if (rt_current_module != rt_current_thread->module_id)
+            {
                 rt_current_module = (rt_module_t)rt_current_thread->module_id;
+                if (rt_current_module)
+                    mmu_switchtlb(rt_current_module->pid);
+            }
             if (rt_current_module)
             {
-                mmu_switchtlb(rt_current_module->pid);
                 _impure_ptr = rt_current_thread->plib_reent;
                 rt_current_module->impure_ptr = rt_current_thread->plib_reent;
             }

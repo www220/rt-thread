@@ -215,6 +215,7 @@ ctor_end:
     .global rt_hw_trap_resv
     .global rt_hw_trap_irq
     .global rt_hw_trap_fiq
+    .global rt_hw_trap_assert
 
     .global rt_interrupt_enter
     .global rt_interrupt_leave
@@ -273,6 +274,10 @@ PAbt_Handler:
     STR     R6, [R8, #8]            @; Save CPSR
     MOV     R0, SP
     BL      rt_hw_trap_pabt
+    ADD     SP, SP, #S_FRAME_SIZE
+    MSR     CPSR_c, #MODE_SVC|NOINT @; Switch to SVC mode and no interrupt
+    LDR     SP, =SVC_STACK_START
+    BL      rt_hw_trap_assert
 
     .align  5
 DAbt_Handler:
@@ -288,6 +293,10 @@ DAbt_Handler:
     STR     R6, [R8, #8]            @; Save CPSR
     MOV     R0, SP
     BL      rt_hw_trap_dabt
+    ADD     SP, SP, #S_FRAME_SIZE
+    MSR     CPSR_c, #MODE_SVC|NOINT @; Switch to SVC mode and no interrupt
+    LDR     SP, =SVC_STACK_START
+    BL      rt_hw_trap_assert
 
     .align  5
 Resv_Handler:

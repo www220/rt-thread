@@ -133,11 +133,15 @@ void rt_hw_trap_pabt(struct rt_hw_register *regs)
     rt_uint32_t rest;
 
     __asm volatile("mrc p15, 0, %0, c5, c0, 1":"=r" (rest));
-    rt_kprintf("\nprefetch abort call:%x type:%d%d%d%d\n",regs->lr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
+    rt_kprintf("\nprefetch abort sp:%x call:%x type:%d%d%d%d\n",regs->sp,regs->lr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s - stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_FINSH
     list_thread();
+#endif
+#ifdef RT_USING_MODULE
+    if (rt_module_self() != RT_NULL)
+        return;
 #endif
     rt_hw_cpu_shutdown();
 }
@@ -156,13 +160,26 @@ void rt_hw_trap_dabt(struct rt_hw_register *regs)
 
     __asm volatile("mrc p15, 0, %0, c6, c0, 0":"=r" (addr));
     __asm volatile("mrc p15, 0, %0, c5, c0, 0":"=r" (rest));
-    rt_kprintf("\ndata abort call:%x addr:%x type:%d%d%d%d\n",regs->lr,addr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
+    rt_kprintf("\ndata abort sp:%x call:%x addr:%x type:%d%d%d%d\n",regs->sp,regs->lr,addr,(rest>>3)&1,(rest>>2)&1,(rest>>1)&1,rest&1);
     rt_kprintf("thread - %.*s - stack:\n", RT_NAME_MAX, rt_current_thread->name);
 
 #ifdef RT_USING_FINSH
     list_thread();
 #endif
+#ifdef RT_USING_MODULE
+    if (rt_module_self() != RT_NULL)
+        return;
+#endif
     rt_hw_cpu_shutdown();
+}
+
+void rt_hw_trap_assert()
+{
+    /* unload assertion module */
+    rt_module_unload(rt_module_self());
+
+    /* re-schedule */
+    rt_schedule();
 }
 
 /**

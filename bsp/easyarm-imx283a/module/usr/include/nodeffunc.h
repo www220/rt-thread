@@ -22,6 +22,7 @@ int getgrouplist (const char *user, gid_t group, gid_t *groups, int *ngroups);
 #define SA_RESTART	0x10000000
 int _EXFUN(sigaction, (int, const struct sigaction *, struct sigaction *));
 int _EXFUN(sigsuspend, (const sigset_t *));
+int _EXFUN(kill, (pid_t, int));
 
 //#include<stdio.h>
 #define getline __getline
@@ -48,5 +49,27 @@ extern int nanosleep (__const struct timespec *__requested_time, struct timespec
 //#include<limit.h>
 #define NAME_MAX         255	/* # chars in a file name */
 #define	PATH_MAX		 1024	/* max bytes in pathname */
+
+//#include<resource.h>
+typedef int __rlimit_resource_t;
+typedef unsigned long int rlim_t;
+
+struct rlimit
+{
+    /* The current (soft) limit.  */
+    rlim_t rlim_cur;
+    /* The hard limit.  */
+    rlim_t rlim_max;
+};
+
+# define RLIM_INFINITY ((unsigned long int)(~0UL))
+extern int getrlimit (__rlimit_resource_t __resource, struct rlimit *__rlimits) __THROW;
+extern int setrlimit (__rlimit_resource_t __resource, __const struct rlimit *__rlimits) __THROW;
+
+//#include<wait.h>
+#define	__WCOREFLAG		0x80
+#define	__WCOREDUMP(status)	((status) & __WCOREFLAG)
+# define __WAIT_INT(status)	(status)
+# define WCOREDUMP(status)	__WCOREDUMP (__WAIT_INT (status))
 
 #endif //_NODEFFUNC
