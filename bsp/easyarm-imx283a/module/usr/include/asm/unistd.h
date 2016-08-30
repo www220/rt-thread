@@ -15,7 +15,7 @@
 
 #define __NR_OABI_SYSCALL_BASE	0x900000
 
-#if defined(__thumb__) || defined(__ARM_EABI__)
+#if defined(__thumb__)
 #define __NR_SYSCALL_BASE	0
 #else
 #define __NR_SYSCALL_BASE	__NR_OABI_SYSCALL_BASE

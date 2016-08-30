@@ -1,14 +1,29 @@
 CC = ../../bin/arm-none-eabi-gcc
 AR = ../../bin/arm-none-eabi-ar
 CFLAGS = -mcpu=arm926ej-s -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable -Os
-CFLAGS += -isystem../include
+CFLAGS += -isystem../include -I./posix -I./linux
 LIBS = -Wl,--gc-sections,-n,--section-start=.init=0x10000000 --specs=linux.specs
 OBJS = main.o \
 	syscalls.o \
+	posix/collcmp.o \
+	posix/collate.o \
 	posix/regcomp.o \
 	posix/regerror.o \
 	posix/regexec.o \
-	posix/regfree.o
+	posix/regfree.o \
+	posix/fnmatch.o \
+	posix/execl.o \
+	posix/execle.o \
+	posix/execlp.o \
+	posix/execv.o \
+	posix/execve.o \
+	posix/execvp.o \
+	linux/sysconf.o \
+	linux/strverscmp.o \
+	linux/basename.o \
+	linux/dirname.o \
+	linux/realpath.o \
+	linux/termios.o
 
 %.o:%.c
 	@echo CC $<
@@ -25,5 +40,6 @@ rtt_do:$(OBJS)
 clean:
 	rm -f *.o
 	rm -f posix/*.o
+	rm -f linux/*.o
 	rm -f rtt_syscall.a rtt_do.mo
 

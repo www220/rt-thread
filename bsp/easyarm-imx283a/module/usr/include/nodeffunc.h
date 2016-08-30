@@ -41,6 +41,7 @@ pid_t _EXFUN(getsid, (pid_t));
 extern long int syscall (long int __sysno, ...) __THROW;
 extern char *getlogin (void);
 extern int getlogin_r (char *__name, size_t __name_len) __nonnull ((1));
+int _EXFUN(_execve, (const char *__path, char * const __argv[], char * const __envp[] ));
 
 //#include<time.h>
 extern int stime (__const time_t *__when) __THROW;
