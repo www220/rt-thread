@@ -581,14 +581,14 @@ int creat (const char *__file, mode_t mod)
 
 int sigaction (int sig, const struct sigaction *act, struct sigaction *oact)
 {
-	printf("\n\ncall sigaction failed.\n\n");
-	return -1;
+	int rc = sys_call3(__NR_sigaction, sig, (uintptr_t)act, (uintptr_t)oact);
+	return _set_errno(rc);
 }
 
 //#include<sys/poll.h>
 
 int poll (struct pollfd *__fds, nfds_t __nfds, int __timeout)
 {
-	printf("\n\ncall poll failed.\n\n");
-	return -1;
+	int rc = sys_call3(__NR_poll, (uintptr_t)__fds, __nfds, __timeout);
+	return _set_errno(rc);
 }

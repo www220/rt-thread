@@ -64,8 +64,8 @@
 #ifndef RT_USING_SLAB
 #error "defined RT_USING_SLAB"
 #endif
-#if PROCESS_MAX > 64
-#error "PROCESS_MAX <= 64"
+#if PROCESS_MAX > 30
+#error "PROCESS_MAX <= 30"
 #endif
 #if PROCESS_MEM > 64
 #error "PROCESS_MEM <= 64"
@@ -88,6 +88,7 @@ extern rt_thread_t rt_thread_create2(const char *name,
 static int pid_buf[MAX_PID_SIZE];
 static unsigned short pidinfo[MAX_PID_SIZE][2];
 static int current_pid = 0;
+static struct rt_event mod_event;
 
 static unsigned short getempty_pid(unsigned short parent)
 {
@@ -117,6 +118,7 @@ int rt_system_module_init(void)
     int i;
     for (i=0; i<PROCESS_MAX; i++)
         pids |= (1<<i);
+    rt_event_init(&mod_event, "process", RT_IPC_FLAG_FIFO);
     return 0;
 }
 INIT_COMPONENT_EXPORT(rt_system_module_init);
@@ -676,7 +678,8 @@ rt_module_t rt_module_do_main(const char *name,
     }
 #endif
 
-    rt_thread_delay(500);
+    rt_event_recv(&mod_event, 1<<(module->pid-1), RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,
+                                        RT_WAITING_FOREVER, RT_NULL);
     return module;
 }
 
@@ -1086,6 +1089,7 @@ rt_err_t rt_module_destroy(rt_module_t module)
 
     /* switch tls */
     mmu_switchtlb(0);
+    rt_event_send(&mod_event, 1<<(module->pid-1));
     /* free tls */
     pids |= (1<<(module->pid-1));
     mmu_freetlb(module->pid);
