@@ -529,12 +529,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_uname:
     {
         struct utsname* uname = (struct utsname*)rt_module_conv_ptr(module,parm1,sizeof(struct utsname));
-        strcpy(uname->sysname,"Linux");
-        strcpy(uname->nodename,"root");
-        strcpy(uname->release,"2.6.35");
-        strcpy(uname->version,"7/12/2014");
+        strcpy(uname->sysname,"RTThread");
+        strcpy(uname->nodename,"local");
+        strcpy(uname->release,"2.1.0");
+        strcpy(uname->version,__DATE__);
         strcpy(uname->machine,"ARM9");
-        strcpy(uname->__domainname,"root");
+        strcpy(uname->__domainname,"localdomain");
         return 0;
     }
     case SYS_unlink:

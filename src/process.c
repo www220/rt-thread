@@ -67,6 +67,9 @@
 #if PROCESS_MAX > 64
 #error "PROCESS_MAX <= 64"
 #endif
+#if PROCESS_MEM > 64
+#error "PROCESS_MEM <= 64"
+#endif
 
 #define PAGE_COUNT_MAX    (256 * PROCESS_MEM)
 static volatile rt_uint32_t pids = 0;
@@ -80,6 +83,29 @@ extern rt_thread_t rt_thread_create2(const char *name,
                              rt_uint32_t stack_size,
                              rt_uint8_t  priority,
                              rt_uint32_t tick);
+
+#define MAX_PID_SIZE	4096
+static int pid_buf[MAX_PID_SIZE];
+static unsigned short pidinfo[MAX_PID_SIZE][2];
+static int current_pid = 0;
+
+static unsigned short getempty_pid(unsigned short parent)
+{
+	int i,ret;
+	for(i=0; i<MAX_PID_SIZE; i++)
+	{
+		if (pidinfo[current_pid][0] == 0)
+		{
+			ret = current_pid+1;
+			pidinfo[current_pid][0] = 1;
+			pidinfo[current_pid][1] = parent;
+			if (++current_pid >= MAX_PID_SIZE)
+				current_pid = 0;
+			return ret;
+		}
+	}
+	return 0;
+}
 
 /**
  * @ingroup SystemInit
