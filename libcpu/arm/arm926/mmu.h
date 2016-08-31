@@ -62,7 +62,7 @@
 #define DOMAIN1_ATTR        (DOMAIN_FAULT<<2)
 
 #define RW_CBE      (AP_RO|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
-#define RW_CBD      (AP_NA|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
+#define RW_CB       (AP_NA|DOMAIN0|CB|DESC_SEC)     /* Read/Write, cache, write back */
 #define RW_CNB      (AP_NA|DOMAIN0|CNB|DESC_SEC)    /* Read/Write, cache, write through */
 #define RW_NCNB     (AP_NA|DOMAIN0|NCNB|DESC_SEC)   /* Read/Write without cache and write buffer */
 

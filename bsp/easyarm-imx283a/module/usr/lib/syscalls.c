@@ -15,14 +15,12 @@
 #include <sys/poll.h>
 #include <grp.h>
 #include <pwd.h>
-#include <utime.h>
 #include <limits.h>
 #include <time.h>
 #include <sys/types.h>
 
 extern int _set_errno(int n);
 extern int _getdents(int file, struct dirent *dirp, size_t nbytes);
-extern int _utime(__const char *__file, __const struct utimbuf *__file_times);
 extern pid_t _getpid(void);
 
 /* SWI with SYS_ call number and no parameters */
@@ -387,37 +385,16 @@ int closedir(DIR *d)
 
 //#include<time.h>
 
-int
-utimes (const char *file, const struct timeval tvp[2])
+int utimes (const char *file, const struct timeval tvp[2])
 {
-  struct utimbuf buf, *times;
-
-  if (tvp)
-    {
-      times = &buf;
-      times->actime = tvp[0].tv_sec + tvp[0].tv_usec / 1000000;
-      times->modtime = tvp[1].tv_sec + tvp[1].tv_usec / 1000000;
-    }
-  else
-    times = NULL;
-
-  return _utime(file, times);
+	int rc = sys_call2(__NR_utimes, (uintptr_t)file, (uintptr_t)tvp);
+	return _set_errno(rc);
 }
 
 int lutimes (const char *path, const struct timeval tvp[2])
 {
-  struct utimbuf buf, *times;
-
-  if (tvp)
-    {
-      times = &buf;
-      times->actime = tvp[0].tv_sec + tvp[0].tv_usec / 1000000;
-      times->modtime = tvp[1].tv_sec + tvp[1].tv_usec / 1000000;
-    }
-  else
-    times = NULL;
-
-  return _utime(path, times);
+	errno = ENOTSUP;
+	return -1;
 }
 
 unsigned sleep(unsigned int seconds)

@@ -228,7 +228,7 @@ int debug_printf_ap(int debug_level, const char *module, const char *format, va_
     if(debug_level <= g_debug_level)
     {
         static u32 s_infoindex = 0xffffffff;
-        static char s_info[32][4096];
+        static char s_info[16][4096];
         rt_base_t level;
         int nbuf,info;
         struct timeval tp;

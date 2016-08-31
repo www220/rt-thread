@@ -487,14 +487,14 @@ void mmu_usermap(rt_uint32_t pid, rt_uint32_t base, rt_uint32_t map, rt_uint32_t
             j = ((map-0x40000000)&0xfffff)/4096;
         else
             RT_ASSERT(0);
-        if (pid == 0)
+        if (flush&2)
             pSS[j] = PET_RO|CB|DESC_SMALL|base;
         else
             pSS[j] = PET_RW_CB|base;
         base += 4096;
         map += 4096;
     }
-	if (flush)
+	if (flush&1)
 	{
 		asm volatile("	mov	ip, #0\n"
 					"1:	mrc	p15, 0, r15, c7, c10, 3 	@ test,clean\n"
@@ -525,7 +525,7 @@ void mmu_userunmap(rt_uint32_t pid, rt_uint32_t map, rt_uint32_t size, rt_uint32
         *pTT = ((*pTT)&(~PET_RW))|PET_NA;
         pTT++;
     }
-	if (flush)
+	if (flush&1)
 	{
 		asm volatile("	mov	ip, #0\n"
 					"1:	mrc	p15, 0, r15, c7, c10, 3 	@ test,clean\n"
@@ -579,7 +579,7 @@ void rt_hw_mmu_init(struct mem_desc *mdesc, rt_uint32_t size)
         mdesc++;
     }
     /* set moudule_fn table */
-    mmu_usermap(0,0x40000000,0x40000000,8192,0);
+    mmu_usermap(0,0x40000000,0x40000000,8192,2);
 
     /* set MMU table address */
     mmu_setttbase((rt_uint32_t)_page_table);

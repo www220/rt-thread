@@ -71,6 +71,13 @@ extern void usbh_init(void);
 
 #ifdef RT_USING_RTC
 extern void list_date(void);
+#ifndef RT_USING_FINSH
+void list_date(void)
+{
+    time_t now = time(RT_NULL);
+    rt_kprintf("%s\n", ctime(&now));
+}
+#endif
 #endif
 
 #ifdef RT_USING_LIBC
@@ -217,7 +224,7 @@ static void rt_thread_entry_wtdog(void* parameter)
 }
 
 ALIGN(RT_ALIGN_SIZE)
-static char thread_main_stack[32768];
+static char thread_main_stack[4096];
 struct rt_thread thread_main;
 static void rt_thread_entry_main(void* parameter)
 {
@@ -285,9 +292,9 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
 #ifdef RT_USING_DFS_ROMFS
-    dfs_mount(RT_NULL, "/rom", "rom", 0, &romfs_root);
-    rt_kprintf("Mount /rom ok!\n");
-    SysLog_Main(rtt_LogNotice, "Mount /rom ok!\n");
+    dfs_mount(RT_NULL, "/boot", "rom", 0, &romfs_root);
+    rt_kprintf("Mount /boot ok!\n");
+    SysLog_Main(rtt_LogNotice, "Mount /boot ok!\n");
 #endif
 #ifdef RT_USING_DFS_DEVFS
     dfs_mount(RT_NULL, "/dev", "devfs", 0, 0);
@@ -370,14 +377,6 @@ static void rt_thread_entry_main(void* parameter)
     SysLog_Main(rtt_LogNotice, "TCP/IP initialized!\n");
 #endif
 
-#ifdef RT_USING_RTGUI
-    lcd_init();
-    touch_init();
-    rtgui_system_server_init();
-    rt_kprintf("RtGUI initialized!\n");
-    SysLog_Main(rtt_LogNotice, "RtGUI initialized!\n");
-#endif
-
     /* list date */
 #ifdef RT_USING_RTC
     list_date();
@@ -388,17 +387,6 @@ static void rt_thread_entry_main(void* parameter)
     finsh_system_init();
     finsh_set_device(FINSH_DEVICE_NAME);
    	rt_thread_delay(100);
-#endif
-
-#if defined(FINSH_USING_MSH)
-    if (PZ[1] && dfs_file_stat(rttCfgFileDir "/auto.sh", &st) == 0)
-    {
-    	char * cmd[] = {"sh", rttCfgFileDir "/auto.sh"};
-    	char * beep[] = {"beep", "200"};
-    	cmd_beep(0,NULL);
-    	cmd_sh(2, cmd);
-    	cmd_beep(2,beep);
-    }
 #endif
 
     while (1)
