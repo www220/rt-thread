@@ -50,14 +50,9 @@ _fork_r(struct _reent *ptr)
 int
 _fstat_r(struct _reent *ptr, int fd, struct stat *pstat)
 {
-#ifndef RT_USING_DFS
-	return 0;
-#else
-	int rc;
-
-	rc = fstat(fd, pstat);
-	return rc;
-#endif
+	/* return "not supported" */
+	ptr->_errno = ENOTSUP;
+	return -1;
 }
 
 int
@@ -71,15 +66,9 @@ _isatty_r(struct _reent *ptr, int fd)
 {
 	if (fd >=0 && fd < 3) return 1;
 
-	return 0;
-}
-
-int
-_isatty(int fd)
-{
-	if (fd >=0 && fd < 3) return 1;
-
-	return 0;
+	/* return "not supported" */
+	ptr->_errno = ENOTSUP;
+	return -1;
 }
 
 int

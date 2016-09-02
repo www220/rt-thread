@@ -227,35 +227,28 @@ int debug_printf_ap(int debug_level, const char *module, const char *format, va_
 {
     if(debug_level <= g_debug_level)
     {
-        static u32 s_infoindex = 0xffffffff;
-        static char s_info[16][4096];
-        rt_base_t level;
         int nbuf,info;
         struct timeval tp;
         struct tm now;
 		char *bufdata;
 		int buflen;
 
-        level = rt_hw_interrupt_disable();
-        info = __rt_ffs(s_infoindex);
-        if (info)
-            s_infoindex &= ~(1<<(info-1));
-        rt_hw_interrupt_enable(level);
-
-        if (!info)
+#define _DEF_MSGBUF 4096
+        char *msg_info = (char *)rt_malloc(_DEF_MSGBUF);
+        if (!msg_info)
             return 0;
 
         gettimeofday(&tp,NULL);
         localtime_r(&tp.tv_sec, &now);
 
-        nbuf = sprintf(s_info[info-1], "%04d-%02d-%02d %02d:%02d:%02d.%03d %-16s %02d ", now.tm_year+1900, now.tm_mon+1, now.tm_mday,
+        nbuf = sprintf(msg_info, "%04d-%02d-%02d %02d:%02d:%02d.%03d %-16s %02d ", now.tm_year+1900, now.tm_mon+1, now.tm_mday,
             now.tm_hour, now.tm_min, now.tm_sec, (int)(tp.tv_usec/1000l), module, debug_level);
 
-        vsnprintf(s_info[info-1]+nbuf, sizeof(s_info[info-1])-nbuf, format, ap);
-        s_info[info-1][sizeof(s_info[info-1])-1] = 0;
+        vsnprintf(msg_info+nbuf, sizeof(_DEF_MSGBUF)-nbuf, format, ap);
+        msg_info[_DEF_MSGBUF-1] = 0;
 
 		buflen = 0;
-		bufdata = s_info[info-1];
+		bufdata = msg_info;
 		while(*bufdata){
 			if (*bufdata == '\r' || *bufdata == '\n')
 				*bufdata = ' ';
@@ -263,15 +256,12 @@ int debug_printf_ap(int debug_level, const char *module, const char *format, va_
 			bufdata++;
 		}
 		if (buflen)
-			s_info[info-1][buflen-1] = '\n';
+			msg_info[buflen-1] = '\n';
 
         if (g_print_info)
-            nbuf = g_print_info(s_info[info-1], buflen);
+            nbuf = g_print_info(msg_info, buflen);
 
-        level = rt_hw_interrupt_disable();
-        s_infoindex |= (1<<(info-1));
-        rt_hw_interrupt_enable(level);
-
+        rt_free(msg_info);
         return nbuf;
     }
 

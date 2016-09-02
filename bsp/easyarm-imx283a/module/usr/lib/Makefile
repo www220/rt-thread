@@ -1,8 +1,8 @@
 CC = ../../bin/arm-none-eabi-gcc
 AR = ../../bin/arm-none-eabi-ar
-CFLAGS = -mcpu=arm926ej-s -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable -Os
+CFLAGS = -mcpu=arm926ej-s -ffunction-sections -fdata-sections -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable -Os
 CFLAGS += -isystem../include -I./posix -I./linux
-LIBS = -Wl,--gc-sections,-n,--section-start=.init=0x10000000 --specs=linux.specs
+LIBS = -Wl,--gc-sections,-n,-z,max-page-size=0x8 --section-start=.init=0x10000000 --specs=linux.specs
 OBJS = main.o \
 	syscalls.o \
 	posix/collcmp.o \
@@ -11,6 +11,7 @@ OBJS = main.o \
 	posix/regerror.o \
 	posix/regexec.o \
 	posix/regfree.o \
+	posix/glob.o \
 	posix/fnmatch.o \
 	posix/execl.o \
 	posix/execle.o \
@@ -31,7 +32,7 @@ OBJS = main.o \
 
 rtt_syscall:$(OBJS)
 	@echo AR rtt_syscall.a
-	@$(AR) rc rtt_syscall.a $(OBJS)
+	@$(AR) -rc rtt_syscall.a $(OBJS)
 
 rtt_do:$(OBJS)
 	@echo LD rtt_do.mo

@@ -507,6 +507,10 @@ long int syscall (long int __sysno, ...)
 	return _set_errno(rc);
 }
 
+void syslog (int __pri, __const char *__fmt, ...)
+{
+}
+
 pid_t getpid(void)
 {
 	return _getpid();
@@ -516,6 +520,16 @@ pid_t getppid(void)
 {
 	int rc = sys_call0(__NR_getppid);
 	return _set_errno(rc);
+}
+
+int issetugid(void)
+{
+	return 0;
+}
+
+int setpgrp(void)
+{
+	return setpgid(0,0);
 }
 
 //#include<stdlib.h>
@@ -562,6 +576,35 @@ int sigaction (int sig, const struct sigaction *act, struct sigaction *oact)
 	return _set_errno(rc);
 }
 
+int sigsuspend (const sigset_t *mask)
+{
+	int rc = sys_call1(__NR_sigsuspend, (uintptr_t)mask);
+	return _set_errno(rc);
+}
+
+int sigpending (sigset_t *set)
+{
+	int rc = sys_call1(__NR_sigpending, (uintptr_t)set);
+	return _set_errno(rc);
+}
+
+# define __sigisemptyset(set)   (*(set) == (sigset_t) 0)
+# define __sigandset(dest, left, right) \
+                ((*(dest) = (*(left) & *(right))), 0)
+# define __sigorset(dest, left, right) \
+                ((*(dest) = (*(left) | *(right))), 0)
+int sigisemptyset (const sigset_t *set)
+{
+	if (set == NULL)
+		return _set_errno(-EINVAL);
+	return __sigisemptyset(set);
+}
+
+int killpg (__pid_t __pgrp, int __sig)
+{
+	return kill(-__pgrp,__sig);
+}
+
 //#include<sys/poll.h>
 
 int poll (struct pollfd *__fds, nfds_t __nfds, int __timeout)
@@ -569,3 +612,18 @@ int poll (struct pollfd *__fds, nfds_t __nfds, int __timeout)
 	int rc = sys_call3(__NR_poll, (uintptr_t)__fds, __nfds, __timeout);
 	return _set_errno(rc);
 }
+
+//#include<resource.h>
+
+int getrlimit (__rlimit_resource_t __resource, struct rlimit *__rlimits)
+{
+	int rc = sys_call2(__NR_getrlimit, __resource, (uintptr_t)__rlimits);
+	return _set_errno(rc);
+}
+
+int setrlimit (__rlimit_resource_t __resource, __const struct rlimit *__rlimits)
+{
+	int rc = sys_call2(__NR_setrlimit, __resource, (uintptr_t)__rlimits);
+	return _set_errno(rc);
+}
+

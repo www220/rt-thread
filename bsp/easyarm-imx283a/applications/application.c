@@ -45,6 +45,7 @@
 #ifdef RT_USING_DFS
 #include <dfs_init.h>
 #include <dfs_fs.h>
+#include <dfs_file.h>
 #ifdef RT_USING_DFS_ELMFAT
 #include <dfs_elm.h>
 #endif

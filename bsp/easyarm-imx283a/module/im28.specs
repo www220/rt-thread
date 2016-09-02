@@ -10,13 +10,13 @@
 %(libgloss) %(lib_old)
 
 *link:
---gc-sections -n --section-start=.init=0x10000000 %(link_old)
+--gc-sections -n -z max-page-size=0x8 --section-start=.init=0x10000000 %(link_old)
 
 *cc1:
-%{!mcpu=:-mcpu=arm926ej-s} -isystem%R/../usr/include %(cc1_old)
+%{!mcpu=:-mcpu=arm926ej-s} -ffunction-sections -fdata-sections -isystem%R/../usr/include %(cc1_old)
 
 *cc1plus:
-%{!mcpu=:-mcpu=arm926ej-s} -isystem%R/../usr/include %(cc1plus_old)
+%{!mcpu=:-mcpu=arm926ej-s} -ffunction-sections -fdata-sections -isystem%R/../usr/include %(cc1plus_old)
 
 *startfile:
 linux-crt0%O%s crti%O%s crtbegin%O%s

@@ -48,7 +48,7 @@ if PLATFORM == 'gcc':
     OBJDUMP = PREFIX + 'objdump'
     OBJCPY = PREFIX + 'objcopy'
 
-    DEVICE = ' -mcpu=arm926ej-s -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable'
+    DEVICE = ' -mcpu=arm926ej-s -ffunction-sections -fdata-sections -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable'
     CFLAGS = DEVICE
     AFLAGS = '-c'+ DEVICE + ' -x assembler-with-cpp'
     AFLAGS += ' -Iplatform'
@@ -69,7 +69,7 @@ if PLATFORM == 'gcc':
     POST_ACTION += SIZE + ' $TARGET\n'
 
     M_CFLAGS = CFLAGS + ' -mlong-calls -fPIC '
-    M_LFLAGS = DEVICE + ' -Wl,--gc-sections,-z,max-page-size=0x4 -shared -fPIC -nostdlib'
+    M_LFLAGS = DEVICE + ' -Wl,--gc-sections,-n,-z,max-page-size=0x8 -shared -fPIC -nostdlib'
     M_LFLAGS += ' -T imx283_dll.ld'
 
 elif PLATFORM == 'cl':

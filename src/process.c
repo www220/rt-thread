@@ -1279,7 +1279,9 @@ void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size)
 
     rt_kprintf("\nthread - %.*s - ", RT_NAME_MAX, rt_current_thread->name);
     rt_kprintf("data abort addr:%x size:%x\n", ptr, size);
-    RT_ASSERT(0);
+
+	rt_module_unload(module);
+	rt_schedule();
     return RT_NULL;
 }
 
