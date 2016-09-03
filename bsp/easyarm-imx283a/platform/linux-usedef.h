@@ -166,9 +166,7 @@ struct termios
 #endif
 
 /* c_cflag bit meaning */
-#ifdef __USE_MISC
-# define CBAUD	0010017
-#endif
+#define CBAUD	0010017
 #define  B0	0000000		/* hang up */
 #define  B50	0000001
 #define  B75	0000002
@@ -200,9 +198,7 @@ struct termios
 #define PARODD	0001000
 #define HUPCL	0002000
 #define CLOCAL	0004000
-#ifdef __USE_MISC
-# define CBAUDEX 0010000
-#endif
+#define CBAUDEX 0010000
 #define  B57600   0010001
 #define  B115200  0010002
 #define  B230400  0010003
@@ -237,13 +233,11 @@ struct termios
 #define ECHONL	0000100
 #define NOFLSH	0000200
 #define TOSTOP	0000400
-#ifdef __USE_MISC
-# define ECHOCTL 0001000
-# define ECHOPRT 0002000
-# define ECHOKE	 0004000
-# define FLUSHO	 0010000
-# define PENDIN	 0040000
-#endif
+#define ECHOCTL 0001000
+#define ECHOPRT 0002000
+#define ECHOKE	 0004000
+#define FLUSHO	 0010000
+#define PENDIN	 0040000
 #define IEXTEN	0100000
 
 /* tcflow() and TCXONC use these */
@@ -261,5 +255,14 @@ struct termios
 #define	TCSANOW		0
 #define	TCSADRAIN	1
 #define	TCSAFLUSH	2
+
+/* Enable reboot using Ctrl-Alt-Delete keystroke.  */
+#define RB_ENABLE_CAD	0x89abcdef
+/* Disable reboot using Ctrl-Alt-Delete keystroke.  */
+#define RB_DISABLE_CAD	0
+
+#define MAX_PID_SIZE	4096
+extern volatile int pid_buf[MAX_PID_SIZE];
+extern volatile unsigned short pidinfo[MAX_PID_SIZE][4];
 
 #endif /* _USED_ARM_LINUX_UNISTD_H */

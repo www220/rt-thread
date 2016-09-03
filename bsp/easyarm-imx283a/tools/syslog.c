@@ -298,6 +298,11 @@ int cmd_sysloglevel(int argc, char** argv)
 int cmd_syslogsave(int argc, char** argv)
 {
     int i;
+    if (!fs_system_init)
+    {
+        rt_kprintf("syslog saved!\n");
+        return 0;
+    }
     g_nSaveSysLog = 1;
     rt_sem_release(&syslog_sem);
     g_nSaveSysLog = 1;

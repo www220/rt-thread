@@ -215,13 +215,8 @@ _write_r(struct _reent *ptr, int fd, const void *buf, size_t nbytes)
 }
 
 int
-_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
+rt_gettimeofday(struct timeval *__tp, void *__tzp)
 {
-#ifndef RT_USING_RTC
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
-#else
 	static time_t sysnow = 0;
 	static uint16_t sysms = 0;
 	time_t nownow = time(NULL);
@@ -247,9 +242,20 @@ _gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
 	if (zone)
 	{
 		zone->tz_dsttime = 0;
-		zone->tz_minuteswest = -480;
+		zone->tz_minuteswest = 0;
 	}
 	return 0;
+}
+
+int
+_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
+{
+#ifndef RT_USING_RTC
+	/* return "not supported" */
+	ptr->_errno = ENOTSUP;
+	return -1;
+#else
+	return rt_gettimeofday(__tp, __tzp);
 #endif
 }
 
@@ -374,6 +380,7 @@ void abort(void)
 #include "linux-usedef.h"
 extern void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size);
 extern rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr);
+extern int rt_module_vfork(rt_module_t module);
 static inline int ret_err(int ret)
 {
     if (ret < 0)
@@ -443,6 +450,84 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         }
         return 0;
     }
+    case SYS_getpid:
+    {
+        return module->tpid;
+    }
+    case SYS_getppid:
+    {
+        return pidinfo[module->tpid-1][1];
+    }
+    case SYS_getpgrp:
+    {
+        return pidinfo[module->tpid-1][2];
+    }
+    case SYS_getpgid:
+    {
+    	if (parm1 == 0)
+    		parm1 = module->tpid;
+    	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
+    		return -EINVAL;
+    	if (pidinfo[parm1-1][0] < 1)
+    		return -ESRCH;
+    	return pidinfo[parm1-1][2];
+    }
+    case SYS_getsid:
+    {
+    	if (parm1 == 0)
+    		parm1 = module->tpid;
+    	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
+    		return -EINVAL;
+    	if (pidinfo[parm1-1][0] < 1)
+    		return -ESRCH;
+    	return pidinfo[parm1-1][3];
+    }
+    case SYS_setpgid:
+    {
+    	if (parm1 == 0)
+    		parm1 = module->tpid;
+    	if (parm2 == 0)
+    		parm2 = module->tpid;
+    	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
+    		return -EINVAL;
+    	if (pidinfo[parm1-1][0] < 1)
+    		return -ESRCH;
+    	if (parm2 < 0 && parm2 > MAX_PID_SIZE)
+    		return -EINVAL;
+    	if (pidinfo[parm2-1][0] < 1)
+    		return -ESRCH;
+    	return pidinfo[parm1-1][2] = parm2;
+    }
+    case SYS_setsid:
+    {
+    	if (module->tpid == pidinfo[module->tpid-1][2])
+    		return -EPERM;
+    	pidinfo[module->tpid-1][2] = module->tpid;
+    	pidinfo[module->tpid-1][3] = module->tpid;
+    	return module->tpid;
+    }
+    case SYS_reboot:
+    {
+        if (parm3 == RB_ENABLE_CAD || parm3 == RB_DISABLE_CAD)
+            return 0;
+        rt_kprintf("syscall reboot 0x%x\n",parm3);
+        return -ENOTSUP;
+    }
+    case SYS_fork:
+    {
+        rt_kprintf("syscall fork\n");
+        return 0;
+    }
+    case SYS_vfork:
+    {
+    	return rt_module_vfork(module);
+    }
+    case SYS_execve:
+    {
+        const char *file = (const char *)rt_module_conv_ptr(module,parm1,0);
+        rt_kprintf("syscall execve %s\n",file);
+        return 0;
+    }
     case SYS_getuid:
     case SYS_getgid:
     case SYS_geteuid:
@@ -457,6 +542,10 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         gid_t *groups = rt_module_conv_ptr(module,parm2,parm1*sizeof(gid_t));
         groups[0] = 0;
         return 1;
+    }
+    case SYS_setgroups:
+    {
+        return -ENOTSUP;
     }
     case SYS_link:
     {
@@ -600,7 +689,13 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         errno = 0;
         struct timezone *zone = (parm2)?((struct timezone *)rt_module_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
-        return ret_err(_gettimeofday_r(RT_NULL, (struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
+        return ret_err(rt_gettimeofday((struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
+    }
+    case SYS_settimeofday:
+    {
+        errno = 0;
+        struct timezone *zone = (parm2)?((struct timezone *)rt_module_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
+        return ret_err(settimeofday((struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
     }
     case SYS_ioctl:
     {
@@ -615,14 +710,19 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             win->ws_row = 60;
             return 0;
         }
+        case TIOCSWINSZ:
+        {
+            struct winsize *win = (struct winsize *)rt_module_conv_ptr(module,parm3,sizeof(struct winsize));
+            return 0;
+        }
         case TCGETS:
         {
             struct termios *ios = (struct termios *)rt_module_conv_ptr(module,parm3,sizeof(struct termios));
             memset(ios,0,sizeof(struct termios));
-            ios->c_iflag = ICRNL | IXON;
+            ios->c_iflag = ICRNL | IXON | IXOFF;
             ios->c_oflag = OPOST | ONLCR;
-            ios->c_cflag = B9600 | CS8 | CREAD | HUPCL;
-            ios->c_lflag = ISIG | ICANON | ECHO | ECHOE | ECHOK;
+            ios->c_cflag = B115200 | CS8 | CREAD | HUPCL | CLOCAL;
+            ios->c_lflag = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | IEXTEN;
             return 0;
         }
         case TCSETS:

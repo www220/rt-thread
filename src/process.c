@@ -85,8 +85,10 @@ extern rt_thread_t rt_thread_create2(const char *name,
                              rt_uint32_t tick);
 
 #define MAX_PID_SIZE	4096
-static int pid_buf[MAX_PID_SIZE];
-static unsigned short pidinfo[MAX_PID_SIZE][2];
+//status
+volatile int pid_buf[MAX_PID_SIZE];
+//pz:[0],ppid:[1],pgid[2],sid[3]
+volatile unsigned short pidinfo[MAX_PID_SIZE][4];
 static int current_pid = 0;
 static struct rt_event mod_event;
 
@@ -100,6 +102,13 @@ static unsigned short getempty_pid(unsigned short parent)
 			ret = current_pid+1;
 			pidinfo[current_pid][0] = 1;
 			pidinfo[current_pid][1] = parent;
+			pidinfo[current_pid][2] = parent;
+			pidinfo[current_pid][3] = parent;
+			if (parent)
+			{
+				pidinfo[current_pid][2] = pidinfo[parent-1][2];
+				pidinfo[current_pid][3] = pidinfo[parent-1][3];
+			}
 			if (++current_pid >= MAX_PID_SIZE)
 				current_pid = 0;
 			return ret;
@@ -324,9 +333,23 @@ static struct rt_module *_load_exec_object(const char *name,
     module->page_cnt = 0;
     module->mod_mutex = RT_NULL;
     module->impure_ptr = RT_NULL;
+    module->jmppid = 0;
+    module->jmpsp = 0;
+    module->jmpsplen = 0;
 
-    extern int __rt_ffs(int value);
+    {extern int __rt_ffs(int value);
+    register rt_ubase_t temp = rt_hw_interrupt_disable();
     module->pid = __rt_ffs(pids);
+    if (module->pid)
+    {
+        rt_module_t parent = rt_module_self();
+        module->tpid = getempty_pid(parent?parent->tpid:0);
+        if (module->tpid == 0)
+            module->pid = 0;
+        if (module->pid)
+            pids &= ~(1<<(module->pid-1));
+    }
+    rt_hw_interrupt_enable(temp);}
     if (module->pid == 0)
     {
         rt_kprintf("Module: allocate pid failed.\n");
@@ -340,7 +363,10 @@ static struct rt_module *_load_exec_object(const char *name,
     module->module_space = rt_page_alloc(module_size/RT_MM_PAGE_SIZE);
     if (module->module_space == RT_NULL)
     {
+        {register rt_ubase_t temp = rt_hw_interrupt_disable();
         pids |= (1<<(module->pid-1));
+        pidinfo[module->tpid-1][0] = 0;
+        rt_hw_interrupt_enable(temp);}
         mmu_freetlb(module->pid);
 
         rt_kprintf("Module: allocate space failed.\n");
@@ -595,7 +621,9 @@ rt_module_t rt_module_do_main(const char *name,
             mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,
                     module->vstart_addr-module->module_cmd_size,module->module_cmd_size,0);
             /* hold thread stack */
-            mmu_userunmap(module->pid,module->vstart_addr-RT_USING_MODULE_STKSZ,RT_MM_PAGE_SIZE,0);
+            mmu_userunmap(module->pid,module->vstart_addr-RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
+            mmu_userunmap(module->pid,module->vstart_addr-RT_USING_MODULE_STKSZ-2*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
+            mmu_userunmap(module->pid,module->vstart_addr-RT_USING_MODULE_STKSZ-RT_ALIGN(sizeof(struct _reent),1024)-3*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
         }
         else
         {
@@ -639,7 +667,7 @@ rt_module_t rt_module_do_main(const char *name,
         module->module_thread = rt_thread_create2(name,
                                                  module_main_entry,
                                                  (void *)(module->vstart_addr-RT_MODULE_MEMMAKE-RT_USING_MODULE_STKSZ),
-                                                 module->module_cmd_line+RT_MODULE_MEMMAKE,
+                                                 module->module_cmd_line+RT_MODULE_MEMMAKE-RT_MM_PAGE_SIZE,
                                                  RT_USING_MODULE_STKSZ,
                                                  RT_USING_MODULE_PRIO, 20);
         if (!module->module_thread)
@@ -654,14 +682,16 @@ rt_module_t rt_module_do_main(const char *name,
 
         /* set module id */
         module->module_thread->module_id = (void *)module;
-        module->module_thread->sp = (void *)(module->vstart_addr-(rt_uint32_t)(module->module_cmd_line+module->module_cmd_size-(rt_uint8_t *)module->module_thread->sp));
-        module->module_thread->stack_addr = (void *)(module->vstart_addr-RT_USING_MODULE_STKSZ);
-        module->module_thread->plib_reent = (struct _reent *)(module->vstart_addr-RT_USING_MODULE_STKSZ-RT_ALIGN(sizeof(struct _reent),1024));
+        module->module_thread->sp = (void *)module->vstart_addr-(module->module_thread->stack_addr+module->module_thread->stack_size-module->module_thread->sp)-RT_MM_PAGE_SIZE;
+        module->module_thread->stack_addr = (void *)module->vstart_addr-RT_USING_MODULE_STKSZ-RT_MM_PAGE_SIZE;
+        module->module_thread->plib_reent = (struct _reent *)(module->vstart_addr-RT_USING_MODULE_STKSZ-RT_ALIGN(sizeof(struct _reent),1024)-2*RT_MM_PAGE_SIZE);
         struct module_main_info *main_info = (struct module_main_info*)module->module_cmd_line;
         main_info->module_cmd_line = module->module_thread->parameter+sizeof(struct module_main_info);
         main_info->module_env_line = main_info->module_cmd_line+main_info->module_cmd_size+1;
         module->parent.flag |= RT_MODULE_FLAG_WITHENTRY;
 
+        /* thread while startup */
+        pidinfo[module->tpid-1][0] = 2;
         /* startup module thread */
         rt_thread_startup(module->module_thread);
     }
@@ -1089,9 +1119,14 @@ rt_err_t rt_module_destroy(rt_module_t module)
 
     /* switch tls */
     mmu_switchtlb(0);
-    rt_event_send(&mod_event, 1<<(module->pid-1));
-    /* free tls */
+    {register rt_ubase_t temp = rt_hw_interrupt_disable();
     pids |= (1<<(module->pid-1));
+    if (pidinfo[module->tpid-1][0] == 1)
+        pidinfo[module->tpid-1][0] = 0;
+    else
+        rt_event_send(&mod_event, 1<<(module->pid-1));
+    rt_hw_interrupt_enable(temp);}
+    /* free tls */
     mmu_freetlb(module->pid);
 
     /* delete module object */
@@ -1117,6 +1152,18 @@ rt_err_t rt_module_unload(rt_module_t module)
     /* check parameter */
     if (module == RT_NULL)
         return -RT_ERROR;
+
+    /* vfork exit code */
+    if (module->jmppid)
+    {
+    	//load thread used stack
+    	rt_uint32_t jmp;
+    	volatile char buf[512] = {0};
+    	rt_memcpy((void *)module->jmpsp,module->jmpspbuf,module->jmpsplen);
+    	//
+    	jmp = module->tpid;module->tpid = module->jmppid;module->jmppid = 0;
+    	longjmp(module->jmpbuf,jmp);
+    }
 
     rt_enter_critical();
     if (!(module->parent.flag & RT_MODULE_FLAG_WITHOUTENTRY))
@@ -1153,6 +1200,8 @@ rt_err_t rt_module_unload(rt_module_t module)
     }
 #endif
 
+    /* thread while unload */
+    pidinfo[module->tpid-1][0] = 3;
     return RT_EOK;
 }
 
@@ -1289,6 +1338,38 @@ void rt_module_free(rt_module_t module, void *addr)
 {
     /* should not get here */
     RT_ASSERT(0);
+}
+
+int rt_module_vfork(rt_module_t module)
+{
+	//save thread used stack
+	rt_thread_t tid = rt_thread_self();
+	__asm volatile("mov %0,sp":"=r" (module->jmpsp));
+	module->jmpsplen = module->jmpsp-tid->stack_addr-tid->stack_size;
+	if (module->jmpsplen > sizeof(module->jmpspbuf)) module->jmpsplen = sizeof(module->jmpspbuf);
+	rt_memcpy(module->jmpspbuf,module->jmpsp,module->jmpsplen);
+	//
+    int jmp = setjmp(module->jmpbuf);
+    if (jmp != 0)
+    {
+    	if (module->jmpsp == 0 && module->jmpsplen)
+        	return -ENOMEM;
+    	module->jmpsp = 0;
+    	module->jmpsplen = 0;
+    	return jmp;
+    }
+    {register rt_ubase_t temp = rt_hw_interrupt_disable();
+    module->jmppid = module->tpid;
+    module->tpid = getempty_pid(module->jmppid);
+    rt_hw_interrupt_enable(temp);}
+    if (module->tpid == 0)
+    {
+    	module->tpid = module->jmppid;
+    	module->jmpsp = 0;
+    	module->jmpsplen = 0;
+    	return -ENOMEM;
+    }
+    return 0;
 }
 
 #endif

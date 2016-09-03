@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <setjmp.h>
 
 //#include<sys/stat.h>
 typedef __int32_t blksize_t;
@@ -32,6 +33,23 @@ int _EXFUN(sigpending, (sigset_t *));
 int _EXFUN(sigpause, (int));
 extern int sigisemptyset (__const sigset_t *__set) __THROW;
 extern int killpg (__pid_t __pgrp, int __sig) __THROW;
+
+//#include <setjmp.h>
+typedef struct __sigjmpbuf
+{
+  jmp_buf __buf;
+  int __is_mask_saved;
+  sigset_t __saved_mask;
+} sigjmp_buf;
+
+void	_EXFUN(siglongjmp,(sigjmp_buf __jmpb, int __retval));
+int	_EXFUN(sigsetjmp,(sigjmp_buf __jmpb, int __savemask));
+
+/* sigsetjmp is implemented as macro using setjmp */
+#define sigsetjmp(__jmpb, __savemask) \
+                 ( __jmpb.__is_mask_saved = __savemask && \
+                   (sigprocmask (SIG_BLOCK, NULL, &__jmpb.__saved_mask) == 0), \
+                    setjmp (__jmpb.__buf) )
 
 //#include<stdio.h>
 #define getline __getline

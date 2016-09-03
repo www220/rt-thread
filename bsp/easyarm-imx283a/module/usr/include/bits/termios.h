@@ -117,9 +117,7 @@ struct termios
 #endif
 
 /* c_cflag bit meaning */
-#ifdef __USE_MISC
-# define CBAUD	0010017
-#endif
+#define CBAUD	0010017
 #define  B0	0000000		/* hang up */
 #define  B50	0000001
 #define  B75	0000002
@@ -151,9 +149,7 @@ struct termios
 #define PARODD	0001000
 #define HUPCL	0002000
 #define CLOCAL	0004000
-#ifdef __USE_MISC
-# define CBAUDEX 0010000
-#endif
+#define CBAUDEX 0010000
 #define  B57600   0010001
 #define  B115200  0010002
 #define  B230400  0010003

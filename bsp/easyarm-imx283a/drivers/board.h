@@ -111,6 +111,7 @@ EXTVAL extern volatile int wtdog_count;
 EXTVAL extern volatile int sys_stauts;
 EXTVAL extern volatile int ppp_linkstauts;
 EXTVAL extern volatile int uptime_count;
+EXTVAL extern volatile int fs_system_init;
 EXTVAL extern unsigned char PZ[4];
 EXTVAL extern char RTT_USER[30];
 EXTVAL extern char RTT_PASS[30];

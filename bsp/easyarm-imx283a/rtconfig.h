@@ -89,16 +89,16 @@
 #define RT_CONSOLEBUF_SIZE	4096
 
 /* SECTION: finsh, a C-Express shell */
-//#define RT_USING_FINSH
-//#define FINSH_USING_MSH
-//#define FINSH_USING_MSH_DEFAULT
+#define RT_USING_FINSH
+#define FINSH_USING_MSH
+#define FINSH_USING_MSH_DEFAULT
 //#define FINSH_USING_MSH_ONLY
-//#define RT_USING_RYM
+#define RT_USING_RYM
 
 /* Using symbol table */
 #define FINSH_USING_SYMTAB
 #define FINSH_USING_DESCRIPTION
-#define FINSH_THREAD_STACK_SIZE	131072
+#define FINSH_THREAD_STACK_SIZE	8192
 
 /* SECTION: device filesystem */
 #define RT_USING_DFS
@@ -120,10 +120,10 @@
 #define RT_USING_DFS_DEVFS
 
 /* the max number of mounted filesystem */
-#define DFS_FILESYSTEMS_MAX			10
+#define DFS_FILESYSTEMS_MAX			20
 #define DFS_FILESYSTEM_TYPES_MAX	10
 /* the max number of opened files 		*/
-#define DFS_FD_MAX					32
+#define DFS_FD_MAX					128
 
 #define rtt_LogDebug	7
 #define rtt_LogInfo		6

@@ -19,12 +19,16 @@ OBJS = main.o \
 	posix/execv.o \
 	posix/execve.o \
 	posix/execvp.o \
+	posix/popen.o \
 	linux/sysconf.o \
 	linux/strverscmp.o \
 	linux/basename.o \
 	linux/dirname.o \
 	linux/realpath.o \
-	linux/termios.o
+	linux/termios.o \
+	linux/cfspeed.o \
+	linux/tcdrain.o \
+	linux/tcsendbrk.o
 
 %.o:%.c
 	@echo CC $<

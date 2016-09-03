@@ -73,6 +73,38 @@ static rt_err_t console_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 	return rt_device_control(_console.device, cmd, args);
 }
 
+struct null_device
+{
+	struct rt_device parent;
+};
+struct null_device _nulldev;
+
+/* common device interface */
+static rt_err_t nulldev_init(rt_device_t dev)
+{
+	return RT_EOK;
+}
+
+static rt_err_t nulldev_open(rt_device_t dev, rt_uint16_t oflag)
+{
+	return RT_EOK;
+}
+
+static rt_err_t nulldev_close(rt_device_t dev)
+{
+	return RT_EOK;
+}
+
+static rt_size_t nulldev_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
+{
+	return 0;
+}
+
+static rt_size_t nulldev_write(rt_device_t dev, rt_off_t pos, const void* buffer, rt_size_t size)
+{
+	return size;
+}
+
 void rt_console_init(const char* device_name)
 {
 	rt_device_t device;
@@ -100,6 +132,26 @@ void rt_console_init(const char* device_name)
 		console->device = device;
 
 		rt_device_register(&console->parent, "console", RT_DEVICE_FLAG_RDWR);
+	}
+
+	if (1)
+	{
+		struct null_device* nulldev;
+		/* get console device */
+		nulldev = &_nulldev;
+		rt_memset(nulldev, 0, sizeof(_nulldev));
+
+		/* device initialization */
+		nulldev->parent.type = RT_Device_Class_Char;
+		/* set device interface */
+		nulldev->parent.init 	= nulldev_init;
+		nulldev->parent.open 	= nulldev_open;
+		nulldev->parent.close   = nulldev_close;
+		nulldev->parent.read 	= nulldev_read;
+		nulldev->parent.write   = nulldev_write;
+		nulldev->parent.user_data = RT_NULL;
+
+		rt_device_register(&nulldev->parent, "null", RT_DEVICE_FLAG_RDWR);
 	}
 }
 

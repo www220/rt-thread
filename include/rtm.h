@@ -31,7 +31,6 @@ struct rt_module_symtab
     const char *name;
 };
 
-#ifndef RT_USING_PROCESS
 #if defined(_MSC_VER)
 #pragma section("RTMSymTab$f",read)
 #define RTM_EXPORT(symbol)                                            \
@@ -49,9 +48,6 @@ const struct rt_module_symtab __rtmsym_##symbol SECTION("RTMSymTab")= \
     (void *)&symbol,                                                  \
     __rtmsym_##symbol##_name                                          \
 };
-#endif
-#else
-#define RTM_EXPORT(symbol)
 #endif
 
 #else

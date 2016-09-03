@@ -66,10 +66,6 @@ extern void nand_init(void);
 #endif
 #endif
 
-#ifdef RT_USING_USB_HOSTU
-extern void usbh_init(void);
-#endif
-
 #ifdef RT_USING_RTC
 extern void list_date(void);
 #ifndef RT_USING_FINSH
@@ -99,12 +95,6 @@ extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
 #endif
 
-#ifdef RT_USING_RTGUI
-extern int rtgui_system_server_init(void);
-extern int lcd_init(void);
-extern int touch_init(void);
-#endif
-
 #ifdef FINSH_USING_MSH
 extern int cmd_sh(int argc, char** argv);
 extern int cmd_beep(int argc, char** argv);
@@ -116,6 +106,7 @@ volatile int wtdog_count = 0;
 volatile int sys_stauts = -1;
 volatile int ppp_linkstatus = 0;
 volatile int uptime_count = 0;
+volatile int fs_system_init = 0;
 
 unsigned char NET_MAC[6] = {0};
 char NET_ADDR[3][30] = {{0}};
@@ -203,20 +194,27 @@ static void rt_thread_entry_wtdog(void* parameter)
             GPIO_SetBits(LED_RUN_PORT, LED_RUN_PIN);
             GPIO_ResetBits(LED_ERR_PORT, LED_ERR_PIN);
             //save log
-            SysLog_Main(rtt_LogEmerg, "WTDog Reset!\n");
-            g_nSaveSysLog = 1;
-            rt_sem_release(&syslog_sem);
-            g_nSaveSysLog = 1;
-            rt_sem_release(&syslog_sem);
-            rt_sem_release(&syslog_sem);
-            rt_sem_release(&syslog_sem);
-            rt_sem_release(&syslog_sem);
-            for (i=0; i<10 && g_nSaveSysLog; i++)
+            if (fs_system_init)
             {
-                rt_thread_delay(500);
-                GPIO_ResetBits(WDT_PORT, WDT_PIN);
-                rt_thread_delay(500);
-                GPIO_SetBits(WDT_PORT, WDT_PIN);
+                SysLog_Main(rtt_LogEmerg, "WTDog Reset!\n");
+                g_nSaveSysLog = 1;
+                rt_sem_release(&syslog_sem);
+                g_nSaveSysLog = 1;
+                rt_sem_release(&syslog_sem);
+                rt_sem_release(&syslog_sem);
+                rt_sem_release(&syslog_sem);
+                rt_sem_release(&syslog_sem);
+                for (i=0; i<10 && g_nSaveSysLog; i++)
+                {
+                    rt_thread_delay(500);
+                    GPIO_ResetBits(WDT_PORT, WDT_PIN);
+                    rt_thread_delay(500);
+                    GPIO_SetBits(WDT_PORT, WDT_PIN);
+                }
+            }
+            else
+            {
+                rt_kprintf("WTDog Reset!\n");
             }
             //
             rt_thread_delay(300000);
@@ -278,8 +276,10 @@ static void rt_thread_entry_main(void* parameter)
         mkdir("/usr/bin", 666);
         mkdir("/usr/sbin", 666);
         mkdir("/usr/lib", 666);
+        fs_system_init = 1;
         rt_kprintf("File System initialized!\n");
     } else {
+        fs_system_init = 0;
         rt_kprintf("File System failed!\n");
         RT_ASSERT(0);
     }
@@ -313,10 +313,6 @@ static void rt_thread_entry_main(void* parameter)
     }
 #endif
 
-#endif
-
-#ifdef RT_USING_USB_HOSTU
-    usbh_init();
 #endif
 
 #ifdef RT_USING_LIBC

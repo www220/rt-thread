@@ -127,6 +127,13 @@ _isatty(int fd)
     return 0;
 }
 
+int
+ttyname_r (int fd, char *buf, size_t buflen)
+{
+	int rc = sys_call3(__NR_SYSCALL_BASE+1001, fd, (uintptr_t)buf, buflen);
+	return _set_errno(rc);
+}
+
 void
 __malloc_lock (struct _reent *ptr)
 {
@@ -294,6 +301,12 @@ int getgrnam_r (__const char *__restrict __name,
 int initgroups (__const char *__user, __gid_t __group)
 {
 	return 0;
+}
+
+int	setgroups (int ngroups, const gid_t *grouplist)
+{
+	int rc = sys_call2(__NR_setgroups, ngroups, (uintptr_t)grouplist);
+	return _set_errno(rc);
 }
 
 int getgrouplist (const char *user, gid_t group, gid_t *groups, int *ngroups)
@@ -507,10 +520,6 @@ long int syscall (long int __sysno, ...)
 	return _set_errno(rc);
 }
 
-void syslog (int __pri, __const char *__fmt, ...)
-{
-}
-
 pid_t getpid(void)
 {
 	return _getpid();
@@ -522,6 +531,12 @@ pid_t getppid(void)
 	return _set_errno(rc);
 }
 
+pid_t getsid(pid_t __pid)
+{
+	int rc = sys_call1(__NR_getsid, __pid);
+	return _set_errno(rc);
+}
+
 int issetugid(void)
 {
 	return 0;
@@ -530,6 +545,11 @@ int issetugid(void)
 int setpgrp(void)
 {
 	return setpgid(0,0);
+}
+
+int getpagesize(void)
+{
+	return 4096;
 }
 
 //#include<stdlib.h>
@@ -605,6 +625,15 @@ int killpg (__pid_t __pgrp, int __sig)
 	return kill(-__pgrp,__sig);
 }
 
+void
+siglongjmp (sigjmp_buf env, int val)
+{
+  if (env.__is_mask_saved)
+    sigprocmask (SIG_SETMASK, &env.__saved_mask, NULL);
+
+  longjmp (env.__buf, val);
+}
+
 //#include<sys/poll.h>
 
 int poll (struct pollfd *__fds, nfds_t __nfds, int __timeout)
@@ -625,5 +654,43 @@ int setrlimit (__rlimit_resource_t __resource, __const struct rlimit *__rlimits)
 {
 	int rc = sys_call2(__NR_setrlimit, __resource, (uintptr_t)__rlimits);
 	return _set_errno(rc);
+}
+
+//#include<syslog.h>
+
+static char *LogTag = NULL;      /* string to tag the entry with */
+static int  LogMask = 0xff;     /* mask of priorities to be logged */
+
+void closelog (void)
+{
+	printf("call closelog [%s]\n",LogTag);
+	free(LogTag);
+	LogTag = NULL;
+}
+
+void openlog (__const char *__ident, int __option, int __facility)
+{
+	if (LogTag)
+		free(LogTag);
+	LogTag = strdup(__ident?__ident:"");
+	printf("call openlog  [%s] %d,%d\n",LogTag,__option,__facility);
+}
+
+int setlogmask (int __mask)
+{
+    int omask = LogMask;
+    if (__mask != 0)
+        LogMask = __mask;
+    return (omask);
+}
+
+void syslog (int __pri, __const char *__fmt, ...)
+{
+	va_list __arg;
+
+	va_start(__arg,__fmt);
+	printf("call syslog   [%s] %d ",LogTag,__pri);
+	vprintf(__fmt,__arg);printf("\n");
+	va_end(__arg);
 }
 

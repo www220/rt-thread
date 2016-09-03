@@ -40,6 +40,7 @@
 #ifdef RT_USING_PROCESS
 #include <string.h>
 #include <sys/reent.h>
+#include <setjmp.h>
 #endif
 
 #ifdef __cplusplus
@@ -1001,8 +1002,14 @@ struct rt_module
 
     rt_uint16_t                  nref;                  /**< reference count */
 #ifdef RT_USING_PROCESS
-    rt_uint16_t                  pid;                   /**< process pid */
+    rt_uint16_t                  pid;                   /**< mmu pid */
+    rt_uint16_t                  tpid;                  /**< process pid */
     struct _reent               *impure_ptr;            /**< newlibc reent */
+    rt_uint16_t                  jmppid;                /**< vfork pid */
+    rt_uint16_t                  jmpsplen;              /**< vfork buf */
+    jmp_buf                      jmpbuf;                /**< vfork buf */
+    void                        *jmpsp;                 /**< vfork buf */
+    rt_uint8_t                   jmpspbuf[512];         /**< vfork buf */
 #endif
 
     rt_uint16_t                  nsym;                  /**< number of symbol in the module */

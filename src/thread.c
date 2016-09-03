@@ -391,7 +391,7 @@ rt_thread_t rt_thread_create2(const char *name,
         return RT_NULL;
 
     thread->flags |= RT_OBJECT_FLAG_PROCESS;
-    thread->plib_reent = stack_start-RT_ALIGN(sizeof(struct _reent), 1024);
+    thread->plib_reent = stack_start-RT_ALIGN(sizeof(struct _reent), 1024)-RT_MM_PAGE_SIZE;
 
     _rt_thread_init(thread,
                     name,
