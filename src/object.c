@@ -208,7 +208,7 @@ void rt_object_init(struct rt_object         *object,
     register rt_base_t temp;
     struct rt_object_information *information;
 
-#ifdef RT_USING_MODULE
+#if 0
     /* get module object information */
     information = (rt_module_self() != RT_NULL) ?
         &rt_module_self()->module_object[type] : &rt_object_container[type];
@@ -226,7 +226,7 @@ void rt_object_init(struct rt_object         *object,
     object->flag = 0;
 
 #ifdef RT_USING_MODULE
-    object->module_id = (void *)rt_module_self();
+    object->module_id = 0;
 #endif
 
     /* copy name */
@@ -286,7 +286,7 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
 
     RT_DEBUG_NOT_IN_INTERRUPT;
 
-#ifdef RT_USING_MODULE
+#if 0
     /*
      * get module object information,
      * module object should be managed by kernel object container
@@ -320,7 +320,7 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
         object->flag |= RT_OBJECT_FLAG_MODULE;
     }
 #endif
-    object->module_id = (void *)rt_module_self();
+    object->module_id = 0;
 #endif
 
     /* copy name */

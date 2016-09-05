@@ -424,14 +424,14 @@ void mmu_setmtt(rt_uint32_t vaddrStart, rt_uint32_t vaddrEnd,
     }
 }
 
-void mmu_maketlb(rt_uint32_t pid)
+void mmu_maketlb(rt_uint32_t pid, rt_uint32_t spid)
 {
     rt_uint32_t i,size;
     for (i=0; i<4096; i++)
-        _page_table[pid*4096+i] = _page_table[i];
+        _page_table[pid*4096+i] = _page_table[spid*4096+i];
     size = (PROCESS_IN+PROCESS_MEM)*256;
     for (i=0; i<size; i++)
-        _small_table[pid*size+i] = _small_table[i];
+        _small_table[pid*size+i] = _small_table[spid*size+i];
 }
 
 void mmu_freetlb(rt_uint32_t pid)

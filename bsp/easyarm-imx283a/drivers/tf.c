@@ -430,19 +430,19 @@ static void sd_monitor_thread_entry(void *parameter)
             		mmcsd_change(mci.host);
             		mmcsd_wait_cd_changed(5000);
             		if (mci.host->card == NULL)
-            			rt_kprintf("Unmount /mmc ok!\n");
+            			rt_kprintf("Unmount /mnt/mmc ok!\n");
             		else
-            			rt_kprintf("Unmount /mmc failed!\n");
+            			rt_kprintf("Unmount /mnt/mmc failed!\n");
         		}
         	} else {
         		printf("MMC: Card detected!\n");
         		mci_run = 1;
         		mmcsd_change(mci.host);
         		mmcsd_wait_cd_changed(5000);
-        	    if (dfs_mount("sd0", "/mmc", "elm", 0, 0) == 0)
-        	        rt_kprintf("Mount /mmc ok!\n");
+        	    if (dfs_mount("sd0", "/mnt/mmc", "elm", 0, 0) == 0)
+        	        rt_kprintf("Mount /mnt/mmc ok!\n");
         	    else
-        	        rt_kprintf("Mount /mmc failed!\n");
+        	        rt_kprintf("Mount /mnt/mmc failed!\n");
         	}
             card = status;
         }

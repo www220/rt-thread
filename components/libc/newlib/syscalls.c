@@ -370,6 +370,7 @@ void abort(void)
 #include "linux-usedef.h"
 extern void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size);
 extern rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr);
+extern int rt_module_fork(rt_module_t module);
 extern int rt_module_vfork(rt_module_t module);
 extern int rt_module_waitpid(rt_module_t module, pid_t pid, int* status, int opt);
 static inline int ret_err(int ret)
@@ -504,8 +505,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_fork:
     {
-        rt_kprintf("syscall fork\n");
-        return 0;
+    	return rt_module_fork(module);
     }
     case SYS_vfork:
     {
@@ -551,6 +551,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         rt_kprintf("syscall symlink %s=>%s\n",(const char *)rt_module_conv_ptr(module,parm1,0),
                 (const char *)rt_module_conv_ptr(module,parm2,0));
+        return -ENOTSUP;
+    }
+    case SYS_readlink:
+    {
+        rt_kprintf("syscall readlink %s\n",(const char *)rt_module_conv_ptr(module,parm1,0));
         return -ENOTSUP;
     }
     case SYS_uname:

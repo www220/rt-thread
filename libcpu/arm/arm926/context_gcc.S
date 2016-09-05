@@ -69,6 +69,21 @@ rt_hw_context_switch_usr:
     LDMFD   SP!, {PC}^
 
 /*
+ * void rt_hw_context_save(rt_uint32 ret, rt_uint32 to);
+ * r0 --> ret
+ * r1 --> to
+ */
+    .globl rt_hw_context_save
+rt_hw_context_save:
+    STMFD   SP!, {LR}           @; push pc (lr should be pushed in place of pc)
+    STMFD   SP!, {R0-R12, LR}       @; push lr & register file
+    MRS     R0, CPSR
+    STMFD   SP!, {R0}               @; push cpsr
+    STR     SP, [R1]                @; store sp in preempted tasks tcb
+    MOV     R0, R1
+    MOV     PC, LR
+
+/*
  * void rt_hw_context_switch_to(rt_uint32 to);
  * r0 --> to
  */
