@@ -215,13 +215,16 @@ _write_r(struct _reent *ptr, int fd, const void *buf, size_t nbytes)
 }
 
 int
-rt_gettimeofday(struct timeval *__tp, void *__tzp)
+gettimeofday(struct timeval *__tp, void *__tzp)
 {
+#ifndef RT_USING_RTC
+	/* return "not supported" */
+	return -1;
+#else
 	static time_t sysnow = 0;
 	static uint16_t sysms = 0;
 	time_t nownow = time(NULL);
 	uint16_t nowms = rt_tick_get() % 1000;
-	struct timezone *zone = (struct timezone*)__tzp;
 	if (sysnow == 0 && sysms == 0)
 	{
 		sysnow = nownow;
@@ -239,25 +242,10 @@ rt_gettimeofday(struct timeval *__tp, void *__tzp)
 	}
 	__tp->tv_sec = sysnow;
 	__tp->tv_usec = sysms * 1000l;
-	if (zone)
-	{
-		zone->tz_dsttime = 0;
-		zone->tz_minuteswest = 0;
-	}
 	return 0;
-}
-
-int
-_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
-{
-#ifndef RT_USING_RTC
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
-#else
-	return rt_gettimeofday(__tp, __tzp);
 #endif
 }
+RTM_EXPORT(gettimeofday);
 
 int
 settimeofday(const struct timeval *__tp, const struct timezone *__tzp)
@@ -334,6 +322,8 @@ _exit (int status)
 	module = rt_module_self();
 	if (module != RT_NULL)
 	{
+		module->exitcode = (status&0xff)<<8;
+
 		/* unload assertion module */
 		rt_module_unload(module);
 
@@ -381,6 +371,7 @@ void abort(void)
 extern void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size);
 extern rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr);
 extern int rt_module_vfork(rt_module_t module);
+extern int rt_module_waitpid(rt_module_t module, pid_t pid, int* status, int opt);
 static inline int ret_err(int ret)
 {
     if (ret < 0)
@@ -426,11 +417,6 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         return -EPERM;
     }
-    case SYS_alarm:
-    {
-        rt_thread_delay(parm1*1000);
-        return 0;
-    }
     case SYS_nanosleep:
     {
         struct timespec *tim1 = (parm1)?(rt_module_conv_ptr(module,parm1,sizeof(struct timespec))):(0);
@@ -468,7 +454,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     		parm1 = module->tpid;
     	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
     		return -EINVAL;
-    	if (pidinfo[parm1-1][0] < 1)
+    	if (pidinfo[parm1-1][0] < 100)
     		return -ESRCH;
     	return pidinfo[parm1-1][2];
     }
@@ -478,7 +464,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     		parm1 = module->tpid;
     	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
     		return -EINVAL;
-    	if (pidinfo[parm1-1][0] < 1)
+    	if (pidinfo[parm1-1][0] < 100)
     		return -ESRCH;
     	return pidinfo[parm1-1][3];
     }
@@ -490,11 +476,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     		parm2 = module->tpid;
     	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
     		return -EINVAL;
-    	if (pidinfo[parm1-1][0] < 1)
+    	if (pidinfo[parm1-1][0] < 100)
     		return -ESRCH;
     	if (parm2 < 0 && parm2 > MAX_PID_SIZE)
     		return -EINVAL;
-    	if (pidinfo[parm2-1][0] < 1)
+    	if (pidinfo[parm2-1][0] < 100)
     		return -ESRCH;
     	return pidinfo[parm1-1][2] = parm2;
     }
@@ -508,10 +494,13 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_reboot:
     {
+        if ((parm1 != 0xfee1dead) || (parm1 != 0x28121969))
+            return -EINVAL;
         if (parm3 == RB_ENABLE_CAD || parm3 == RB_DISABLE_CAD)
             return 0;
-        rt_kprintf("syscall reboot 0x%x\n",parm3);
-        return -ENOTSUP;
+        extern void sys_reboot(void);
+        sys_reboot();
+        return 0;
     }
     case SYS_fork:
     {
@@ -527,6 +516,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         const char *file = (const char *)rt_module_conv_ptr(module,parm1,0);
         rt_kprintf("syscall execve %s\n",file);
         return 0;
+    }
+    case SYS_wait4:
+    {
+        int *status = (parm2)?((int *)rt_module_conv_ptr(module,parm2,sizeof(int))):RT_NULL;
+        return rt_module_waitpid(module,(pid_t)parm1,status,parm3);
     }
     case SYS_getuid:
     case SYS_getgid:
@@ -593,7 +587,6 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         return ret_err(lseek(parm1, parm2, parm3));
     }
     case SYS_stat:
-    case SYS_lstat:
     {
         errno = 0;
         return ret_err(stat((const char *)rt_module_conv_ptr(module,parm1,0),
@@ -689,7 +682,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         errno = 0;
         struct timezone *zone = (parm2)?((struct timezone *)rt_module_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
-        return ret_err(rt_gettimeofday((struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
+        return ret_err(gettimeofday((struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
     }
     case SYS_settimeofday:
     {

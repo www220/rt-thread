@@ -120,21 +120,6 @@ void cleartmppath(void);
 char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *file);
 int SetPrivateStringData(const char *name, const char *buf, const char *file);
 
-#define SysLog_Main(debug_level, format, ...) debug_printf_def(debug_level, "Main", format, ##__VA_ARGS__)
-#define SysLog_Gprs(debug_level, format, ...) debug_printf_def(debug_level, "Gprs", format, ##__VA_ARGS__)
-#define SysLog_Vpn(debug_level, format, ...) debug_printf_def(debug_level, "Vpn", format, ##__VA_ARGS__)
-#define SysLog_Ioscan(debug_level, format, ...) rt_kprintf(format, ##__VA_ARGS__); \
-    debug_printf_def(debug_level, "Ioscan", format, ##__VA_ARGS__)
-#define SysLog_Web(debug_level, format, ...) rt_kprintf(format, ##__VA_ARGS__); \
-    debug_printf_def(debug_level, "Web", format, ##__VA_ARGS__)
-
-extern struct rt_semaphore syslog_sem;
-extern volatile int g_nSaveSysLog;
-
-extern int debug_printf_init();
-extern int debug_printf_def(int debug_level, const char *module, const char *format, ...);
-extern int debug_printf_ap(int debug_level, const char *module, const char *format, va_list ap);
-
 #ifndef _MSC_VER
 extern void __delay(int loops);
 extern void __bad_udelay(void);

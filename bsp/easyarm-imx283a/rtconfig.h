@@ -125,19 +125,6 @@
 /* the max number of opened files 		*/
 #define DFS_FD_MAX					128
 
-#define rtt_LogDebug	7
-#define rtt_LogInfo		6
-#define rtt_LogNotice	5
-#define rtt_LogWarn		4
-#define rtt_LogErr		3
-#define rtt_LogCrit		2
-#define rtt_LogAlert	1
-#define rtt_LogEmerg	0
-
-#define rttTempFileDir "/tmp"
-#define rttLogFileDir "/tmp/log"
-#define rttCfgFileDir "/etc"
-
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
 //#define RT_USING_LWIP_HEAD
 //#define RT_USING_LWIP

@@ -7,7 +7,6 @@ cwd = GetCurrentDir()
 src = Split("""
 readspeed.c
 writespeed.c
-syslog.c
 """)
 
 ethdev_src = Split("""

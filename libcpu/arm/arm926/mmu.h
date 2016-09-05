@@ -29,7 +29,7 @@
 #define HEAP_BEGIN        0x40E00000
 #define HEAP_END          0x43E00000
 
-#define PROCESS_MAX       16
+#define PROCESS_MAX       50
 #define PROCESS_BASE      0x10000000
 #define PROCESS_IN        2
 #define PROCESS_MEM       16

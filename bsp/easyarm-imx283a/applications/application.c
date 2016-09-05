@@ -194,28 +194,7 @@ static void rt_thread_entry_wtdog(void* parameter)
             GPIO_SetBits(LED_RUN_PORT, LED_RUN_PIN);
             GPIO_ResetBits(LED_ERR_PORT, LED_ERR_PIN);
             //save log
-            if (fs_system_init)
-            {
-                SysLog_Main(rtt_LogEmerg, "WTDog Reset!\n");
-                g_nSaveSysLog = 1;
-                rt_sem_release(&syslog_sem);
-                g_nSaveSysLog = 1;
-                rt_sem_release(&syslog_sem);
-                rt_sem_release(&syslog_sem);
-                rt_sem_release(&syslog_sem);
-                rt_sem_release(&syslog_sem);
-                for (i=0; i<10 && g_nSaveSysLog; i++)
-                {
-                    rt_thread_delay(500);
-                    GPIO_ResetBits(WDT_PORT, WDT_PIN);
-                    rt_thread_delay(500);
-                    GPIO_SetBits(WDT_PORT, WDT_PIN);
-                }
-            }
-            else
-            {
-                rt_kprintf("WTDog Reset!\n");
-            }
+            rt_kprintf("WTDog Reset!\n");
             //
             rt_thread_delay(300000);
         }
@@ -259,14 +238,14 @@ static void rt_thread_entry_main(void* parameter)
     elm_init();
 #endif
 
-    debug_printf_init();
 #if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     if (dfs_mount("nand0", "/", "yaffs2", 0, 0) == 0) {
         mkdir("/tmp", 666);
+        mkdir("/var", 666);
         mkdir("/rom", 666);
         mkdir("/dev", 666);
-        mkdir("/mmc", 666);
-        mkdir("/usb", 666);
+        mkdir("/mnt", 666);
+        mkdir("/mnt/mmc", 666);
 
         mkdir("/root", 666);
         mkdir("/bin", 666);
@@ -283,33 +262,28 @@ static void rt_thread_entry_main(void* parameter)
         rt_kprintf("File System failed!\n");
         RT_ASSERT(0);
     }
-    if (dfs_mount("nand1", "/tmp", "yaffs2", 0, 0) == 0) {
-        rt_kprintf("Mount /tmp ok!\n");
-        SysLog_Main(rtt_LogNotice, "Mount /tmp ok!\n");
+    if (dfs_mount("nand1", "/var", "yaffs2", 0, 0) == 0) {
+        rt_kprintf("Mount /var ok!\n");
     } else {
-        rt_kprintf("Mount /tmp failed!\n");
-        SysLog_Main(rtt_LogWarn, "Mount /tmp failed!\n");
+        rt_kprintf("Mount /var failed!\n");
+        RT_ASSERT(0);
     }
 #endif
 
 #ifdef RT_USING_DFS_ROMFS
     dfs_mount(RT_NULL, "/boot", "rom", 0, &romfs_root);
     rt_kprintf("Mount /boot ok!\n");
-    SysLog_Main(rtt_LogNotice, "Mount /boot ok!\n");
 #endif
 #ifdef RT_USING_DFS_DEVFS
     dfs_mount(RT_NULL, "/dev", "devfs", 0, 0);
     rt_kprintf("Mount /dev ok!\n");
-    SysLog_Main(rtt_LogNotice, "Mount /dev ok!\n");
 #endif
 
 #if defined(RT_USING_SDIO) && defined(RT_USING_DFS_ELMFAT)
-    if (dfs_mount("sd0", "/mmc", "elm", 0, 0) == 0) {
-        rt_kprintf("Mount /mmc ok!\n");
-        SysLog_Main(rtt_LogNotice, "Mount /mmc ok!\n");
+    if (dfs_mount("sd0", "/mnt/mmc", "elm", 0, 0) == 0) {
+        rt_kprintf("Mount /mnt/mmc ok!\n");
     } else {
-        rt_kprintf("Mount /mmc failed!\n");
-        SysLog_Main(rtt_LogWarn, "Mount /mmc failed!\n");
+        rt_kprintf("Mount /mnt/mmc failed!\n");
     }
 #endif
 
@@ -320,12 +294,13 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
 #if defined(RT_USING_DFS)
+#define RTT_DEF_CONF "/etc/syscfg.cfg"
     inittmppath();
-    if (PZ[0] && dfs_file_stat(rttCfgFileDir "/syscfg.cfg", &st) == 0)
+    if (PZ[0] && dfs_file_stat(RTT_DEF_CONF, &st) == 0)
     {
         char buf[100];
         memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("mac",buf,100,rttCfgFileDir "/syscfg.cfg");
+        GetPrivateStringData("mac",buf,100,RTT_DEF_CONF);
         if (buf[0])
         {
             int netcfg[6];
@@ -340,26 +315,26 @@ static void rt_thread_entry_main(void* parameter)
             }
         }
         memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("ip",buf,100,rttCfgFileDir "/syscfg.cfg");
+        GetPrivateStringData("ip",buf,100,RTT_DEF_CONF);
         if (buf[0])
             rt_strncpy(NET_ADDR[0],buf,30);
         memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("mask",buf,100,rttCfgFileDir "/syscfg.cfg");
+        GetPrivateStringData("mask",buf,100,RTT_DEF_CONF);
         if (buf[0])
             rt_strncpy(NET_ADDR[1],buf,30);
-        GetPrivateStringData("gw",buf,100,rttCfgFileDir "/syscfg.cfg");
+        GetPrivateStringData("gw",buf,100,RTT_DEF_CONF);
         if (buf[0])
             rt_strncpy(NET_ADDR[2],buf,30);
         memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("dhcp",buf,100,rttCfgFileDir "/syscfg.cfg");
+        GetPrivateStringData("dhcp",buf,100,RTT_DEF_CONF);
         if (buf[0])
             NET_DHCP = atol(buf);
         memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("user",buf,100,rttCfgFileDir "/syscfg.cfg");
+        GetPrivateStringData("user",buf,100,RTT_DEF_CONF);
         if (buf[0])
             rt_strncpy(RTT_USER,buf,30);
         memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("pass",buf,100,rttCfgFileDir "/syscfg.cfg");
+        GetPrivateStringData("pass",buf,100,RTT_DEF_CONF);
         if (buf[0])
             rt_strncpy(RTT_PASS,buf,30);
     }
@@ -371,7 +346,6 @@ static void rt_thread_entry_main(void* parameter)
     rt_hw_eth_init();
     lwip_sys_init();
     rt_kprintf("TCP/IP initialized!\n");
-    SysLog_Main(rtt_LogNotice, "TCP/IP initialized!\n");
 #endif
 
     /* list date */

@@ -41,6 +41,7 @@
 #include <string.h>
 #include <sys/reent.h>
 #include <setjmp.h>
+#include <signal.h>
 #endif
 
 #ifdef __cplusplus
@@ -1009,7 +1010,8 @@ struct rt_module
     rt_uint16_t                  jmpsplen;              /**< vfork buf */
     jmp_buf                      jmpbuf;                /**< vfork buf */
     void                        *jmpsp;                 /**< vfork buf */
-    rt_uint8_t                   jmpspbuf[512];         /**< vfork buf */
+    rt_uint8_t                   jmpspbuf[256];         /**< vfork buf */
+    int                          exitcode;              /**< exit code */
 #endif
 
     rt_uint16_t                  nsym;                  /**< number of symbol in the module */

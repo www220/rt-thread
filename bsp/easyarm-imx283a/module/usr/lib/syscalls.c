@@ -315,7 +315,7 @@ int getgrouplist (const char *user, gid_t group, gid_t *groups, int *ngroups)
 		|| user == NULL || strcmp(user,defgroup.gr_name) != 0
 		|| group != defgroup.gr_gid)
 	{
-		errno = EINTR;
+		errno = ENOENT;
 		if (ngroups)
 			*ngroups = 0;
 		return -1;

@@ -175,10 +175,17 @@ void rt_hw_trap_dabt(struct rt_hw_register *regs)
 
 void rt_hw_trap_assert()
 {
-    /* unload assertion module */
-    rt_module_unload(rt_module_self());
+    rt_module_t module = rt_module_self();
+    if (module == RT_NULL)
+        return;
 
-    /* re-schedule */
+    if (module->jmppid)
+    {
+        module->tpid = module->jmppid;
+        module->jmppid = 0;
+    }
+    module->exitcode = SIGSEGV;
+    rt_module_unload(module);
     rt_schedule();
 }
 

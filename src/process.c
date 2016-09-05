@@ -26,6 +26,10 @@
 #include <rtthread.h>
 #include <rtm.h>
 #include <mmu.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
@@ -64,17 +68,15 @@
 #ifndef RT_USING_SLAB
 #error "defined RT_USING_SLAB"
 #endif
-#if PROCESS_MAX > 30
-#error "PROCESS_MAX <= 30"
+#if PROCESS_MAX > 60
+#error "PROCESS_MAX <= 60"
 #endif
 #if PROCESS_MEM > 64
 #error "PROCESS_MEM <= 64"
 #endif
 
 #define PAGE_COUNT_MAX    (256 * PROCESS_MEM)
-static volatile rt_uint32_t pids = 0;
 #define RT_MODULE_ARG_MAX    20
-extern struct rt_thread *rt_current_thread;
 #define RT_MODULE_MEMMAKE (32 * 1024)
 extern rt_thread_t rt_thread_create2(const char *name,
                              void (*entry)(void *parameter),
@@ -83,36 +85,100 @@ extern rt_thread_t rt_thread_create2(const char *name,
                              rt_uint32_t stack_size,
                              rt_uint8_t  priority,
                              rt_uint32_t tick);
+extern int __rt_ffs(int value);
 
 #define MAX_PID_SIZE	4096
 //status
-volatile int pid_buf[MAX_PID_SIZE];
+volatile int pidbuf[MAX_PID_SIZE];
 //pz:[0],ppid:[1],pgid[2],sid[3]
 volatile unsigned short pidinfo[MAX_PID_SIZE][4];
+static int current_tpid = 0;
+//pid
+static volatile rt_uint32_t pidid[1+PROCESS_MAX/32];
 static int current_pid = 0;
-static struct rt_event mod_event;
+//wait
+static rt_uint32_t mod_waitp[1+PROCESS_MAX/32];
+static struct rt_event mod_eventp[1+PROCESS_MAX/32];
 
-static unsigned short getempty_pid(unsigned short parent)
+static unsigned short getempty_pid()
+{
+	int i,ret;
+	for(i=0; i<PROCESS_MAX; i++)
+	{
+		if ((pidid[current_pid/32] & (1<<(i%32))) == 0)
+		{
+			ret = current_pid+1;
+			pidid[current_pid/32] |= (1<<(i%32));
+			if (++current_pid >= PROCESS_MAX)
+				current_pid = 0;
+			return ret;
+		}
+	}
+	return 0;
+}
+static void free_pid(unsigned short pid)
+{
+	if (pid <= 0)
+		return;
+	--pid;
+	pidid[pid/32] &= ~(1<<(pid%32));
+}
+
+static unsigned short getempty_tpid(unsigned short parent)
 {
 	int i,ret;
 	for(i=0; i<MAX_PID_SIZE; i++)
 	{
-		if (pidinfo[current_pid][0] == 0)
+		if (pidinfo[current_tpid][0] == 0)
 		{
-			ret = current_pid+1;
-			pidinfo[current_pid][0] = 1;
-			pidinfo[current_pid][1] = parent;
-			pidinfo[current_pid][2] = parent;
-			pidinfo[current_pid][3] = parent;
+			ret = current_tpid+1;
+			pidbuf[current_tpid] = 0;
+			pidinfo[current_tpid][0] = 101;
+			pidinfo[current_tpid][1] = parent;
+			pidinfo[current_tpid][2] = parent;
+			pidinfo[current_tpid][3] = parent;
 			if (parent)
 			{
-				pidinfo[current_pid][2] = pidinfo[parent-1][2];
-				pidinfo[current_pid][3] = pidinfo[parent-1][3];
+				pidinfo[current_tpid][2] = pidinfo[parent-1][2];
+				pidinfo[current_tpid][3] = pidinfo[parent-1][3];
 			}
-			if (++current_pid >= MAX_PID_SIZE)
-				current_pid = 0;
+			if (++current_tpid >= MAX_PID_SIZE)
+				current_tpid = 0;
 			return ret;
 		}
+	}
+	return 0;
+}
+static void free_tpid(unsigned short tpid)
+{
+	if (tpid <= 0)
+		return;
+	pidinfo[tpid-1][0] = 0;
+	pidbuf[tpid-1] = 0;
+}
+static void release_tpid(unsigned short tpid, int exitcode)
+{
+	int i;
+	if (tpid <= 0)
+		return;
+	pidinfo[tpid-1][0] = 102;
+	pidbuf[tpid-1] = exitcode;
+	for(i=0; i<1+PROCESS_MAX/32; i++)
+		rt_event_send(&mod_eventp[i], 0xffffffff);
+}
+static int find_tpid(unsigned short tpid, unsigned short tme)
+{
+	int i,ret;
+	for(i=0; i<MAX_PID_SIZE; i++)
+	{
+		if (pidinfo[i][0] == 0)
+			continue;
+		if (i+1 == tme)
+			continue;
+		if ((pidinfo[i][1] == tpid)
+				|| (pidinfo[i][2] == tpid)
+				|| (pidinfo[i][3] == tpid))
+			return 1;
 	}
 	return 0;
 }
@@ -124,11 +190,18 @@ static unsigned short getempty_pid(unsigned short parent)
  */
 int rt_system_module_init(void)
 {
-    int i;
-    for (i=0; i<PROCESS_MAX; i++)
-        pids |= (1<<i);
-    rt_event_init(&mod_event, "process", RT_IPC_FLAG_FIFO);
-    return 0;
+	int i;
+	char buf[20];
+	for(i=0; i<PROCESS_MAX; i++)
+	{
+		mod_waitp[i/32] |= (1<<(i%32));
+		if ((i%32) == 0)
+		{
+			sprintf(buf,"process%d",i/32);
+			rt_event_init(&mod_eventp[i/32], buf, RT_IPC_FLAG_FIFO);
+		}
+	}
+	return 0;
 }
 INIT_COMPONENT_EXPORT(rt_system_module_init);
 
@@ -336,18 +409,19 @@ static struct rt_module *_load_exec_object(const char *name,
     module->jmppid = 0;
     module->jmpsp = 0;
     module->jmpsplen = 0;
+    module->exitcode = 0;
 
-    {extern int __rt_ffs(int value);
-    register rt_ubase_t temp = rt_hw_interrupt_disable();
-    module->pid = __rt_ffs(pids);
+    {register rt_ubase_t temp = rt_hw_interrupt_disable();
+    module->pid = getempty_pid();
     if (module->pid)
     {
         rt_module_t parent = rt_module_self();
-        module->tpid = getempty_pid(parent?parent->tpid:0);
+        module->tpid = getempty_tpid(parent?parent->tpid:0);
         if (module->tpid == 0)
+        {
+            free_pid(module->pid);
             module->pid = 0;
-        if (module->pid)
-            pids &= ~(1<<(module->pid-1));
+        }
     }
     rt_hw_interrupt_enable(temp);}
     if (module->pid == 0)
@@ -357,17 +431,15 @@ static struct rt_module *_load_exec_object(const char *name,
 
         return RT_NULL;
     }
-    mmu_maketlb(module->pid);
 
     /* allocate module space */
     module->module_space = rt_page_alloc(module_size/RT_MM_PAGE_SIZE);
     if (module->module_space == RT_NULL)
     {
         {register rt_ubase_t temp = rt_hw_interrupt_disable();
-        pids |= (1<<(module->pid-1));
-        pidinfo[module->tpid-1][0] = 0;
+        free_pid(module->pid);
+        free_tpid(module->tpid);
         rt_hw_interrupt_enable(temp);}
-        mmu_freetlb(module->pid);
 
         rt_kprintf("Module: allocate space failed.\n");
         rt_object_delete(&(module->parent));
@@ -376,6 +448,7 @@ static struct rt_module *_load_exec_object(const char *name,
     }
 
     /* zero all space */
+    mmu_maketlb(module->pid);
     rt_memset(module->module_space, 0, module_size);
     mmu_usermap(module->pid,(Elf32_Addr)module->module_space,vstart_addr,module_size,0);
 
@@ -690,8 +763,6 @@ rt_module_t rt_module_do_main(const char *name,
         main_info->module_env_line = main_info->module_cmd_line+main_info->module_cmd_size+1;
         module->parent.flag |= RT_MODULE_FLAG_WITHENTRY;
 
-        /* thread while startup */
-        pidinfo[module->tpid-1][0] = 2;
         /* startup module thread */
         rt_thread_startup(module->module_thread);
     }
@@ -708,8 +779,6 @@ rt_module_t rt_module_do_main(const char *name,
     }
 #endif
 
-    rt_event_recv(&mod_event, 1<<(module->pid-1), RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,
-                                        RT_WAITING_FOREVER, RT_NULL);
     return module;
 }
 
@@ -851,13 +920,6 @@ rt_module_t rt_module_exec_cmd(const char *path, const char* cmd_line, int size)
 
     /* check parameters */
     RT_ASSERT(path != RT_NULL);
-
-    /* alloc pid */
-    if (pids == 0)
-    {
-        rt_kprintf("Module: pid full\n");
-        goto __exit;
-    }
 
     /* get file size */
     if (stat(path, &s) !=0)
@@ -1119,15 +1181,11 @@ rt_err_t rt_module_destroy(rt_module_t module)
 
     /* switch tls */
     mmu_switchtlb(0);
-    {register rt_ubase_t temp = rt_hw_interrupt_disable();
-    pids |= (1<<(module->pid-1));
-    if (pidinfo[module->tpid-1][0] == 1)
-        pidinfo[module->tpid-1][0] = 0;
-    else
-        rt_event_send(&mod_event, 1<<(module->pid-1));
-    rt_hw_interrupt_enable(temp);}
     /* free tls */
     mmu_freetlb(module->pid);
+    {register rt_ubase_t temp = rt_hw_interrupt_disable();
+    free_pid(module->pid);
+    rt_hw_interrupt_enable(temp);}
 
     /* delete module object */
     rt_object_delete((rt_object_t)module);
@@ -1158,7 +1216,7 @@ rt_err_t rt_module_unload(rt_module_t module)
     {
     	//load thread used stack
     	rt_uint32_t jmp;
-    	volatile char buf[512] = {0};
+    	volatile char buf[256] = {0};
     	rt_memcpy((void *)module->jmpsp,module->jmpspbuf,module->jmpsplen);
     	//
     	jmp = module->tpid;module->tpid = module->jmppid;module->jmppid = 0;
@@ -1201,7 +1259,9 @@ rt_err_t rt_module_unload(rt_module_t module)
 #endif
 
     /* thread while unload */
-    pidinfo[module->tpid-1][0] = 3;
+    {register rt_ubase_t temp = rt_hw_interrupt_disable();
+    release_tpid(module->tpid,module->exitcode);
+    rt_hw_interrupt_enable(temp);}
     return RT_EOK;
 }
 
@@ -1326,9 +1386,10 @@ void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size)
             return (void *)ptr;
     } while (0);
 
-    rt_kprintf("\nthread - %.*s - ", RT_NAME_MAX, rt_current_thread->name);
+    rt_kprintf("\nthread - %.*s - ", RT_NAME_MAX, rt_thread_self()->name);
     rt_kprintf("data abort addr:%x size:%x\n", ptr, size);
 
+	module->exitcode = SIGSEGV;
 	rt_module_unload(module);
 	rt_schedule();
     return RT_NULL;
@@ -1360,7 +1421,7 @@ int rt_module_vfork(rt_module_t module)
     }
     {register rt_ubase_t temp = rt_hw_interrupt_disable();
     module->jmppid = module->tpid;
-    module->tpid = getempty_pid(module->jmppid);
+    module->tpid = getempty_tpid(module->jmppid);
     rt_hw_interrupt_enable(temp);}
     if (module->tpid == 0)
     {
@@ -1370,6 +1431,89 @@ int rt_module_vfork(rt_module_t module)
     	return -ENOMEM;
     }
     return 0;
+}
+
+int rt_module_waitpid(rt_module_t module, pid_t pid, int* status, int opt)
+{
+	int i,waitpid = 0,wait = opt & WNOHANG;
+	int find = 0,ret = 0;
+	register rt_ubase_t temp = rt_hw_interrupt_disable();
+	for(i=0; i<MAX_PID_SIZE; i++)
+	{
+		if (pidinfo[i][0] < 100)
+			continue;
+		//判断是否有子进程的存在
+		if (pid < -1)
+		{
+			if (pidinfo[i][2] != -pid)
+				continue;
+		}
+		else if (pid == -1)
+		{
+			if (pidinfo[i][1] != module->tpid)
+				continue;
+		}
+		else if (pid == 0)
+		{
+			if (pidinfo[i][2] != pidinfo[module->tpid-1][2])
+				continue;
+		}
+		else
+		{
+			if (i != pid-1)
+				continue;
+		}
+		find = 1;
+		//判断进程是否退出
+		if (pidinfo[i][0] == 102)
+		{
+			if (status)
+				*status = pidbuf[i];
+			//搜索进程是否还有被占用的存在
+			pidinfo[i][0] = 1;
+			if (!find_tpid(i+1,i+1))
+				pidinfo[i][0] = 0;
+			if (pidinfo[pidinfo[i][1]-1][0] < 100 && !find_tpid(pidinfo[i][1],i+1))
+				pidinfo[pidinfo[i][1]-1][0] = 0;
+			if (pidinfo[pidinfo[i][2]-1][0] < 100 && !find_tpid(pidinfo[i][2],i+1))
+				pidinfo[pidinfo[i][2]-1][0] = 0;
+			if (pidinfo[pidinfo[i][3]-1][0] < 100 && !find_tpid(pidinfo[i][3],i+1))
+				pidinfo[pidinfo[i][3]-1][0] = 0;
+			wait = 0;
+			ret = i+1;
+			break;
+		}
+	}
+	//需要等待
+	waitpid = 0;
+	if (wait && find)
+	{
+		for (i=0;i<1+PROCESS_MAX/32;i++)
+		{
+			if (mod_waitp[i] == 0)
+				continue;
+			waitpid = __rt_ffs(mod_waitp[i]);
+			waitpid += i*32;
+			break;
+		}
+	}
+	//没有子进程
+	else if (wait)
+	{
+		waitpid = 0;
+		ret = -ECHILD;
+	}
+	rt_hw_interrupt_enable(temp);
+	//等待
+	if (waitpid)
+	{
+		--waitpid;
+		rt_event_recv(&mod_eventp[waitpid/32],(1<<waitpid%32),RT_NULL,
+				RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0);
+		rt_event_recv(&mod_eventp[waitpid/32],(1<<waitpid%32),RT_NULL,
+				RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0);
+	}
+	return ret;
 }
 
 #endif

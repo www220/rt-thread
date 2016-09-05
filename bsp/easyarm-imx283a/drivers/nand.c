@@ -1159,7 +1159,7 @@ static rt_err_t nanddrv_file_write_page(struct rt_mtd_nand_device *device,
 	nand_command(device, NAND_CMD_PAGEPROG, -1, -1);
 	status = nand_wait(device);
 
-    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;;
+    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;
 }
 
 static rt_err_t nanddrv_file_move_page(struct rt_mtd_nand_device *device, rt_off_t from, rt_off_t to)
@@ -1222,7 +1222,7 @@ static rt_err_t nanddrv_file_mark_block(struct rt_mtd_nand_device *device, rt_ui
 	nand_command(device, NAND_CMD_PAGEPROG, -1, -1);
 	status = nand_wait(device);
 
-    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;;
+    return status & NAND_STATUS_FAIL ? -RT_EIO : RT_EOK;
 }
 
 const static struct rt_mtd_nand_driver_ops _ops =

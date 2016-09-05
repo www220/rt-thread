@@ -8,26 +8,22 @@
 
 void inittmppath(void)
 {
-    mkdir(rttCfgFileDir, 666);
-    mkdir(rttLogFileDir, 666);
+    mkdir("/var/tmp", 666);
     cleartmppath();
 }
 
 void cleartmppath(void)
 {
-    char buf[100];
+    char buf[200];
 	struct dirent *ent = NULL;
 
-	DIR *pDir = opendir(rttTempFileDir);
+	DIR *pDir = opendir("/var/tmp");
 	if (pDir != NULL)
     {
         while((ent=readdir(pDir)) != NULL)
         {  
-			if ((ent->d_type & DFS_DT_DIR) == 0)
-            {
-				sprintf(buf,"%s/%s",rttTempFileDir,ent->d_name);
-				unlink(buf);
-			}
+			sprintf(buf,"/var/tmp/%s",ent->d_name);
+			unlink(buf);
 		}
 		closedir(pDir);
 	}

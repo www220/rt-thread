@@ -166,12 +166,20 @@ void rt_hw_board_init()
     rt_hw_ssp_init();
 #endif
 
-#ifdef RT_USING_USB_HOSTU
-    rt_hw_usbh_init();
-#endif
-
     pin_gpio_set(PIN_WDT, 1);
     rt_kprintf("loops %d, init %d, all %d\n",loops_per_jiffy,init[2]-init[1],init[5]-init[0]);
+}
+
+void sys_reboot(void)
+{
+    //save log
+    rt_kprintf("System Reboot!\n");
+    //
+	//使用内部的看门狗来达到重启的目的
+	writel(1, REGS_RTC_BASE + HW_RTC_WATCHDOG);
+	writel(0x80000000, REGS_RTC_BASE + HW_RTC_PERSISTENT1_SET);
+	writel(BM_RTC_CTRL_WATCHDOGEN, REGS_RTC_BASE + HW_RTC_CTRL_SET);
+    while(1);
 }
 
 #if defined(FINSH_USING_MSH)
@@ -179,23 +187,7 @@ void rt_hw_board_init()
 #include <msh.h>
 int cmd_reboot(int argc, char** argv)
 {
-	int i;
-    SysLog_Main(rtt_LogEmerg, "Cmd Reboot!\n");
-    g_nSaveSysLog = 1;
-    rt_sem_release(&syslog_sem);
-    g_nSaveSysLog = 1;
-    rt_sem_release(&syslog_sem);
-    rt_sem_release(&syslog_sem);
-    rt_sem_release(&syslog_sem);
-    rt_sem_release(&syslog_sem);
-    for (i=0; i<100 && g_nSaveSysLog; i++)
-        rt_thread_delay(100);
-
-	//使用内部的看门狗来达到重启的目的
-	writel(1, REGS_RTC_BASE + HW_RTC_WATCHDOG);
-	writel(0x80000000, REGS_RTC_BASE + HW_RTC_PERSISTENT1_SET);
-	writel(BM_RTC_CTRL_WATCHDOGEN, REGS_RTC_BASE + HW_RTC_CTRL_SET);
-    while(1);
+	sys_reboot();
 	return 0;
 }
 RTM_EXPORT(__delay);
