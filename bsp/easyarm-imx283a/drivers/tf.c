@@ -67,7 +67,7 @@ static void set_bit_clock(struct at91_mci *mmc, u32 clock)
 		divide << BP_SSP_TIMING_CLOCK_DIVIDE |
 		(rate - 1) << BP_SSP_TIMING_CLOCK_RATE);
 
-	printf("MMC: Set clock rate to %d KHz (requested %d KHz)\n",
+	rt_kprintf("MMC: Set clock rate to %d KHz (requested %d KHz)\n",
 		tgtclk, clock);
 }
 
@@ -97,7 +97,7 @@ static void set_bit_width(struct at91_mci *mmc, u8 width)
 	}
 	ssp_mmc_write(mmc, HW_SSP_CTRL0, regval);
 
-	printf("MMC: Set %d bits bus width\n",
+	rt_kprintf("MMC: Set %d bits bus width\n",
 		bus_width);
 }
 
@@ -124,7 +124,7 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 		BM_SSP_STATUS_DATA_BUSY | BM_SSP_STATUS_CMD_BUSY)) {
 		udelay(100);
 		if (i++ == 10000) {
-			printf("MMC: Bus busy timeout!\n");
+			rt_kprintf("MMC: Bus busy timeout!\n");
 			return TIMEOUT;
 		}
 	}
@@ -160,7 +160,7 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 			ssp_mmc_write(mmc, HW_SSP_CTRL0_SET,
 				BM_SSP_CTRL0_READ);
 		} else if (ssp_mmc_is_wp(mmc)) {
-			printf("MMC: Can not write a locked card!\n");
+			rt_kprintf("MMC: Can not write a locked card!\n");
 			return UNUSABLE_ERR;
 		}
 		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_DATA_XFER);
@@ -183,7 +183,7 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	do {
 		udelay(100);
 		if (i++ == 10000) {
-			printf("MMC: Command %ld busy\n",
+			rt_kprintf("MMC: Command %ld busy\n",
 				cmd->cmd_code);
 			break;
 		}
@@ -193,7 +193,7 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	/* Check command timeout */
 	if (ssp_mmc_read(mmc, HW_SSP_STATUS) &
 		BM_SSP_STATUS_RESP_TIMEOUT) {
-		printf("MMC: Command %ld timeout\n",
+		rt_kprintf("MMC: Command %ld timeout\n",
 			cmd->cmd_code);
 		return TIMEOUT;
 	}
@@ -201,7 +201,7 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	/* Check command errors */
 	if (ssp_mmc_read(mmc, HW_SSP_STATUS) &
 		(BM_SSP_STATUS_RESP_CRC_ERR | BM_SSP_STATUS_RESP_ERR)) {
-		printf("MMC: Command %ld error (status 0x%08x)!\n",
+		rt_kprintf("MMC: Command %ld error (status 0x%08x)!\n",
 			cmd->cmd_code,
 			ssp_mmc_read(mmc, HW_SSP_STATUS));
 		return COMM_ERR;
@@ -249,7 +249,7 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	if (ssp_mmc_read(mmc, HW_SSP_STATUS) &
 		(BM_SSP_STATUS_TIMEOUT | BM_SSP_STATUS_DATA_CRC_ERR |
 		BM_SSP_STATUS_FIFO_OVRFLW | BM_SSP_STATUS_FIFO_UNDRFLW)) {
-		printf("MMC: Data error with command %ld (status 0x%08x)!\n",
+		rt_kprintf("MMC: Data error with command %ld (status 0x%08x)!\n",
 			cmd->cmd_code,
 			ssp_mmc_read(mmc, HW_SSP_STATUS));
 		return COMM_ERR;
@@ -392,7 +392,7 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 		switch (io_cfg->power_mode)
 		{
 			case MMCSD_POWER_OFF:
-				printf("MMC: Power Off!\n");
+				rt_kprintf("MMC: Power Off!\n");
 				mci_run = 0;
 				break;
 		}
@@ -425,7 +425,7 @@ static void sd_monitor_thread_entry(void *parameter)
         status  = (ssp_mmc_read(&mci, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT);
         if (status != card) {
             if (status) {
-        		printf("MMC: No card detected!\n");
+        		rt_kprintf("MMC: No card detected!\n");
         		if (mci.host->card) {
             		mmcsd_change(mci.host);
             		mmcsd_wait_cd_changed(5000);
@@ -435,7 +435,7 @@ static void sd_monitor_thread_entry(void *parameter)
             			rt_kprintf("Unmount /mnt/mmc failed!\n");
         		}
         	} else {
-        		printf("MMC: Card detected!\n");
+        		rt_kprintf("MMC: Card detected!\n");
         		mci_run = 1;
         		mmcsd_change(mci.host);
         		mmcsd_wait_cd_changed(5000);
@@ -481,9 +481,9 @@ void tf_init(void)
 	mmcsd_change(host);
 	mmcsd_wait_cd_changed(5000);
 	if (mci_run)
-        printf("MMC: Card detected!\n");
+        rt_kprintf("MMC: Card detected!\n");
 	else
-        printf("MMC: No card detected!\n");
+        rt_kprintf("MMC: No card detected!\n");
 
     /* start sd monitor */
     {

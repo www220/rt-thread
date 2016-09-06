@@ -753,7 +753,7 @@ int mxs_dma_init(void)
 		err = mxs_dma_request(dma_channel);
 
 		if (err) {
-			printf("Can't acquire DMA channel %u\n", dma_channel);
+			rt_kprintf("Can't acquire DMA channel %u\n", dma_channel);
 
 			/* Free all the channels we've already acquired. */
 			while (--dma_channel >= 0)

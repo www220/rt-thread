@@ -222,7 +222,11 @@ ctor_end:
     .global rt_thread_switch_interrupt_flag
     .global rt_interrupt_from_thread
     .global rt_interrupt_to_thread
-    
+
+    .globl rt_pids_from
+    .globl rt_pids_to
+    .globl mmu_switchtlb
+
     .align  5
 Undef_Handler:
     SUB     SP, SP, #S_FRAME_SIZE
@@ -370,6 +374,16 @@ rt_hw_context_switch_interrupt_from_usr_do:
     LDR     R5,  [R4]               @; R5 = stack ptr in old tasks's TCB
     STR     SP,  [R5]               @; Store SP in preempted tasks's TCB
 
+    LDR     R4, =rt_pids_to
+    LDR     R0, [R4]
+    LDR     R4, =rt_pids_from
+    LDR     R5, [R4]
+    CMP     R0, R5
+    BEQ     rt_hw_context_switch_interrupt_to_tlb
+    STR     R0, [R4]
+    BL      mmu_switchtlb
+
+rt_hw_context_switch_interrupt_to_tlb:
     LDR     R6,  =rt_interrupt_to_thread
     LDR     R6,  [R6]               @; R6 = stack ptr in new tasks's TCB
     LDR     SP,  [R6]               @; Get new task's stack pointer

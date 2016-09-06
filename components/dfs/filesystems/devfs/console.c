@@ -55,7 +55,13 @@ static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_si
 	device = (struct console_device*)dev;
 	RT_ASSERT(device != RT_NULL);
 
-	return rt_device_read(device->device, pos, buffer, size);
+	do
+	{
+		int ret = rt_device_read(device->device, pos, buffer, size);
+		if (ret > 0)
+			return ret;
+		rt_thread_delay(10);
+	} while (1);
 }
 
 static rt_size_t console_write(rt_device_t dev, rt_off_t pos, const void* buffer, rt_size_t size)

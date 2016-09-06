@@ -47,9 +47,9 @@ extern int __rt_ffs(int value);
 rt_list_t rt_thread_priority_table[RT_THREAD_PRIORITY_MAX];
 struct rt_thread *rt_current_thread;
 #ifdef RT_USING_PROCESS
+rt_uint32_t rt_pids_from;
+rt_uint32_t rt_pids_to;
 struct rt_module *rt_current_module;
-rt_uint32_t rt_current_pids;
-extern void mmu_switchtlb(rt_uint32_t pid);
 #endif
 
 rt_uint8_t rt_current_priority;
@@ -141,7 +141,7 @@ void rt_system_scheduler_init(void)
     rt_current_thread = RT_NULL;
 #ifdef RT_USING_PROCESS
     rt_current_module = RT_NULL;
-    rt_current_pids = 0;
+    rt_pids_from = rt_pids_to = 0;
 #endif
 
     /* initialize ready priority group */
@@ -186,10 +186,7 @@ void rt_system_scheduler_start(void)
     {
         rt_current_module = (rt_module_t)rt_current_thread->module_id;
         if (rt_current_module)
-        {
-            rt_current_pids = rt_current_module->pid;
-            mmu_switchtlb(rt_current_module->pid);
-        }
+            rt_pids_to = rt_current_module->pid;
     }
     if (rt_current_module)
     {
@@ -257,10 +254,7 @@ void rt_schedule(void)
             {
                 rt_current_module = (rt_module_t)rt_current_thread->module_id;
                 if (rt_current_module)
-                {
-                    rt_current_pids = rt_current_module->pid;
-                    mmu_switchtlb(rt_current_module->pid);
-                }
+                    rt_pids_to = rt_current_module->pid;
             }
             if (rt_current_module)
             {

@@ -47,6 +47,9 @@ rt_hw_interrupt_enable:
  * r0 --> from
  * r1 --> to
  */
+    .globl rt_pids_from
+    .globl rt_pids_to
+    .globl mmu_switchtlb
     .globl rt_hw_context_switch
 rt_hw_context_switch:
     STMFD   SP!, {LR}           @; push pc (lr should be pushed in place of pc)
@@ -54,6 +57,17 @@ rt_hw_context_switch:
     MRS     R4, CPSR
     STMFD   SP!, {R4}               @; push cpsr
     STR     SP, [R0]                @; store sp in preempted tasks tcb
+    LDR     R3, =rt_pids_to
+    LDR     R0, [R3]
+    LDR     R3, =rt_pids_from
+    LDR     R2, [R3]
+    CMP     R0, R2
+    BEQ     rt_hw_context_switch_tlb
+    STR     R0, [R3]
+    MOV     R4, R1                  @; push r1
+    BL      mmu_switchtlb
+    MOV     R1, R4                  @; store r1
+rt_hw_context_switch_tlb:
     LDR     SP, [R1]                @; get new task stack pointer
     LDMFD   SP!, {R4}               @; pop new task spsr
     MSR     SPSR_cxsf, R4

@@ -204,7 +204,7 @@ static int send_command(struct rt_mtd_nand_device *mtd, unsigned chip,
 	error = mxs_dma_go(dma_channel);
 
 	if (error)
-		printf("[%s] DMA error\n", __func__);
+		rt_kprintf("[%s] DMA error\n", __func__);
 
 	/* Return success. */
 	return error;
@@ -270,7 +270,7 @@ static int send_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 	error = mxs_dma_go(dma_channel);
 
 	if (error)
-		printf("[%s] DMA error\n", __func__);
+		rt_kprintf("[%s] DMA error\n", __func__);
 
 	/* Return success. */
 	return error;
@@ -384,17 +384,17 @@ static int read_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 	error = mxs_dma_go(dma_channel);
 
 	if (error)
-		printf("[%s] DMA error\n", __func__);
+		rt_kprintf("[%s] DMA error\n", __func__);
 
 #ifdef CONFIG_MTD_DEBUG
 	{
 		int i;
 		dma_addr_t *tmp_buf_ptr = (dma_addr_t *)buffer;
 
-		printf("Buffer:");
+		rt_kprintf("Buffer:");
 		for (i = 0; i < length; ++i)
-			printf("0x%08x ", tmp_buf_ptr[i]);
-		printf("\n");
+			rt_kprintf("0x%08x ", tmp_buf_ptr[i]);
+		rt_kprintf("\n");
 	}
 #endif
 
@@ -490,14 +490,14 @@ static int send_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	error = mxs_dma_go(dma_channel);
 
 	if (error)
-		printf("[%s] DMA error\n", __func__);
+		rt_kprintf("[%s] DMA error\n", __func__);
 
 	error = wait_for_bch_completion(1000000);
 
 	error = (error) ? -ETIMEDOUT : 0;
 
 	if (error)
-		printf("[%s] bch timeout!!!\n", __func__);
+		rt_kprintf("[%s] bch timeout!!!\n", __func__);
 
 	clear_bch(NULL);
 
@@ -676,14 +676,14 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	error = mxs_dma_go(dma_channel);
 
 	if (error)
-		printf("[%s] DMA error\n", __func__);
+		rt_kprintf("[%s] DMA error\n", __func__);
 
 	error = wait_for_bch_completion(1000000);
 
 	error = (error) ? -ETIMEDOUT : 0;
 
 	if (error)
-		printf("[%s] bch timeout!!!\n", __func__);
+		rt_kprintf("[%s] bch timeout!!!\n", __func__);
 
 	clear_bch(NULL);
 
@@ -728,7 +728,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
 		memalign(MXS_DMA_ALIGNMENT, GPMI_NFC_COMMAND_BUFFER_SIZE);
 #endif
 		if (!cmd_queue) {
-			printf("%s: failed to allocate command "
+			rt_kprintf("%s: failed to allocate command "
 				"queuebuffer\n",
 				__func__);
 			return;
@@ -768,7 +768,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
 #if defined(CONFIG_MTD_DEBUG)
 	display[0] = 0;
 	for (i = 0; i < cmd_Q_len; i++)
-		sprintf(display + strlen(display),
+		srt_kprintf(display + strlen(display),
 			" 0x%02x", cmd_queue[i] & 0xff);
 	MTDDEBUG(MTD_DEBUG_LEVEL1, "%s: command: %s\n", __func__, display);
 #endif
@@ -782,7 +782,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
 #endif
 
 	if (error)
-		printf("Command execute failed!\n");
+		rt_kprintf("Command execute failed!\n");
 
 	/* Reset. */
 	cmd_Q_len = 0;
@@ -823,7 +823,7 @@ static void nand_write_buf(struct rt_mtd_nand_device *mtd,
 		memalign(MXS_DMA_ALIGNMENT, PAGE_SIZE);
 #endif
 		if (!data_buf) {
-			printf("%s: failed to allocate data_buf "
+			rt_kprintf("%s: failed to allocate data_buf "
 				"queuebuffer\n",
 				__func__);
 			return;
@@ -834,10 +834,10 @@ static void nand_write_buf(struct rt_mtd_nand_device *mtd,
 	}
     
 	if (len > PAGE_SIZE)
-		printf("[%s] Inadequate DMA buffer\n", __func__);
+		rt_kprintf("[%s] Inadequate DMA buffer\n", __func__);
 
 	if (!buf)
-		printf("[%s] Buffer pointer is NULL\n", __func__);
+		rt_kprintf("[%s] Buffer pointer is NULL\n", __func__);
 
 	rt_memcpy(data_buf, buf, len);
 
@@ -872,7 +872,7 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 		memalign(MXS_DMA_ALIGNMENT, PAGE_SIZE);
 #endif
 		if (!data_buf) {
-			printf("%s: failed to allocate data_buf "
+			rt_kprintf("%s: failed to allocate data_buf "
 				"queuebuffer\n",
 				__func__);
 			return;
@@ -883,10 +883,10 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 	}
     
 	if (len > PAGE_SIZE)
-		printf("[%s] Inadequate DMA buffer\n", __func__);
+		rt_kprintf("[%s] Inadequate DMA buffer\n", __func__);
 
 	if (!buf)
-		printf("[%s] Buffer pointer is NULL\n", __func__);
+		rt_kprintf("[%s] Buffer pointer is NULL\n", __func__);
 
 	/* Ask the NFC. */
 #ifdef CONFIG_ARCH_MMU

@@ -517,7 +517,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_kprintf("syscall execve %s\n",file);
         return 0;
     }
-    case SYS_wait4:
+    case SYS_wait4+1111:
     {
         int *status = (parm2)?((int *)rt_module_conv_ptr(module,parm2,sizeof(int))):RT_NULL;
         return rt_module_waitpid(module,(pid_t)parm1,status,parm3);
@@ -742,6 +742,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_BASE+904:
     {
         rt_mutex_release(module->mod_mutex);
+        return 0;
+    }
+    case SYS_BASE+1001:
+    {
+        char *name = (char *)rt_module_conv_ptr(module,parm2,parm3);
+        strncpy(name,"/dev/console",parm3);
         return 0;
     }
     }

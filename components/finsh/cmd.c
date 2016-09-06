@@ -622,6 +622,13 @@ int list_mod_detail(const char *name)
                 else if (thread->stat == RT_THREAD_SUSPEND) rt_kprintf(" suspend");
                 else if (thread->stat == RT_THREAD_INIT)    rt_kprintf(" init   ");
 
+#ifdef RT_USING_PROCESS
+                rt_kprintf(" 0x%08x 0x%08x 0x-------- 0x%08x %03d\n",
+                           thread->stack_size + ((rt_uint32_t)thread->stack_addr - (rt_uint32_t)thread->sp),
+                           thread->stack_size,
+                           thread->remaining_tick,
+                           thread->error);
+#else
                 ptr = (rt_uint8_t *)thread->stack_addr;
                 while (*ptr == '#')ptr ++;
 
@@ -631,6 +638,7 @@ int list_mod_detail(const char *name)
                            thread->stack_size - ((rt_uint32_t) ptr - (rt_uint32_t)thread->stack_addr),
                            thread->remaining_tick,
                            thread->error);
+#endif
             }
 
             /* list sub thread in module */

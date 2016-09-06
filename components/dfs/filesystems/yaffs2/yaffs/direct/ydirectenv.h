@@ -62,7 +62,7 @@ void yaffs_qsort(void *aa, size_t n, size_t es,
 
 #define yaffs_trace(msk, fmt, ...) do { \
 	if(yaffs_trace_mask & (msk)) \
-		printf("yaffs: " fmt "\n", ##__VA_ARGS__); \
+		rt_kprintf("yaffs: " fmt "\n", ##__VA_ARGS__); \
 } while(0)
 
 

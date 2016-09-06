@@ -157,7 +157,7 @@ static void fec_reset(struct rt_stm32_eth *dev)
 		udelay(1);
 
 	if (i == FEC_RESET_DELAY)
-		printf("FEC_RESET_DELAY timeout\n");
+		rt_kprintf("FEC_RESET_DELAY timeout\n");
 }
 
 static void fec_get_mac_addr(unsigned char *mac)
@@ -374,7 +374,7 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 		j++;
 	}
 	if (j >= FEC_MAX_TIMEOUT)
-		printf("TX timeout packet at %p\n", p);
+		rt_kprintf("TX timeout packet at %p\n", p);
 
 	rc = (info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY);
 	info->txIdx = (info->txIdx + 1) % TX_BUF_CNT;

@@ -14,6 +14,9 @@
 #define FT_DIRECTORY	2	/* directory    */
 #define FT_USER			3	/* user defined */
 
+#define O_DIRECTORY     0x200000
+#define O_EXEC          0x400000
+
 #define DT_UNKNOWN		0
 #define DT_FIFO         1
 #define DT_CHR          2

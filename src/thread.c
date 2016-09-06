@@ -375,6 +375,7 @@ rt_thread_t rt_thread_create(const char *name,
 }
 RTM_EXPORT(rt_thread_create);
 
+#ifdef RT_USING_PROCESS
 rt_thread_t rt_thread_create2(const char *name,
                              void (*entry)(void *parameter),
                              void       *parameter,
@@ -405,6 +406,7 @@ rt_thread_t rt_thread_create2(const char *name,
     return thread;
 }
 RTM_EXPORT(rt_thread_create2);
+#endif
 
 /**
  * This function will delete a thread. The thread object will be removed from

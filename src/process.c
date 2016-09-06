@@ -86,7 +86,8 @@ extern rt_thread_t rt_thread_create2(const char *name,
                              rt_uint8_t  priority,
                              rt_uint32_t tick);
 extern int __rt_ffs(int value);
-extern rt_uint32_t rt_current_pids;
+extern rt_uint32_t rt_pids_from;
+extern rt_uint32_t rt_pids_to;
 
 #define MAX_PID_SIZE	4096
 //status
@@ -182,6 +183,66 @@ static int find_tpid(unsigned short tpid, unsigned short tme)
 			return 1;
 	}
 	return 0;
+}
+
+//以下函数实现系统对象的复制
+extern struct rt_object_information rt_object_container[];
+rt_object_t rt_module_copy_object(rt_object_t desc, rt_object_t src)
+{
+	int i,make = 0,type = src->type&0x7f;
+	register rt_base_t temp;
+	struct rt_object_information *information;
+	if (desc == RT_NULL)
+	{
+		desc = rt_object_allocate(type,"");
+		make = 1;
+	}
+	if (desc == RT_NULL)
+		return desc;
+	if (make)
+	{
+		/* remove object into information object list */
+		temp = rt_hw_interrupt_disable();
+		rt_list_remove(&(desc->list));
+		rt_hw_interrupt_enable(temp);
+	}
+	information = &rt_object_container[type];
+	rt_memcpy(desc,src,information->object_size);
+	/* insert object into information object list */
+	temp = rt_hw_interrupt_disable();
+	rt_list_insert_after(&(src->list), &(desc->list));
+	rt_hw_interrupt_enable(temp);
+	/* dump object */
+	switch(type)
+	{
+	case RT_Object_Class_Timer:
+	{
+		rt_timer_t src_timer = (rt_timer_t)src;
+		rt_timer_t desc_timer = (rt_timer_t)desc;
+		temp = rt_hw_interrupt_disable();
+		for (i = 0; i < RT_TIMER_SKIP_LIST_LEVEL; i++)
+		{
+			rt_list_init(&(desc_timer->row[i]));
+			if (!rt_list_isempty(&(src_timer->row[i])))
+				rt_list_insert_after(&(src_timer->row[i]), &(desc_timer->row[i]));
+		}
+		rt_hw_interrupt_enable(temp);
+		//fix parameter
+		break;
+	}
+	case RT_Object_Class_Thread:
+	{
+		rt_thread_t src_thread = (rt_thread_t)src;
+		rt_thread_t desc_thread = (rt_thread_t)desc;
+		rt_list_init(&(desc_thread->tlist));
+		//timer
+		rt_module_copy_object(&desc_thread->thread_timer.parent, &src_thread->thread_timer.parent);
+		desc_thread->thread_timer.parameter = desc_thread;
+		//fix module_id
+		break;
+	}
+	}
+	return desc;
 }
 
 /**
@@ -824,6 +885,7 @@ rt_module_t rt_module_do_main(const char *name,
     }
 #endif
 
+    rt_thread_delay(30000);
     return module;
 }
 
@@ -1219,9 +1281,9 @@ rt_err_t rt_module_destroy(rt_module_t module)
 #endif
 
     /* switch tls */
-    if (rt_current_pids == module->pid)
+    if (rt_pids_to == module->pid)
     {
-        rt_current_pids = 0;
+        rt_pids_from = rt_pids_to = 0;
         mmu_switchtlb(0);
     }
     /* free tls */
@@ -1452,22 +1514,15 @@ int rt_module_fork(rt_module_t module)
 		return -ENOSYS;
 
     /* allocate module */
-    rt_module_t forkmod = (struct rt_module *)rt_object_allocate(RT_Object_Class_Module,
-    		module->parent.name);
+    rt_module_t forkmod = (struct rt_module *)rt_module_copy_object(RT_NULL,&module->parent);
     if (!forkmod)
-    	return -ENOMEM;
-
-    /* copy module */
-    list = forkmod->parent.list;
-    *forkmod = *module;
-    strcat(forkmod->parent.name,"1");
-    forkmod->parent.list = list;
+        return -ENOMEM;
 
     {register rt_ubase_t temp = rt_hw_interrupt_disable();
     forkmod->pid = getempty_pid();
     if (forkmod->pid)
     {
-        forkmod->tpid = getempty_tpid(module->tpid);
+        forkmod->tpid = getempty_tpid(forkmod->tpid);
         if (forkmod->tpid == 0)
         {
             free_pid(forkmod->pid);
@@ -1484,7 +1539,7 @@ int rt_module_fork(rt_module_t module)
     }
 
     /* allocate module space */
-    forkmod->module_space = rt_page_alloc(module->module_size/RT_MM_PAGE_SIZE);
+    forkmod->module_space = rt_page_alloc(forkmod->module_size/RT_MM_PAGE_SIZE);
     if (forkmod->module_space == RT_NULL)
     {
         {register rt_ubase_t temp = rt_hw_interrupt_disable();
@@ -1504,9 +1559,9 @@ int rt_module_fork(rt_module_t module)
 
     /* init module object container */
     rt_module_init_object_container(forkmod);
-    /* copy system object */
+    /* fix copy system object */
 
-    forkmod->module_cmd_line = (rt_uint8_t*)rt_page_alloc(module->module_cmd_size/RT_MM_PAGE_SIZE);
+    forkmod->module_cmd_line = (rt_uint8_t*)rt_page_alloc(forkmod->module_cmd_size/RT_MM_PAGE_SIZE);
     if (!forkmod->module_cmd_line)
     {
         /* release module space memory */
@@ -1562,8 +1617,7 @@ int rt_module_fork(rt_module_t module)
     }
 
     /* create module thread */
-    forkmod->module_thread = (struct rt_thread *)rt_object_allocate(RT_Object_Class_Thread,
-    		module->module_thread->name);
+    forkmod->module_thread = (struct rt_thread *)rt_module_copy_object(RT_NULL,(rt_object_t)module->module_thread);
     if (!forkmod->module_thread)
     {
         /* release module space memory */
@@ -1587,29 +1641,15 @@ int rt_module_fork(rt_module_t module)
 
         return -ENOMEM;
     }
-
-    /* copy module */
-    list = forkmod->module_thread->list;
-    *forkmod->module_thread = *module->module_thread;
-    strcat(forkmod->module_thread->name,"1");
-    forkmod->module_thread->list = list;
+    /* set module module_id */
     forkmod->module_thread->module_id = (void *)forkmod;
 
-    /* init resume thread */
-    rt_list_init(&(forkmod->module_thread->tlist));
-    /* init thread timer */
-    rt_timer_init(&(forkmod->module_thread->thread_timer),
-                  forkmod->module_thread->name,
-                  rt_thread_timeout,
-                  forkmod->module_thread,
-                  0,
-                  RT_TIMER_FLAG_ONE_SHOT);
     /* copy mempage info */
     for (i = 0; i < module->page_cnt; i ++)
     {
-    	((void **)forkmod->page_array)[i] = rt_page_alloc(1);
-    	if (!((void **)forkmod->page_array)[i])
-    	{
+        ((void **)forkmod->page_array)[i] = rt_page_alloc(1);
+        if (!((void **)forkmod->page_array)[i])
+        {
             /* release module space memory */
             rt_page_free(forkmod->module_space,forkmod->module_size/RT_MM_PAGE_SIZE);
 
@@ -1629,26 +1669,20 @@ int rt_module_fork(rt_module_t module)
             free_tpid(forkmod->tpid);
             rt_hw_interrupt_enable(temp);}
 
-            rt_kprintf("Module: allocate  failed.\n");
+            rt_kprintf("Module: allocate failed.\n");
             rt_thread_delete(forkmod->module_thread);
             rt_object_delete(&(forkmod->parent));
 
             return -ENOMEM;
-    	}
-    	mmu_usermap(forkmod->pid,(rt_uint32_t)(((void **)forkmod->page_array)[i]),
-    			forkmod->vstart_addr+forkmod->module_size+forkmod->page_cnt*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
-    	forkmod->page_cnt++;
+        }
+        mmu_usermap(forkmod->pid,(rt_uint32_t)(((void **)forkmod->page_array)[i]),
+                forkmod->vstart_addr+forkmod->module_size+forkmod->page_cnt*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
+        forkmod->page_cnt++;
     }
-
-    /* resume module thread */
-    forkmod->module_thread->stat = RT_THREAD_SUSPEND;
-    rt_thread_resume(forkmod->module_thread);
 
     /* dump thread stack */
     extern int rt_hw_context_save(rt_uint32_t ret, rt_uint32_t to);
     ret = rt_hw_context_save(0, (rt_uint32_t)&forkmod->module_thread->sp);
-    rt_kprintf("Module: retttttt %08x:%08x %d.\n",ret,forkmod->module_thread->sp,
-    		rt_module_self()->tpid);
     if (ret != 0)
     {
         rt_memcpy(forkmod->module_space, (void *)forkmod->vstart_addr, forkmod->module_size);
@@ -1656,39 +1690,16 @@ int rt_module_fork(rt_module_t module)
         for (i = 0; i < forkmod->page_cnt; i ++)
         {
             rt_memcpy(((void **)forkmod->page_array)[i],
-            		(void *)forkmod->vstart_addr+forkmod->module_size+i*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE);
+                    (void *)forkmod->vstart_addr+forkmod->module_size+i*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE);
         }
         ret = forkmod->tpid;
-        rt_kprintf("1111111111 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-        rt_kprintf("1111111111 %x:%x\n",module->module_thread,module->module_thread->sp);
-        rt_thread_delay(200);
-        rt_kprintf("1111111111 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-        rt_kprintf("1111111111 %x:%x\n",module->module_thread,module->module_thread->sp);
-        rt_thread_delay(200);
-        rt_kprintf("1111111111 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-        rt_kprintf("1111111111 %x:%x\n",module->module_thread,module->module_thread->sp);
-        rt_thread_delay(200);
-        rt_kprintf("1111111111 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-        rt_kprintf("1111111111 %x:%x\n",module->module_thread,module->module_thread->sp);
-        rt_thread_delay(200);
-        rt_kprintf("2222222222\n");
-        rt_thread_delay(1000);
         __asm volatile("add sp, #16*4");
+        //开放调度
+        {register rt_ubase_t temp = rt_hw_interrupt_disable();
+        if (!rt_list_isempty(&(module->module_thread->tlist)))
+            rt_list_insert_before(&(module->module_thread->tlist), &(forkmod->module_thread->tlist));
+        rt_hw_interrupt_enable(temp);}
     }
-    rt_kprintf("3333333333 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-    rt_kprintf("3333333333 %x:%x\n",module->module_thread,module->module_thread->sp);
-    rt_thread_delay(100);
-    rt_kprintf("3333333333 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-    rt_kprintf("3333333333 %x:%x\n",module->module_thread,module->module_thread->sp);
-    rt_thread_delay(100);
-    rt_kprintf("3333333333 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-    rt_kprintf("3333333333 %x:%x\n",module->module_thread,module->module_thread->sp);
-    rt_thread_delay(100);
-    rt_kprintf("3333333333 %x:%x\n",forkmod->module_thread,forkmod->module_thread->sp);
-    rt_kprintf("3333333333 %x:%x\n",module->module_thread,module->module_thread->sp);
-    rt_thread_delay(100);
-    rt_kprintf("4444444444\n");
-    rt_thread_delay(1000);
     return ret;
 }
 

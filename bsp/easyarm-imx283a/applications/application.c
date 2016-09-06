@@ -104,7 +104,6 @@ volatile int eth_wtdog = 0;
 volatile int eth_linkstatus = 0;
 volatile int wtdog_count = 0;
 volatile int sys_stauts = -1;
-volatile int ppp_linkstatus = 0;
 volatile int uptime_count = 0;
 volatile int fs_system_init = 0;
 
@@ -112,8 +111,6 @@ unsigned char NET_MAC[6] = {0};
 char NET_ADDR[3][30] = {{0}};
 int NET_DHCP = 0;
 unsigned char PZ[4] = {0};
-char RTT_USER[30] = {"admin"};
-char RTT_PASS[30] = {"admin"};
 extern void cpu_usage_idle_hook(void);
 
 #ifdef _MSC_VER
@@ -329,14 +326,6 @@ static void rt_thread_entry_main(void* parameter)
         GetPrivateStringData("dhcp",buf,100,RTT_DEF_CONF);
         if (buf[0])
             NET_DHCP = atol(buf);
-        memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("user",buf,100,RTT_DEF_CONF);
-        if (buf[0])
-            rt_strncpy(RTT_USER,buf,30);
-        memset(buf, 0, sizeof(buf));
-        GetPrivateStringData("pass",buf,100,RTT_DEF_CONF);
-        if (buf[0])
-            rt_strncpy(RTT_PASS,buf,30);
     }
 #endif
 
@@ -358,6 +347,11 @@ static void rt_thread_entry_main(void* parameter)
     finsh_system_init();
     finsh_set_device(FINSH_DEVICE_NAME);
    	rt_thread_delay(100);
+#else
+#ifdef RT_USING_MODULE
+   	rt_module_exec_cmd("/mnt/mmc/busybox.mo", "login", sizeof("login"));
+   	rt_thread_delay(100);
+#endif
 #endif
 
     while (1)

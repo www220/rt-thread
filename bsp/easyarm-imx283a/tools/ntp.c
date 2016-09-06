@@ -111,7 +111,7 @@ void rfc1305(uint32_t *data)
     tv_set.tv_sec  = ntohl(((uint32_t *)data)[10]) - JAN_1970;
     tv_set.tv_usec = USEC(ntohl(((uint32_t *)data)[11]));
     if (settimeofday(&tv_set, NULL) < 0) {
-        printf("settimeofday\n");
+        rt_kprintf("settimeofday\n");
     }
 }
 
@@ -127,7 +127,7 @@ int cmd_ntp(int argc, char *argv[])
     char buf[256];
 
     if (argc <= 1) {
-        printf("Usage: %s <server> [server [...]]\n", argv[0]);
+        rt_kprintf("Usage: %s <server> [server [...]]\n", argv[0]);
         return 1;
     }
 
@@ -137,7 +137,7 @@ int cmd_ntp(int argc, char *argv[])
         srv = strtok(buf, " ");
         while (srv) {
             if ((usd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-                printf("socket error\n");
+                rt_kprintf("socket error\n");
                 return 1;
             }
             if ((he = gethostbyname(srv)) != NULL) {
@@ -146,7 +146,7 @@ int cmd_ntp(int argc, char *argv[])
                 sa.sin_port = htons(NTP_PORT);
                 sa.sin_family = AF_INET;
 
-                printf("trying %s [%s]\n", argv[i], inet_ntoa(sa.sin_addr));
+                rt_kprintf("trying %s [%s]\n", argv[i], inet_ntoa(sa.sin_addr));
                 if (connect(usd, (struct sockaddr*)&sa, sizeof(sa)) != -1) {
                     send_packet(usd);
                     tv.tv_sec = 3;
@@ -162,20 +162,20 @@ int cmd_ntp(int argc, char *argv[])
                             rfc1305(packet);
                             closesocket(usd);
                             now = time(NULL);
-                            printf("time updated %s",ctime(&now));
+                            rt_kprintf("time updated %s",ctime(&now));
                             return 0;
                         }
                     }
                     else {
-                        printf("recv\n");
+                        rt_kprintf("recv\n");
                     }
                 }
                 else {
-                    printf("connect\n");
+                    rt_kprintf("connect\n");
                 }
             }
             else {
-                printf("gethostbyname\n");
+                rt_kprintf("gethostbyname\n");
             }
             closesocket(usd);
             srv = strtok(NULL, " ");

@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define _UTSNAME_LENGTH 65
 #define _UTSNAME_DOMAIN_LENGTH _UTSNAME_LENGTH
