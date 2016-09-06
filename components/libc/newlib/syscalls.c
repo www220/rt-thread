@@ -695,6 +695,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         struct timezone *zone = (parm2)?((struct timezone *)rt_module_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
         return ret_err(settimeofday((struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
     }
+    case SYS_dup:
+    case SYS_dup2:
+    {
+    	return parm2;
+    }
     case SYS_ioctl:
     {
         errno = 0;

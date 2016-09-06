@@ -885,7 +885,7 @@ rt_module_t rt_module_do_main(const char *name,
     }
 #endif
 
-    rt_thread_delay(30000);
+    rt_event_recv(&mod_eventp[0],1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
     return module;
 }
 
@@ -1290,6 +1290,7 @@ rt_err_t rt_module_destroy(rt_module_t module)
     mmu_freetlb(module->pid);
     {register rt_ubase_t temp = rt_hw_interrupt_disable();
     free_pid(module->pid);
+    release_tpid(module->tpid,module->exitcode);
     rt_hw_interrupt_enable(temp);}
 
     /* delete module object */
@@ -1363,10 +1364,6 @@ rt_err_t rt_module_unload(rt_module_t module)
     }
 #endif
 
-    /* thread while unload */
-    {register rt_ubase_t temp = rt_hw_interrupt_disable();
-    release_tpid(module->tpid,module->exitcode);
-    rt_hw_interrupt_enable(temp);}
     return RT_EOK;
 }
 

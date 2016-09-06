@@ -40,12 +40,29 @@ static rt_err_t console_init(rt_device_t dev)
 
 static rt_err_t console_open(rt_device_t dev, rt_uint16_t oflag)
 {
-	return RT_EOK;
+	rt_err_t ret = RT_EOK;
+	struct console_device* device;
+
+	device = (struct console_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	/* open this device and set the new device in finsh shell */
+	ret = rt_device_open(device->device, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
+	if (ret == RT_EOK)
+	{
+	}
+	return ret;
 }
 
 static rt_err_t console_close(rt_device_t dev)
 {
-	return RT_EOK;
+	rt_err_t ret = RT_EOK;
+	struct console_device* device;
+
+	device = (struct console_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	return rt_device_close(device->device);
 }
 
 static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
@@ -59,7 +76,10 @@ static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_si
 	{
 		int ret = rt_device_read(device->device, pos, buffer, size);
 		if (ret > 0)
+		{
+			rt_device_write(device->device, pos, buffer, ret);
 			return ret;
+		}
 		rt_thread_delay(10);
 	} while (1);
 }
