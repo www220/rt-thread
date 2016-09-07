@@ -413,7 +413,12 @@ int dfs_file_stat(const char *path, struct stat *buf)
         if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
             result = fs->ops->stat(fs, fullpath, buf);
         else
-            result = fs->ops->stat(fs, dfs_subdir(fs->path, fullpath), buf);
+        {
+            if (dfs_subdir(fs->path, fullpath) == RT_NULL)
+                result = fs->ops->stat(fs, "/", buf);
+            else
+                result = fs->ops->stat(fs, dfs_subdir(fs->path, fullpath), buf);
+        }
     }
 
     rt_free(fullpath);
@@ -462,12 +467,56 @@ int dfs_file_lstat(const char *path, struct stat *buf)
     else
     {
         if (fs->ops->lstat)
-            result = fs->ops->lstat(fs, dfs_subdir(fs->path, fullpath), buf);
+        {
+            if (dfs_subdir(fs->path, fullpath) == RT_NULL)
+                result = fs->ops->lstat(fs, "/", buf);
+            else
+                result = fs->ops->lstat(fs, dfs_subdir(fs->path, fullpath), buf);
+        }
         else
-            result = fs->ops->stat(fs, dfs_subdir(fs->path, fullpath), buf);
+        {
+            if (dfs_subdir(fs->path, fullpath) == RT_NULL)
+                result = fs->ops->stat(fs, "/", buf);
+            else
+                result = fs->ops->stat(fs, dfs_subdir(fs->path, fullpath), buf);
+        }
     }
 
     rt_free(fullpath);
+
+    return result;
+}
+
+int dfs_file_fstat(struct dfs_fd *fd, struct stat *buf)
+{
+    int result;
+    struct dfs_filesystem *fs;
+
+    if (fd == RT_NULL)
+        return -DFS_STATUS_EINVAL;
+
+    fs = (struct dfs_filesystem *)fd->fs;
+    if (fs->ops->lstat == RT_NULL && fs->ops->fstat == RT_NULL && fs->ops->stat == RT_NULL)
+    {
+        dfs_log(DFS_DEBUG_ERROR,
+                ("the filesystem didn't implement this function"));
+
+        return -DFS_STATUS_ENOSYS;
+    }
+
+    /* get the real file path and get file stat */
+    if (fs->ops->fstat)
+        result = fs->ops->fstat(fd, buf);
+    else
+    {
+        /* flush file info */
+        if (fs->ops->flush)
+            fs->ops->flush(fd);
+        if (fs->ops->lstat)
+            result = fs->ops->lstat(fs, fd->path, buf);
+        else
+            result = fs->ops->stat(fs, fd->path, buf);
+    }
 
     return result;
 }
@@ -510,7 +559,7 @@ int dfs_file_link(const char * oldpath, const char * newpath)
         return -DFS_STATUS_ENOSYS;
     }
 
-    /* get the real file path and get file stat */
+    /* get the real file path and get file link */
     if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
         result = fs->ops->link(fs, fullpath, fullpath2);
     else
@@ -560,7 +609,7 @@ int dfs_file_symlink(const char * oldpath, const char * newpath)
         return -DFS_STATUS_ENOSYS;
     }
 
-    /* get the real file path and get file stat */
+    /* get the real file path and get file symlink */
     if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
         result = fs->ops->symlink(fs, fullpath, fullpath2);
     else
@@ -602,11 +651,24 @@ int dfs_file_readlink(const char *path, char *buf, rt_size_t bufsiz)
         return -DFS_STATUS_ENOSYS;
     }
 
-    /* get the real file path and get file stat */
+    /* get the real file path and get file readlink */
     if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
         result = fs->ops->readlink(fs, fullpath, buf, bufsiz);
     else
         result = fs->ops->readlink(fs, dfs_subdir(fs->path, fullpath), buf, bufsiz);
+
+    /* calc real file path length */
+    if (result == 0)
+    {
+        char *find = buf;
+        while (bufsiz--)
+        {
+            if (*find == '\0')
+                break;
+            find++;
+            result++;
+        }
+    }
 
     rt_free(fullpath);
 

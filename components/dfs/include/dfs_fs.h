@@ -62,6 +62,7 @@ struct dfs_filesystem_operation
     int (*rename)   (struct dfs_filesystem *fs, const char *oldpath, const char *newpath);
     int (*truncate) (struct dfs_fd *fd, rt_off_t length);
     int (*lstat)    (struct dfs_filesystem *fs, const char *filename, struct stat *buf);
+    int (*fstat)    (struct dfs_fd *fd, struct stat *buf);
     int (*link)     (struct dfs_filesystem *fs, const char * oldpath, const char * newpath);
     int (*symlink)  (struct dfs_filesystem *fs, const char * oldpath, const char * newpath);
     int (*readlink)  (struct dfs_filesystem *fs, const char *path, char *buf, rt_size_t bufsiz);

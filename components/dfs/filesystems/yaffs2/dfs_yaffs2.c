@@ -337,6 +337,7 @@ static int dfs_yaffs_unlink(struct dfs_filesystem* fs, const char* path)
 	switch(s.st_mode & S_IFMT) 
 	{ 
 	case S_IFREG: 
+	case S_IFLNK:
 		result = yaffs_unlink(path); 
 		break; 	
 	case S_IFDIR: 
@@ -426,6 +427,32 @@ static int dfs_yaffs_lstat(struct dfs_filesystem* fs, const char *path, struct s
 	return 0;
 }
 
+static int dfs_yaffs_fstat(struct dfs_fd* file, struct stat *st)
+{
+	int result,fd;
+	struct yaffs_stat s;
+	struct rt_mtd_nand_device * mtd;
+    struct dfs_filesystem *fs;
+
+	fd = (int)(file->data);
+	fs = file->fs;
+
+	result = yaffs_fstat(fd, &s);
+	if (result < 0)
+		return yaffsfs_GetLastError();
+
+	/* convert to dfs stat structure */
+	st->st_dev  = 0;
+	st->st_mode = s.st_mode;
+	st->st_size = s.st_size;
+	st->st_mtime = s.yst_mtime;
+
+	mtd = RT_MTD_NAND_DEVICE(fs->dev_id);
+	st->st_blksize = mtd->page_size;
+
+	return 0;
+}
+
 static int dfs_yaffs_link(struct dfs_filesystem* fs, const char *oldpath, const char *new)
 {
 	int result;
@@ -485,6 +512,7 @@ static const struct dfs_filesystem_operation dfs_yaffs_ops =
 	dfs_yaffs_rename,
 	dfs_yaffs_truncate,
 	dfs_yaffs_lstat,
+	dfs_yaffs_fstat,
 	dfs_yaffs_link,
 	dfs_yaffs_symlink,
 	dfs_yaffs_readlink,

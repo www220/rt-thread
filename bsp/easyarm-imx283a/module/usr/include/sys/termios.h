@@ -57,10 +57,8 @@ extern int cfsetospeed (struct termios *__termios_p, speed_t __speed) __THROW;
 /* Set the input baud rate stored in *TERMIOS_P to SPEED.  */
 extern int cfsetispeed (struct termios *__termios_p, speed_t __speed) __THROW;
 
-#ifdef	__USE_BSD
 /* Set both the input and output baud rates in *TERMIOS_OP to SPEED.  */
 extern int cfsetspeed (struct termios *__termios_p, speed_t __speed) __THROW;
-#endif
 
 
 /* Put the state of FD into *TERMIOS_P.  */
@@ -71,11 +69,8 @@ extern int tcgetattr (int __fd, struct termios *__termios_p) __THROW;
 extern int tcsetattr (int __fd, int __optional_actions,
 		      __const struct termios *__termios_p) __THROW;
 
-
-#ifdef	__USE_BSD
 /* Set *TERMIOS_P to indicate raw mode.  */
 extern void cfmakeraw (struct termios *__termios_p) __THROW;
-#endif
 
 /* Send zero bits on FD.  */
 extern int tcsendbreak (int __fd, int __duration) __THROW;
@@ -94,11 +89,8 @@ extern int tcflush (int __fd, int __queue_selector) __THROW;
    Values for ACTION (TC[IO]{OFF,ON}) are in <bits/termios.h>.  */
 extern int tcflow (int __fd, int __action) __THROW;
 
-
-#ifdef __USE_UNIX98
 /* Get process group ID for session leader for controlling terminal FD.  */
 extern __pid_t tcgetsid (int __fd) __THROW;
-#endif
 
 
 #ifdef __USE_BSD

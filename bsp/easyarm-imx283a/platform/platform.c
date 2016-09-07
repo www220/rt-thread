@@ -516,7 +516,7 @@ static enum rym_code _rym_bg(
 {
     struct custom_ctx *cctx = (struct custom_ctx*)ctx;
     /* the buf should be the file name */
-    sprintf(cctx->fpath, "/mmc/%s", (const char*)buf);
+    sprintf(cctx->fpath, "/mnt/mmc/%s", (const char*)buf);
     cctx->fd = open(cctx->fpath, O_CREAT | O_WRONLY | O_TRUNC, 0);
     if (cctx->fd < 0)
     {

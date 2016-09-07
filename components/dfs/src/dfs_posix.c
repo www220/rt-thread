@@ -393,7 +393,7 @@ int fstat(int fildes, struct stat *buf)
         return -1;
     }
 
-    result = dfs_file_stat(d->path, buf);
+    result = dfs_file_fstat(d, buf);
     if (result < 0)
     {
         fd_put(d);

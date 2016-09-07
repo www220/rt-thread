@@ -18,6 +18,7 @@ int strverscmp (__const char *__s1, __const char *__s2);
 //#include<grp.h>
 int initgroups (__const char *__user, __gid_t __group);
 int getgrouplist (const char *user, gid_t group, gid_t *groups, int *ngroups);
+extern int setgroups (size_t __n, __const __gid_t *__groups) __THROW;
 
 //#include<signal.h>
 #define SA_THIRTYTWO	0x02000000

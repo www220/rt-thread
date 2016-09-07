@@ -693,6 +693,21 @@ int dfs_elm_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
     FILINFO file_info;
     FRESULT result;
 
+    /* stat root directory */
+    if ((path[0] == '/') && (path[1] == '\0'))
+    {
+        st->st_dev = 0;
+
+        st->st_mode = DFS_S_IFREG | DFS_S_IRUSR | DFS_S_IRGRP | DFS_S_IROTH |
+            DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH;
+        st->st_mode &= ~DFS_S_IFREG;
+        st->st_mode |= DFS_S_IFDIR | DFS_S_IXUSR | DFS_S_IXGRP | DFS_S_IXOTH;
+
+        st->st_size  = 0;
+        st->st_mtime = 0;
+        return DFS_STATUS_OK;
+    }
+
 #if _VOLUMES > 1
     int vol;
     char *drivers_fn;
