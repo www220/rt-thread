@@ -576,20 +576,31 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_link:
     {
-        rt_kprintf("syscall link %s=>%s\n",(const char *)rt_process_conv_ptr(module,parm1,0),
-                (const char *)rt_process_conv_ptr(module,parm2,0));
-        return -ENOTSUP;
+        errno = 0;
+        return ret_err(link((const char *)rt_process_conv_ptr(module,parm1,0),
+                (const char *)rt_process_conv_ptr(module,parm2,0)));
     }
     case SYS_symlink:
     {
-        rt_kprintf("syscall symlink %s=>%s\n",(const char *)rt_process_conv_ptr(module,parm1,0),
-                (const char *)rt_process_conv_ptr(module,parm2,0));
-        return -ENOTSUP;
+        errno = 0;
+        return ret_err(symlink((const char *)rt_process_conv_ptr(module,parm1,0),
+                (const char *)rt_process_conv_ptr(module,parm2,0)));
     }
     case SYS_readlink:
     {
-        rt_kprintf("syscall readlink %s\n",(const char *)rt_process_conv_ptr(module,parm1,0));
-        return -ENOTSUP;
+        errno = 0;
+        return ret_err(readlink((const char *)rt_process_conv_ptr(module,parm1,0),
+                (char *)rt_process_conv_ptr(module,parm2,parm3),parm3));
+    }
+    case SYS_truncate:
+    {
+        errno = 0;
+        return ret_err(truncate((const char *)rt_process_conv_ptr(module,parm1,0),parm2));
+    }
+    case SYS_ftruncate:
+    {
+        errno = 0;
+        return ret_err(ftruncate(parm1,parm2));
     }
     case SYS_uname:
     {
@@ -630,10 +641,27 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         return ret_err(stat((const char *)rt_process_conv_ptr(module,parm1,0),
                 (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
     }
+    case SYS_lstat:
+    {
+        errno = 0;
+        return ret_err(lstat((const char *)rt_process_conv_ptr(module,parm1,0),
+                (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
+    }
     case SYS_fstat:
     {
         errno = 0;
         return ret_err(fstat(parm1, (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
+    }
+    case SYS_statfs:
+    {
+        errno = 0;
+        return ret_err(statfs((const char *)rt_process_conv_ptr(module,parm1,0),
+                (struct statfs *)rt_process_conv_ptr(module,parm2,sizeof(struct statfs))));
+    }
+    case SYS_fstatfs:
+    {
+        errno = 0;
+        return ret_err(fstatfs(parm1,(struct statfs *)rt_process_conv_ptr(module,parm2,sizeof(struct statfs))));
     }
     case SYS_creat:
     {
@@ -714,7 +742,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_poll:
     {
-        return 0;
+        return parm2;
     }
     case SYS_gettimeofday:
     {
@@ -727,11 +755,6 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         errno = 0;
         struct timezone *zone = (parm2)?((struct timezone *)rt_process_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
         return ret_err(settimeofday((struct timeval *)rt_process_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
-    }
-    case SYS_dup:
-    case SYS_dup2:
-    {
-    	return parm2;
     }
     case SYS_ioctl:
     {
@@ -770,6 +793,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
         return -ENOTSUP;
     }
+    case SYS_fcntl:
+    {
+        rt_kprintf("fcntl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
+        return -ENOTSUP;
+    }
     case SYS_BASE+901:
     case SYS_BASE+903:
     {
@@ -780,12 +808,6 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_BASE+904:
     {
         rt_mutex_release(module->page_mutex);
-        return 0;
-    }
-    case SYS_BASE+1001:
-    {
-        char *name = (char *)rt_process_conv_ptr(module,parm2,parm3);
-        strncpy(name,"/dev/console",parm3);
         return 0;
     }
     }

@@ -1055,6 +1055,8 @@ rt_process_t rt_process_exec_cmd(const char *path, const char* cmd_line, int siz
     /* get process */
     name   = _process_name(path);
     /* execute process */
+    if (size == -1)
+        size = rt_strlen(cmd_line);
     module = rt_process_do_main(name, (void *)buffer, cmd_line, size);
 
 __exit:
@@ -1066,7 +1068,8 @@ __exit:
 
 #if defined(RT_USING_FINSH)
 #include <finsh.h>
-FINSH_FUNCTION_EXPORT_ALIAS(rt_process_open, execve, exec process from a file);
+FINSH_FUNCTION_EXPORT_ALIAS(rt_process_open, execv, exec process from a file);
+FINSH_FUNCTION_EXPORT_ALIAS(rt_process_exec_cmd, execp, exec process from a file);
 #endif
 
 #endif

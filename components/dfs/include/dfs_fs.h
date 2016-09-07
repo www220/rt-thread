@@ -61,6 +61,10 @@ struct dfs_filesystem_operation
     int (*stat)     (struct dfs_filesystem *fs, const char *filename, struct stat *buf);
     int (*rename)   (struct dfs_filesystem *fs, const char *oldpath, const char *newpath);
     int (*truncate) (struct dfs_fd *fd, rt_off_t length);
+    int (*lstat)    (struct dfs_filesystem *fs, const char *filename, struct stat *buf);
+    int (*link)     (struct dfs_filesystem *fs, const char * oldpath, const char * newpath);
+    int (*symlink)  (struct dfs_filesystem *fs, const char * oldpath, const char * newpath);
+    int (*readlink)  (struct dfs_filesystem *fs, const char *path, char *buf, rt_size_t bufsiz);
 };
 
 /* Mounted file system */
@@ -119,5 +123,6 @@ void dfs_lock(void);
 void dfs_unlock(void);
 int dfs_mkfs(const char *fs_name, const char *device_name);
 int dfs_statfs(const char *path, struct statfs *buffer);
+int dfs_fstatfs(struct dfs_fd *fd, struct statfs *buffer);
 
 #endif

@@ -133,6 +133,12 @@ int stat(const char *file, struct stat *buf);
 int fstat(int fildes, struct stat *buf);
 int fsync(int fildes);
 int ioctl(int fildes, unsigned long cmd, void *data);
+int lstat(const char *file, struct stat *buf);
+int link(const char * oldpath, const char * newpath);
+int symlink(const char * oldpath, const char * newpath);
+int readlink(const char *path, char *buf, size_t bufsiz);
+int truncate(const char *path, rt_off_t length);
+int ftruncate(int fildes, rt_off_t length);
 
 /* directory api*/
 int rmdir(const char *path);
@@ -141,6 +147,7 @@ char *getcwd(char *buf, size_t size);
 
 /* file system api */
 int statfs(const char *path, struct statfs *buf);
+int fstatfs(int fildes, struct statfs *buf);
 
 #ifdef __cplusplus
 }

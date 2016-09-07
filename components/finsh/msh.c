@@ -177,7 +177,7 @@ static cmd_function_t msh_get_cmd(char *cmd, int size)
     return cmd_func;
 }
 
-#if defined(RT_USING_MODULE) && defined(RT_USING_DFS)
+#if (defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)) && defined(RT_USING_DFS)
 /* Return 0 on module executed. Other value indicate error.
  */
 int msh_exec_module(const char *cmd_line, int size)
@@ -204,7 +204,7 @@ int msh_exec_module(const char *cmd_line, int size)
     /* copy command0 */
     memcpy(pg_name, cmd_line, cmd_length);
     pg_name[cmd_length] = '\0';
-
+#ifdef RT_USING_MODULE
     if (strstr(pg_name, ".mo") != RT_NULL || strstr(pg_name, ".MO") != RT_NULL)
     {
         /* try to open program */
@@ -232,12 +232,31 @@ int msh_exec_module(const char *cmd_line, int size)
             fd = open(pg_name, O_RDONLY, 0);
         }
     }
+#endif
+#ifdef RT_USING_PROCESS
+    if (fd < 0)
+    {
+        /* try to open program */
+        fd = open(pg_name, O_RDONLY, 0);
 
+        /* search in /bin path */
+        if (fd < 0)
+        {
+            rt_snprintf(pg_name, length - 1, "/bin/%.*s", cmd_length, cmd_line);
+            fd = open(pg_name, O_RDONLY, 0);
+        }
+    }
+#endif
     if (fd >= 0)
     {
         /* found program */
         close(fd);
+#ifdef RT_USING_MODULE
         rt_module_exec_cmd(pg_name, cmd_line, size);
+#endif
+#ifdef RT_USING_PROCESS
+        rt_process_exec_cmd(pg_name, cmd_line, size);
+#endif
         ret = 0;
     }
     else
@@ -319,7 +338,7 @@ int msh_exec(char *cmd, rt_size_t length)
     {
         return cmd_ret;
     }
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
     if (msh_exec_module(cmd, length) == 0)
     {
         return 0;
@@ -517,7 +536,7 @@ void msh_auto_complete(char *prefix)
 
             ptr --;
         }
-#ifdef RT_USING_MODULE
+#if defined(RT_USING_MODULE) || defined(RT_USING_PROCESS)
         /* There is a chance that the user want to run the module directly. So
          * try to complete the file names. If the completed path is not a
          * module, the system won't crash anyway. */

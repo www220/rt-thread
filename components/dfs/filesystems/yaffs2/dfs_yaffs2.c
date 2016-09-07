@@ -404,6 +404,61 @@ static int dfs_yaffs_truncate(struct dfs_fd* file,
 	return result;
 }
 
+static int dfs_yaffs_lstat(struct dfs_filesystem* fs, const char *path, struct stat *st)
+{
+	int result;
+	struct yaffs_stat s;
+	struct rt_mtd_nand_device * mtd;
+
+	result = yaffs_lstat(path, &s);
+	if (result < 0)
+		return yaffsfs_GetLastError();
+
+	/* convert to dfs stat structure */
+	st->st_dev  = 0;
+	st->st_mode = s.st_mode;
+	st->st_size = s.st_size;
+	st->st_mtime = s.yst_mtime;
+
+	mtd = RT_MTD_NAND_DEVICE(fs->dev_id);
+	st->st_blksize = mtd->page_size;
+
+	return 0;
+}
+
+static int dfs_yaffs_link(struct dfs_filesystem* fs, const char *oldpath, const char *new)
+{
+	int result;
+
+	result = yaffs_link(oldpath, new);
+	if (result < 0)
+		return yaffsfs_GetLastError();
+
+	return 0;
+}
+
+static int dfs_yaffs_symlink(struct dfs_filesystem* fs, const char *oldpath, const char *new)
+{
+	int result;
+
+	result = yaffs_symlink(oldpath, new);
+	if (result < 0)
+		return yaffsfs_GetLastError();
+
+	return 0;
+}
+
+static int dfs_yaffs_readlink(struct dfs_filesystem* fs, const char *path, char *buf, rt_size_t bufsiz)
+{
+	int result;
+
+	result = yaffs_readlink(path, buf, bufsiz);
+	if (result < 0)
+		return yaffsfs_GetLastError();
+
+	return 0;
+}
+
 static const struct dfs_filesystem_operation dfs_yaffs_ops = 
 {
 	"yaffs2", /* file system type: yaffs2 */
@@ -429,6 +484,10 @@ static const struct dfs_filesystem_operation dfs_yaffs_ops =
 	dfs_yaffs_stat,
 	dfs_yaffs_rename,
 	dfs_yaffs_truncate,
+	dfs_yaffs_lstat,
+	dfs_yaffs_link,
+	dfs_yaffs_symlink,
+	dfs_yaffs_readlink,
 };
 
 int dfs_yaffs_init(void)

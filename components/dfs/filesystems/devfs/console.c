@@ -30,7 +30,7 @@ struct console_device
 
 	rt_device_t device; /* the actual device */
 };
-struct console_device _console;
+struct console_device _console,_tty;
 
 /* common device interface */
 static rt_err_t console_init(rt_device_t dev)
@@ -77,8 +77,14 @@ static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_si
 		int ret = rt_device_read(device->device, pos, buffer, size);
 		if (ret > 0)
 		{
-			rt_device_write(device->device, pos, buffer, ret);
-			return ret;
+			size = ret;
+			while (ret--)
+			{
+				if (((unsigned char *)buffer)[ret] == '\r')
+					((unsigned char *)buffer)[ret] = '\n';
+			}
+			rt_device_write(device->device, pos, buffer, size);
+			return size;
 		}
 		rt_thread_delay(10);
 	} while (1);
@@ -96,7 +102,12 @@ static rt_size_t console_write(rt_device_t dev, rt_off_t pos, const void* buffer
 
 static rt_err_t console_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 {
-	return rt_device_control(_console.device, cmd, args);
+	struct console_device* device;
+
+	device = (struct console_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	return rt_device_control(device->device, cmd, args);
 }
 
 struct null_device
@@ -158,6 +169,25 @@ void rt_console_init(const char* device_name)
 		console->device = device;
 
 		rt_device_register(&console->parent, "console", RT_DEVICE_FLAG_RDWR);
+
+		/* get tty device */
+		console = &_tty;
+		rt_memset(console, 0, sizeof(_console));
+
+		/* device initialization */
+		console->parent.type = RT_Device_Class_Char;
+		/* set device interface */
+		console->parent.init 	= console_init;
+		console->parent.open 	= console_open;
+		console->parent.close   = console_close;
+		console->parent.read 	= console_read;
+		console->parent.write   = console_write;
+		console->parent.control	= console_control;
+		console->parent.user_data = RT_NULL;
+
+		console->device = device;
+
+		rt_device_register(&console->parent, "tty", RT_DEVICE_FLAG_RDWR);
 	}
 
 	if (1)

@@ -353,6 +353,23 @@ int stat(const char *file, struct stat *buf)
 }
 RTM_EXPORT(stat);
 
+int lstat(const char *file, struct stat *buf)
+{
+    int result;
+
+    rt_memset(buf, 0, sizeof(struct stat));
+    result = dfs_file_lstat(file, buf);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(lstat);
+
 /**
  * this function is a POSIX compliant version, which will get file status.
  *
@@ -363,25 +380,10 @@ RTM_EXPORT(stat);
  */
 int fstat(int fildes, struct stat *buf)
 {
+    int result;
     struct dfs_fd *d;
 
     rt_memset(buf, 0, sizeof(struct stat));
-#if defined(RT_USING_CONSOLE) && defined(RT_USING_DFS_DEVFS)
-    if (fildes < 3)
-    {
-        rt_device_t console_device;
-        console_device = rt_console_get_device();
-        buf->st_dev = 0;
-
-        buf->st_mode = DFS_S_IFCHR | DFS_S_IRUSR | DFS_S_IRGRP | DFS_S_IROTH |
-            DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH;
-
-        buf->st_size  = 0;
-        buf->st_mtime = 0;
-        return (console_device)?0:-1;
-    }
-#endif
-
     /* get the fd */
     d = fd_get(fildes);
     if (d == RT_NULL)
@@ -391,23 +393,17 @@ int fstat(int fildes, struct stat *buf)
         return -1;
     }
 
-    /* it's the root directory */
-    buf->st_dev = 0;
-
-    buf->st_mode = DFS_S_IFREG | DFS_S_IRUSR | DFS_S_IRGRP | DFS_S_IROTH |
-                   DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH;
-    if (d->type == FT_DIRECTORY)
+    result = dfs_file_stat(d->path, buf);
+    if (result < 0)
     {
-        buf->st_mode &= ~DFS_S_IFREG;
-        buf->st_mode |= DFS_S_IFDIR | DFS_S_IXUSR | DFS_S_IXGRP | DFS_S_IXOTH;
+        fd_put(d);
+        rt_set_errno(result);
+
+        return -1;
     }
 
-    buf->st_size    = d->size;
-    buf->st_mtime   = 0;
-
     fd_put(d);
-
-    return DFS_STATUS_OK;
+    return result;
 }
 RTM_EXPORT(fstat);
 #endif
@@ -436,6 +432,11 @@ int fsync(int fildes)
     }
 
     ret = dfs_file_flush(d);
+    if (ret != DFS_STATUS_OK)
+    {
+        rt_set_errno(ret);
+        ret = -1;
+    }
 
     fd_put(d);
     return ret;
@@ -479,6 +480,100 @@ int ioctl(int fildes, unsigned long cmd, void *data)
 }
 RTM_EXPORT(ioctl);
 
+int link(const char * oldpath, const char * newpath)
+{
+    int result;
+
+    result = dfs_file_link(oldpath, newpath);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(link);
+
+int symlink(const char * oldpath, const char * newpath)
+{
+    int result;
+
+    result = dfs_file_symlink(oldpath, newpath);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(symlink);
+
+int readlink(const char *path, char *buf, size_t bufsiz)
+{
+    int result;
+
+    rt_memset(buf, 0, bufsiz);
+    result = dfs_file_readlink(path, buf, bufsiz);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(readlink);
+
+int ftruncate(int fildes, off_t length)
+{
+    int result;
+    struct dfs_fd *d;
+
+    /* get the fd */
+    d = fd_get(fildes);
+    if (d == RT_NULL)
+    {
+        rt_set_errno(-DFS_STATUS_EBADF);
+
+        return -1;
+    }
+
+    result = dfs_file_truncate(d, length);
+    if (result < 0)
+    {
+        fd_put(d);
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    fd_put(d);
+    return result;
+}
+RTM_EXPORT(ftruncate);
+
+int truncate(const char *path, off_t length)
+{
+    int result;
+	int fd = open(path, O_RDWR);
+	if (fd < 0)
+	{
+		rt_set_errno(-DFS_STATUS_ENOENT);
+
+		return -1;
+	}
+
+	result = ftruncate(fd, length);
+	close(fd);
+	return result;
+}
+RTM_EXPORT(truncate);
+
 /**
  * this function is a POSIX compliant version, which will return the
  * information about a mounted file system.
@@ -504,6 +599,35 @@ int statfs(const char *path, struct statfs *buf)
     return result;
 }
 RTM_EXPORT(statfs);
+
+int fstatfs(int fildes, struct statfs *buf)
+{
+    int result;
+    struct dfs_fd *d;
+
+    rt_memset(buf, 0, sizeof(struct statfs));
+    /* get the fd */
+    d = fd_get(fildes);
+    if (d == RT_NULL)
+    {
+        rt_set_errno(-DFS_STATUS_EBADF);
+
+        return -1;
+    }
+
+    result = dfs_fstatfs(d, buf);
+    if (result < 0)
+    {
+        fd_put(d);
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    fd_put(d);
+    return result;
+}
+RTM_EXPORT(fstatfs);
 
 /**
  * this function is a POSIX compliant version, which will make a directory
