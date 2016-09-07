@@ -47,22 +47,19 @@ static rt_err_t console_open(rt_device_t dev, rt_uint16_t oflag)
 	RT_ASSERT(device != RT_NULL);
 
 	/* open this device and set the new device in finsh shell */
-	ret = rt_device_open(device->device, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
-	if (ret == RT_EOK)
+	if (!(dev->flag & RT_DEVICE_FLAG_ACTIVATED)
+		|| (dev->open_flag & (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM))
+			!= (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM))
 	{
+		ret = rt_device_close(device->device);
+		ret = rt_device_open(device->device, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
 	}
 	return ret;
 }
 
 static rt_err_t console_close(rt_device_t dev)
 {
-	rt_err_t ret = RT_EOK;
-	struct console_device* device;
-
-	device = (struct console_device*)dev;
-	RT_ASSERT(device != RT_NULL);
-
-	return rt_device_close(device->device);
+	return RT_EOK;
 }
 
 static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
@@ -190,7 +187,6 @@ void rt_console_init(const char* device_name)
 		rt_device_register(&console->parent, "tty", RT_DEVICE_FLAG_RDWR);
 	}
 
-	if (1)
 	{
 		struct null_device* nulldev;
 		/* get console device */

@@ -237,8 +237,11 @@ static rt_err_t at91_usart_configure(struct rt_serial_device *serial,
     	/* Enable UART */
     	REG_WR(REGS_UARTDBG_BASE, HW_UARTDBGCR,
     		BM_UARTDBGCR_TXE | BM_UARTDBGCR_RXE | BM_UARTDBGCR_UARTEN);
-    	/* Enable UART Irq */
-    	REG_WR(REGS_UARTDBG_BASE, HW_UARTDBGIMSC, BM_UARTDBGIMSC_RXIM);
+    	if (serial->parent.open_flag & RT_DEVICE_FLAG_INT_RX)
+    	{
+    		/* Enable UART Irq */
+    		REG_WR(REGS_UARTDBG_BASE, HW_UARTDBGIMSC, BM_UARTDBGIMSC_RXIM);
+    	}
     }
     else
 #endif
@@ -291,8 +294,11 @@ static rt_err_t at91_usart_configure(struct rt_serial_device *serial,
         /* Enable UART */
     	writel(BM_UARTAPP_CTRL2_UARTEN | BM_UARTAPP_CTRL2_TXE | BM_UARTAPP_CTRL2_RXE,
     			     uart->membase + HW_UARTAPP_CTRL2_SET);
-    	/* Enable UART Irq */
-		writel(CONFIG_INT_MASK, uart->membase + HW_UARTAPP_INTR_SET);
+    	if (serial->parent.open_flag & RT_DEVICE_FLAG_INT_RX)
+    	{
+    		/* Enable UART Irq */
+    		writel(CONFIG_INT_MASK, uart->membase + HW_UARTAPP_INTR_SET);
+    	}
     }
 
     return RT_EOK;

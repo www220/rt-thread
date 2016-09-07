@@ -191,6 +191,11 @@ int dfs_device_fs_open(struct dfs_fd *file)
     result = rt_device_open(device, RT_DEVICE_OFLAG_RDWR);
     if (result == RT_EOK || result == -RT_ENOSYS)
     {
+        // set device fileno
+        extern struct dfs_fd fd_table[];
+        int fileno = file-fd_table;
+        rt_device_control(device, RT_DEVICE_CTRL_CHAR_SETFILE, &fileno);
+        //
         file->data = device;
         return DFS_STATUS_OK;
     }

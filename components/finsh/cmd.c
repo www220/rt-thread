@@ -697,7 +697,142 @@ int list_mod_detail(const char *name)
 
     return 0;
 }
+
+int list_mod_details(int argc, char **argv)
+{
+    if (argc > 1)
+        list_mod_detail(argv[1]);
+    return 0;
+}
 FINSH_FUNCTION_EXPORT(list_mod_detail, list module objects in system)
+MSH_CMD_EXPORT(list_mod_details, list module in system);
+#endif
+
+#ifdef RT_USING_PROCESS
+int list_proc(void)
+{
+    int maxlen;
+    struct rt_process *module;
+    struct rt_list_node *list, *node;
+
+    list = &rt_object_container[RT_Object_Class_Process].object_list;
+
+    maxlen = object_name_maxlen(list);
+
+    rt_kprintf("%-*.s  ref     address \n", maxlen, "process"); object_split(maxlen);
+    rt_kprintf(         "  ------- -----------\n");
+    for (node = list->next; node != list; node = node->next)
+    {
+        module = (struct rt_process *)(rt_list_entry(node, struct rt_object, list));
+        rt_kprintf("%-*.*s %-04d  0x%08x\n",
+                   maxlen, RT_NAME_MAX,
+                   module->parent.name, module->nref, module->module_space);
+    }
+
+    return 0;
+}
+FINSH_FUNCTION_EXPORT(list_proc, list process in system);
+MSH_CMD_EXPORT(list_proc, list process in system);
+
+int list_proc_detail(const char *name)
+{
+    int i;
+    struct rt_process *module;
+
+    /* find process */
+    if ((module = rt_process_find(name)) != RT_NULL)
+    {
+        struct rt_thread *thread;
+        struct rt_list_node *tlist;
+
+        rt_kprintf("pid    tpid\n");
+        rt_kprintf("----------\n");
+        rt_kprintf("%d      %d\n",module->pid,module->tpid);
+
+        rt_kprintf("main thread  pri  status      sp     stack size max used   left tick  error\n");
+        rt_kprintf("------------- ---- ------- ---------- ---------- ---------- ---------- ---\n");
+        thread = module->module_thread;
+        rt_kprintf("%-8.*s 0x%02x", RT_NAME_MAX, thread->name, thread->current_priority);
+
+        if (thread->stat == RT_THREAD_READY)        rt_kprintf(" ready  ");
+        else if (thread->stat == RT_THREAD_SUSPEND) rt_kprintf(" suspend");
+        else if (thread->stat == RT_THREAD_INIT)    rt_kprintf(" init   ");
+
+        rt_kprintf(" 0x%08x 0x%08x 0x-------- 0x%08x %03d\n",
+                   thread->stack_size + ((rt_uint32_t)thread->stack_addr - (rt_uint32_t)thread->sp),
+                   thread->stack_size,
+                   thread->remaining_tick,
+                   thread->error);
+
+        /* list sub thread in process */
+        tlist = &module->module_object[RT_Object_Class_Thread].object_list;
+        if (!rt_list_isempty(tlist)) _list_thread(tlist);
+#ifdef RT_USING_SEMAPHORE
+        /* list semaphored in process */
+        tlist = &module->module_object[RT_Object_Class_Semaphore].object_list;
+        if (!rt_list_isempty(tlist)) _list_sem(tlist);
+#endif
+#ifdef RT_USING_MUTEX
+        /* list mutex in process */
+        tlist = &module->module_object[RT_Object_Class_Mutex].object_list;
+        if (!rt_list_isempty(tlist)) _list_mutex(tlist);
+#endif
+#ifdef RT_USING_EVENT
+        /* list event in process */
+        tlist = &module->module_object[RT_Object_Class_Event].object_list;
+        if (!rt_list_isempty(tlist)) _list_event(tlist);
+#endif
+#ifdef RT_USING_MAILBOX
+        /* list mailbox in process */
+        tlist = &module->module_object[RT_Object_Class_MailBox].object_list;
+        if (!rt_list_isempty(tlist)) _list_mailbox(tlist);
+#endif
+#ifdef RT_USING_MESSAGEQUEUE
+        /* list message queue in process */
+        tlist = &module->module_object[RT_Object_Class_MessageQueue].object_list;
+        if (!rt_list_isempty(tlist)) _list_msgqueue(tlist);
+#endif
+#ifdef RT_USING_MEMHEAP
+        /* list memory heap in process */
+        tlist = &module->module_object[RT_Object_Class_MemHeap].object_list;
+        if (!rt_list_isempty(tlist)) _list_memheap(tlist);
+#endif
+#ifdef RT_USING_MEMPOOL
+        /* list memory pool in process */
+        tlist = &module->module_object[RT_Object_Class_MemPool].object_list;
+        if (!rt_list_isempty(tlist)) _list_mempool(tlist);
+#endif
+#ifdef RT_USING_DEVICE
+        /* list device in process */
+        tlist = &module->module_object[RT_Object_Class_Device].object_list;
+        if (!rt_list_isempty(tlist)) _list_device(tlist);
+#endif
+        /* list timer in process */
+        tlist = &module->module_object[RT_Object_Class_Timer].object_list;
+        if (!rt_list_isempty(tlist)) _list_timer(tlist);
+
+        if (module->page_cnt > 0)
+        {
+            rt_kprintf("mem address\n");
+            rt_kprintf("----------\n");
+
+            /* list process mempage */
+            for (i = 0; i < module->page_cnt; i++)
+            rt_kprintf("0x%x\n",((void **)module->page_array)[i]);
+        }
+    }
+
+    return 0;
+}
+
+int list_proc_details(int argc, char **argv)
+{
+    if (argc > 1)
+        list_proc_detail(argv[1]);
+    return 0;
+}
+FINSH_FUNCTION_EXPORT(list_proc_detail, list process objects in system)
+MSH_CMD_EXPORT(list_proc_details, list process in system);
 #endif
 
 long list(void)

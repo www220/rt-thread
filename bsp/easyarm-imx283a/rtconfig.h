@@ -103,6 +103,7 @@
 /* SECTION: device filesystem */
 #define RT_USING_DFS
 #define DFS_USING_WORKDIR
+#define DFS_USING_SELECT
 
 #define RT_USING_DFS_ELMFAT
 #define RT_DFS_ELM_DRIVES			2

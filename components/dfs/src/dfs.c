@@ -43,6 +43,12 @@ struct dfs_fd fd_table[3 + DFS_FD_MAX];
 struct dfs_fd fd_table[DFS_FD_MAX];
 #endif
 
+#ifdef DFS_USING_SELECT
+#include <rthw.h>
+static int dfs_select_semindex;
+static struct dfs_select_info dfs_select_list;
+#endif
+
 /**
  * @addtogroup DFS
  */
@@ -68,6 +74,12 @@ int dfs_init(void)
     /* set current working directory */
     rt_memset(working_directory, 0, sizeof(working_directory));
     working_directory[0] = '/';
+#endif
+
+#ifdef DFS_USING_SELECT
+    rt_memset(&dfs_select_list, 0, sizeof(dfs_select_list));
+    rt_list_init(&(dfs_select_list.list));
+    dfs_select_semindex = 0;
 #endif
 	return 0;
 }
@@ -419,6 +431,216 @@ up_one:
     return fullpath;
 }
 RTM_EXPORT(dfs_normalize_path);
+
+#ifdef DFS_USING_SELECT
+static struct dfs_fd *dfs_file_isdevfs(int fileno)
+{
+	int devfiles;
+	rt_err_t ret;
+	rt_device_t device;
+	struct dfs_fd *d = fd_get(fileno);
+	//必须是devfs
+	if (d == RT_NULL || d->fs == RT_NULL || rt_strcmp(d->fs->path,"/dev") != 0)
+	{
+		if (d)
+			fd_put(d);
+		return RT_NULL;
+	}
+	device = (rt_device_t)d->data;
+	if (device == RT_NULL || device->type != RT_Device_Class_Char)
+	{
+		fd_put(d);
+		return RT_NULL;
+	}
+	//设备必须打开
+	if ((device->open_flag & RT_DEVICE_OFLAG_OPEN) != RT_DEVICE_OFLAG_OPEN)
+	{
+		fd_put(d);
+		return RT_NULL;
+	}
+	//设备必须支持GETFILE而且文件句柄需要一致
+	ret = rt_device_control(device,RT_DEVICE_CTRL_CHAR_GETFILE,&devfiles);
+	if (ret != RT_EOK || devfiles != fileno)
+	{
+		fd_put(d);
+		return RT_NULL;
+	}
+	return d;
+}
+
+int dfs_file_select(int maxfdp,
+		rt_uint32_t *readset,
+		rt_uint32_t *writeset,
+		rt_uint32_t *exceptset,
+		rt_int32_t timeout)
+{
+	register rt_base_t temp;
+	dfs_select_info_t sel;
+	rt_err_t tak;
+	int i,j,count[3];
+	int status,ret;
+	struct dfs_fd *d;
+
+	if (maxfdp <= 0 || maxfdp > DFS_FD_MAX
+		|| (readset == RT_NULL && writeset == RT_NULL && exceptset == RT_NULL))
+		return -1;
+
+	ret = 0;
+	status = RT_EOK;
+	count[0] = count[1] = count[2] = 0;
+	//先读取一次别浪费了
+	{rt_uint32_t recvset[3][DFS_FD_MAX+31/32] = {{0}};
+	for (i=0; i<maxfdp; i++)
+	{
+		if (readset && (readset[i/32] & (1<<(i%32))))
+		{
+			d = dfs_file_isdevfs(i);
+			if (d != RT_NULL)
+			{
+				int recvbyte = 0;
+				rt_device_t device = (rt_device_t)d->data;
+				status = rt_device_control(device,RT_DEVICE_CTRL_CHAR_GETREAD,&recvbyte);
+				if (status == RT_EOK && recvbyte > 0)
+				{
+					recvset[0][i/32] |= (1<<(i%32));
+					count[0]++;
+				}
+				fd_put(d);
+			}
+			if (d == RT_NULL || status != RT_EOK)
+			{
+				if (exceptset && (exceptset[i/32] & (1<<(i%32)))
+						&& !(recvset[2][i/32] & (1<<(i%32))))
+				{
+					recvset[2][i/32] |= (1<<(i%32));
+					count[2]++;
+				}
+			}
+		}
+		if (writeset && (writeset[i/32] & (1<<(i%32))))
+		{
+			d = dfs_file_isdevfs(i);
+			if (d != RT_NULL)
+			{
+				int writebyte = 0;
+				rt_device_t device = (rt_device_t)d->data;
+				status = rt_device_control(device,RT_DEVICE_CTRL_CHAR_GETWRITE,&writebyte);
+				if (status == RT_EOK && writebyte > 0)
+				{
+					recvset[1][i/32] |= (1<<(i%32));
+					count[1]++;
+				}
+				fd_put(d);
+			}
+			if (d == RT_NULL || status != RT_EOK)
+			{
+				if (exceptset && (exceptset[i/32] & (1<<(i%32)))
+						&& !(recvset[2][i/32] & (1<<(i%32))))
+				{
+					recvset[2][i/32] |= (1<<(i%32));
+					count[2]++;
+				}
+			}
+		}
+		if (exceptset && (exceptset[i/32] & (1<<(i%32)))
+				&& !(recvset[2][i/32] & (1<<(i%32))))
+		{
+			d = dfs_file_isdevfs(i);
+			if (d == RT_NULL)
+			{
+				recvset[2][i/32] |= (1<<(i%32));
+				count[2]++;
+			}
+			else
+			{
+				fd_put(d);
+				d = RT_NULL;
+			}
+		}
+	}
+	//取最大值
+	ret = count[0];
+	if (ret < count[1])
+		ret = count[1];
+	if (ret < count[2])
+		ret = count[2];
+	if (ret > 0)
+	{
+		//复制触发数据
+		if (readset)
+			rt_memcpy(readset,recvset[0],maxfdp+31/32);
+		if (writeset)
+			rt_memcpy(writeset,recvset[1],maxfdp+31/32);
+		if (exceptset)
+			rt_memcpy(exceptset,recvset[2],maxfdp+31/32);
+		return ret;
+	}}
+
+	//创建对象
+	sel = (dfs_select_info_t)rt_malloc(sizeof(struct dfs_select_info));
+	if (sel == RT_NULL)
+		return -1;
+
+	{char name[100];
+	rt_sprintf(name,"dfs_s_%d",dfs_select_semindex++);
+	if (dfs_select_semindex>=1000)
+		dfs_select_semindex = 0;
+	rt_sem_init(&(sel->sem), name, 0, RT_IPC_FLAG_FIFO);}
+	sel->maxfdp = maxfdp;
+	sel->reqset[0] = readset;
+	sel->reqset[1] = writeset;
+	sel->reqset[2] = exceptset;
+	rt_memset(sel->recvset,0,sizeof(sel->recvset));
+
+    /* lock interrupt */
+    temp = rt_hw_interrupt_disable();
+    /* insert object into information object list */
+    rt_list_insert_after(&(dfs_select_list.list), &(sel->list));
+    /* unlock interrupt */
+    rt_hw_interrupt_enable(temp);
+
+	ret = 0;
+	count[0] = count[1] = count[2] = 0;
+	//等待别人触发
+	tak = rt_sem_take(&sel->sem,timeout);
+	/* lock interrupt */
+	temp = rt_hw_interrupt_disable();
+	/* remove object into information object list */
+	rt_list_remove(&(sel->list));
+	/* unlock interrupt */
+	rt_hw_interrupt_enable(temp);
+
+	if (tak == RT_EOK)
+	{
+		//复制触发数据
+		for (i=0; i<3; i++)
+		{
+			if (sel->reqset[i])
+				rt_memcpy(sel->reqset[i],sel->recvset[0],maxfdp+31/32);
+		}
+		//计算返回个数
+		for (i=0; i<maxfdp; i++)
+		{
+			for (j=0; j<3; j++)
+			{
+				if (sel->reqset[j][i/32] & (1<<(i%32)))
+					count[j]++;
+			}
+		}
+		//取最大值
+		ret = count[0];
+		if (ret < count[1])
+			ret = count[1];
+		if (ret < count[2])
+			ret = count[2];
+	}
+
+	rt_sem_detach(&(sel->sem));
+	rt_free(sel);
+    return ret;
+}
+RTM_EXPORT(dfs_file_select);
+#endif
 
 /*@}*/
 

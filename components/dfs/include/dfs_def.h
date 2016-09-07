@@ -312,5 +312,17 @@ struct dfs_fd
     void *data;                  /* Specific file system data */
 };
 
+#ifdef DFS_USING_SELECT
+struct dfs_select_info
+{
+	rt_list_t list;
+	rt_int32_t maxfdp;
+	rt_uint32_t *reqset[3];
+	rt_uint32_t recvset[3][DFS_FD_MAX+31/32];
+	struct rt_semaphore sem;
+};
+typedef struct dfs_select_info *dfs_select_info_t;
+#endif
+
 #endif
 

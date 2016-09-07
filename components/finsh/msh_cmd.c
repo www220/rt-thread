@@ -358,10 +358,16 @@ int cmd_ps(int argc, char **argv)
 {
     extern long list_thread(void);
     extern int list_module(void);
+    extern int list_proc(void);
 
 #ifdef RT_USING_MODULE
     if ((argc == 2) && (strcmp(argv[1], "-m") == 0))
         list_module();
+    else
+#endif
+#ifdef RT_USING_PROCESS
+    if ((argc == 2) && (strcmp(argv[1], "-p") == 0))
+        list_proc();
     else
 #endif
         list_thread();

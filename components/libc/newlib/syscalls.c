@@ -562,6 +562,16 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         return 0;
     }
+    case SYS_setuid:
+    {
+        rt_kprintf("setuid %d\n",parm1);
+        return 0;
+    }
+    case SYS_setgid:
+    {
+        rt_kprintf("setgid %d\n",parm1);
+        return 0;
+    }
     case SYS_getgroups:
     {
         if (parm1 == 0 || parm2 == 0)
@@ -572,7 +582,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_setgroups:
     {
-        return -ENOTSUP;
+        gid_t *groups = rt_process_conv_ptr(module,parm2,parm1*sizeof(gid_t));
+        if (parm1 >= 1)
+            rt_kprintf("setgroups [%d] %s\n",groups[0],((parm1==1)?"":"..."));
+        else
+        	rt_kprintf("setgroups no\n");
+        return 0;
     }
     case SYS_link:
     {
@@ -758,7 +773,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_ioctl:
     {
-        errno = 0;
+        rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
         switch(parm2)
         {
         case TIOCGWINSZ:
@@ -790,7 +805,6 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             return 0;
         }
         }
-        rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
         return -ENOTSUP;
     }
     case SYS_fcntl:
@@ -808,6 +822,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_BASE+904:
     {
         rt_mutex_release(module->page_mutex);
+        return 0;
+    }
+    case SYS_BASE+1001:
+    {
+        char *name = (char *)rt_process_conv_ptr(module,parm2,parm3);
+        rt_strncpy(name,"/dev/console",parm3);
         return 0;
     }
     }

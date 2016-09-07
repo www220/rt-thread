@@ -801,9 +801,9 @@ enum rt_device_class_type
 #define RT_DEVICE_FLAG_STREAM           0x040           /**< stream mode */
 
 #define RT_DEVICE_CTRL_CONFIG           0x03    	/* configure device */
-#define RT_DEVICE_CTRL_SET_INT          0x10    	/* enable receive irq */
-#define RT_DEVICE_CTRL_CLR_INT          0x11    	/* disable receive irq */
-#define RT_DEVICE_CTRL_GET_INT          0x12
+#define RT_DEVICE_CTRL_SET_INT          0x04    	/* enable receive irq */
+#define RT_DEVICE_CTRL_CLR_INT          0x05    	/* disable receive irq */
+#define RT_DEVICE_CTRL_GET_INT          0x06
 
 #define RT_DEVICE_FLAG_INT_RX           0x100           /**< INT mode on Rx */
 #define RT_DEVICE_FLAG_DMA_RX           0x200           /**< DMA mode on Rx */
@@ -826,6 +826,10 @@ enum rt_device_class_type
  * special device commands
  */
 #define RT_DEVICE_CTRL_CHAR_STREAM      0x10            /**< stream mode on char device */
+#define RT_DEVICE_CTRL_CHAR_SETFILE     0x80            /**< set devfs file */
+#define RT_DEVICE_CTRL_CHAR_GETFILE     0x81            /**< get devfs file */
+#define RT_DEVICE_CTRL_CHAR_GETREAD     0x82            /**< read already byte */
+#define RT_DEVICE_CTRL_CHAR_GETWRITE    0x83            /**< write remaining byte */
 #define RT_DEVICE_CTRL_BLK_GETGEOME     0x10            /**< get geometry information   */
 #define RT_DEVICE_CTRL_BLK_SYNC         0x11            /**< flush data to block device */
 #define RT_DEVICE_CTRL_BLK_ERASE        0x12            /**< erase block on block device */
