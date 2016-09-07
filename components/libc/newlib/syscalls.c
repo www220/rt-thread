@@ -322,10 +322,43 @@ _exit (int status)
 	module = rt_module_self();
 	if (module != RT_NULL)
 	{
-		module->exitcode = (status&0xff)<<8;
+		struct rt_list_node *list;
+		struct rt_object *object;
 
+		rt_enter_critical();
+		
+        /* delete all threads in the module */
+        list = &module->module_object[RT_Object_Class_Thread].object_list;
+        while (list->next != list)
+        {
+            object = rt_list_entry(list->next, struct rt_object, list);
+            if (rt_object_is_systemobject(object) == RT_TRUE)
+            {
+                /* detach static object */
+                rt_thread_detach((rt_thread_t)object);
+            }
+            else
+            {
+                /* delete dynamic object */
+                rt_thread_delete((rt_thread_t)object);
+            }
+        }
+		/* delete main thread */
+		rt_thread_delete(module->module_thread);
+		rt_exit_critical();
+
+		/* re-schedule */
+		rt_schedule();
+	}
+#endif
+#ifdef RT_USING_PROCESS
+	rt_process_t process;
+
+	process = rt_process_self();
+	if (process != RT_NULL)
+	{
 		/* unload assertion module */
-		rt_module_unload(module);
+		rt_process_unload(process, (status&0xff)<<8);
 
 		/* re-schedule */
 		rt_schedule();
@@ -368,11 +401,11 @@ void abort(void)
 #ifdef RT_USING_PROCESS
 #include "linux-syscall.h"
 #include "linux-usedef.h"
-extern void *rt_module_conv_ptr(rt_module_t module, rt_uint32_t ptr, rt_uint32_t size);
-extern rt_uint32_t rt_module_brk(rt_module_t module, rt_uint32_t addr);
-extern int rt_module_fork(rt_module_t module);
-extern int rt_module_vfork(rt_module_t module);
-extern int rt_module_waitpid(rt_module_t module, pid_t pid, int* status, int opt);
+extern void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_uint32_t size);
+extern rt_uint32_t rt_process_brk(rt_process_t module, rt_uint32_t addr);
+extern int rt_process_fork(rt_process_t module);
+extern int rt_process_vfork(rt_process_t module);
+extern int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt);
 static inline int ret_err(int ret)
 {
     if (ret < 0)
@@ -390,7 +423,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_uint32_t parm4, rt_uint32_t parm5,
         rt_uint32_t parm6)
 {
-    rt_module_t module = rt_module_self();
+	rt_process_t module = rt_process_self();
 
     RT_ASSERT(module != RT_NULL);
     RT_ASSERT((nbr&SYS_BASE) == SYS_BASE);
@@ -405,7 +438,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_brk:
     {
-        return rt_module_brk(module,parm1);
+        return rt_process_brk(module,parm1);
     }
     case SYS_chmod:
     case SYS_fchmod:
@@ -420,8 +453,8 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_nanosleep:
     {
-        struct timespec *tim1 = (parm1)?(rt_module_conv_ptr(module,parm1,sizeof(struct timespec))):(0);
-        struct timespec *tim2 = (parm2)?(rt_module_conv_ptr(module,parm2,sizeof(struct timespec))):(0);
+        struct timespec *tim1 = (parm1)?(rt_process_conv_ptr(module,parm1,sizeof(struct timespec))):(0);
+        struct timespec *tim2 = (parm2)?(rt_process_conv_ptr(module,parm2,sizeof(struct timespec))):(0);
         if (tim1 == RT_NULL)
             return -EINVAL;
         extern void __udelay(unsigned long usecs);
@@ -505,22 +538,22 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_fork:
     {
-    	return rt_module_fork(module);
+    	return rt_process_fork(module);
     }
     case SYS_vfork:
     {
-    	return rt_module_vfork(module);
+    	return rt_process_vfork(module);
     }
     case SYS_execve:
     {
-        const char *file = (const char *)rt_module_conv_ptr(module,parm1,0);
+        const char *file = (const char *)rt_process_conv_ptr(module,parm1,0);
         rt_kprintf("syscall execve %s\n",file);
         return 0;
     }
     case SYS_wait4+1111:
     {
-        int *status = (parm2)?((int *)rt_module_conv_ptr(module,parm2,sizeof(int))):RT_NULL;
-        return rt_module_waitpid(module,(pid_t)parm1,status,parm3);
+        int *status = (parm2)?((int *)rt_process_conv_ptr(module,parm2,sizeof(int))):RT_NULL;
+        return rt_process_waitpid(module,(pid_t)parm1,status,parm3);
     }
     case SYS_getuid:
     case SYS_getgid:
@@ -533,7 +566,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         if (parm1 == 0 || parm2 == 0)
             return 1;
-        gid_t *groups = rt_module_conv_ptr(module,parm2,parm1*sizeof(gid_t));
+        gid_t *groups = rt_process_conv_ptr(module,parm2,parm1*sizeof(gid_t));
         groups[0] = 0;
         return 1;
     }
@@ -543,24 +576,24 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_link:
     {
-        rt_kprintf("syscall link %s=>%s\n",(const char *)rt_module_conv_ptr(module,parm1,0),
-                (const char *)rt_module_conv_ptr(module,parm2,0));
+        rt_kprintf("syscall link %s=>%s\n",(const char *)rt_process_conv_ptr(module,parm1,0),
+                (const char *)rt_process_conv_ptr(module,parm2,0));
         return -ENOTSUP;
     }
     case SYS_symlink:
     {
-        rt_kprintf("syscall symlink %s=>%s\n",(const char *)rt_module_conv_ptr(module,parm1,0),
-                (const char *)rt_module_conv_ptr(module,parm2,0));
+        rt_kprintf("syscall symlink %s=>%s\n",(const char *)rt_process_conv_ptr(module,parm1,0),
+                (const char *)rt_process_conv_ptr(module,parm2,0));
         return -ENOTSUP;
     }
     case SYS_readlink:
     {
-        rt_kprintf("syscall readlink %s\n",(const char *)rt_module_conv_ptr(module,parm1,0));
+        rt_kprintf("syscall readlink %s\n",(const char *)rt_process_conv_ptr(module,parm1,0));
         return -ENOTSUP;
     }
     case SYS_uname:
     {
-        struct utsname* uname = (struct utsname*)rt_module_conv_ptr(module,parm1,sizeof(struct utsname));
+        struct utsname* uname = (struct utsname*)rt_process_conv_ptr(module,parm1,sizeof(struct utsname));
         strcpy(uname->sysname,"RT-Thread");
         strcpy(uname->nodename,"local");
         sprintf(uname->release,"%ld.%ld.%ld",RT_VERSION,RT_SUBVERSION,RT_REVISION);
@@ -573,18 +606,18 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_rmdir:
     {
         errno = 0;
-        return ret_err(unlink((const char *)rt_module_conv_ptr(module,parm1,0)));
+        return ret_err(unlink((const char *)rt_process_conv_ptr(module,parm1,0)));
     }
     case SYS_rename:
     {
         errno = 0;
-        return ret_err(rename((const char *)rt_module_conv_ptr(module,parm1,0),
-                (const char *)rt_module_conv_ptr(module,parm2,0)));
+        return ret_err(rename((const char *)rt_process_conv_ptr(module,parm1,0),
+                (const char *)rt_process_conv_ptr(module,parm2,0)));
     }
     case SYS_mkdir:
     {
         errno = 0;
-        return ret_err(mkdir((const char *)rt_module_conv_ptr(module,parm1,0),parm2));
+        return ret_err(mkdir((const char *)rt_process_conv_ptr(module,parm1,0),parm2));
     }
     case SYS_lseek:
     {
@@ -594,33 +627,33 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_stat:
     {
         errno = 0;
-        return ret_err(stat((const char *)rt_module_conv_ptr(module,parm1,0),
-                (struct stat *)rt_module_conv_ptr(module,parm2,sizeof(struct stat))));
+        return ret_err(stat((const char *)rt_process_conv_ptr(module,parm1,0),
+                (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
     }
     case SYS_fstat:
     {
         errno = 0;
-        return ret_err(fstat(parm1, (struct stat *)rt_module_conv_ptr(module,parm2,sizeof(struct stat))));
+        return ret_err(fstat(parm1, (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
     }
     case SYS_creat:
     {
         errno = 0;
-        return ret_err(open((const char*)rt_module_conv_ptr(module,parm1,0), O_TRUNC|O_WRONLY|O_CREAT, parm2));
+        return ret_err(open((const char*)rt_process_conv_ptr(module,parm1,0), O_TRUNC|O_WRONLY|O_CREAT, parm2));
     }
     case SYS_open:
     {
        errno = 0;
-       return ret_err(open((const char*)rt_module_conv_ptr(module,parm1,0), parm2, parm3));
+       return ret_err(open((const char*)rt_process_conv_ptr(module,parm1,0), parm2, parm3));
     }
     case SYS_read:
     {
        errno = 0;
-       return ret_err(read(parm1, rt_module_conv_ptr(module,parm2,parm3), parm3));
+       return ret_err(read(parm1, rt_process_conv_ptr(module,parm2,parm3), parm3));
     }
     case SYS_write:
     {
        errno = 0;
-       return ret_err(write(parm1, rt_module_conv_ptr(module,parm2,parm3), parm3));
+       return ret_err(write(parm1, rt_process_conv_ptr(module,parm2,parm3), parm3));
     }
     case SYS_close:
     {
@@ -631,13 +664,13 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         errno = 0;
         extern int getdents(int file, struct dirent *dirp, rt_size_t nbytes);
-        return ret_err(getdents(parm1, (struct dirent*)rt_module_conv_ptr(module,parm2,parm3), parm3));
+        return ret_err(getdents(parm1, (struct dirent*)rt_process_conv_ptr(module,parm2,parm3), parm3));
     }
     case SYS_sendfile:
     {
         char buf[4096];
         int rc,len,readlen = 0;
-        off_t *off = (parm3)?(rt_module_conv_ptr(module,parm3,sizeof(off_t))):(0);
+        off_t *off = (parm3)?(rt_process_conv_ptr(module,parm3,sizeof(off_t))):(0);
         if (off)
         {
             errno = 0;
@@ -666,13 +699,13 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_getcwd:
     {
-        char *buf = rt_module_conv_ptr(module,parm1,parm2);
+        char *buf = rt_process_conv_ptr(module,parm1,parm2);
         return (rt_uint32_t)getcwd(buf,parm2);
     }
     case SYS_chdir:
     {
         errno = 0;
-        return ret_err(chdir((const char*)rt_module_conv_ptr(module,parm1,0)));
+        return ret_err(chdir((const char*)rt_process_conv_ptr(module,parm1,0)));
     }
     case SYS_fsync:
     {
@@ -686,14 +719,14 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_gettimeofday:
     {
         errno = 0;
-        struct timezone *zone = (parm2)?((struct timezone *)rt_module_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
-        return ret_err(gettimeofday((struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
+        struct timezone *zone = (parm2)?((struct timezone *)rt_process_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
+        return ret_err(gettimeofday((struct timeval *)rt_process_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
     }
     case SYS_settimeofday:
     {
         errno = 0;
-        struct timezone *zone = (parm2)?((struct timezone *)rt_module_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
-        return ret_err(settimeofday((struct timeval *)rt_module_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
+        struct timezone *zone = (parm2)?((struct timezone *)rt_process_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
+        return ret_err(settimeofday((struct timeval *)rt_process_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
     }
     case SYS_dup:
     case SYS_dup2:
@@ -707,7 +740,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         {
         case TIOCGWINSZ:
         {
-            struct winsize *win = (struct winsize *)rt_module_conv_ptr(module,parm3,sizeof(struct winsize));
+            struct winsize *win = (struct winsize *)rt_process_conv_ptr(module,parm3,sizeof(struct winsize));
             memset(win,0,sizeof(struct winsize));
             win->ws_col = 80;
             win->ws_row = 60;
@@ -715,12 +748,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         }
         case TIOCSWINSZ:
         {
-            struct winsize *win = (struct winsize *)rt_module_conv_ptr(module,parm3,sizeof(struct winsize));
+            struct winsize *win = (struct winsize *)rt_process_conv_ptr(module,parm3,sizeof(struct winsize));
             return 0;
         }
         case TCGETS:
         {
-            struct termios *ios = (struct termios *)rt_module_conv_ptr(module,parm3,sizeof(struct termios));
+            struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
             memset(ios,0,sizeof(struct termios));
             ios->c_iflag = ICRNL | IXON | IXOFF;
             ios->c_oflag = OPOST | ONLCR;
@@ -730,7 +763,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         }
         case TCSETS:
         {
-            struct termios *ios = (struct termios *)rt_module_conv_ptr(module,parm3,sizeof(struct termios));
+            struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
             return 0;
         }
         }
@@ -740,18 +773,18 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_BASE+901:
     case SYS_BASE+903:
     {
-        rt_mutex_take(module->mod_mutex, RT_WAITING_FOREVER);
+        rt_mutex_take(module->page_mutex, RT_WAITING_FOREVER);
         return 0;
     }
     case SYS_BASE+902:
     case SYS_BASE+904:
     {
-        rt_mutex_release(module->mod_mutex);
+        rt_mutex_release(module->page_mutex);
         return 0;
     }
     case SYS_BASE+1001:
     {
-        char *name = (char *)rt_module_conv_ptr(module,parm2,parm3);
+        char *name = (char *)rt_process_conv_ptr(module,parm2,parm3);
         strncpy(name,"/dev/console",parm3);
         return 0;
     }

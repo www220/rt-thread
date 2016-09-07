@@ -348,7 +348,7 @@ static void rt_thread_entry_main(void* parameter)
     finsh_set_device(FINSH_DEVICE_NAME);
    	rt_thread_delay(100);
 #else
-#ifdef RT_USING_MODULE
+#ifdef RT_USING_PROCESS
    	rt_module_exec_cmd("/mnt/mmc/busybox.mo", "login", sizeof("login"));
    	rt_thread_delay(100);
 #endif

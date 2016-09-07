@@ -9,7 +9,7 @@ SECTIONS
     .text : 
     {
         *(.init)
-        *(.module_fn)
+        *(.process_fn)
         *(.text)
         *(.gnu.linkonce.t*)
         

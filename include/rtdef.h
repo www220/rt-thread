@@ -38,6 +38,7 @@
 /* include rtconfig header to import configuration */
 #include <rtconfig.h>
 #ifdef RT_USING_PROCESS
+#include <stdlib.h>
 #include <string.h>
 #include <sys/reent.h>
 #include <setjmp.h>
@@ -325,6 +326,9 @@ struct rt_object
 #ifdef RT_USING_MODULE
     void      *module_id;                               /**< id of application module */
 #endif
+#ifdef RT_USING_PROCESS
+    void      *process_id;                              /**< id of application process */
+#endif
     rt_list_t  list;                                    /**< list node of kernel object */
 };
 typedef struct rt_object *rt_object_t;                  /**< Type for kernel objects. */
@@ -376,6 +380,9 @@ enum rt_object_class_type
     RT_Object_Class_Timer,                              /**< The object is a timer. */
 #ifdef RT_USING_MODULE
     RT_Object_Class_Module,                             /**< The object is a module. */
+#endif
+#ifdef RT_USING_PROCESS
+    RT_Object_Class_Process,                            /**< The object is a process. */
 #endif
     RT_Object_Class_Unknown,                            /**< The object is unknown. */
     RT_Object_Class_Static = 0x80                       /**< The object is a static object. */
@@ -493,6 +500,9 @@ struct rt_thread
 
 #ifdef RT_USING_MODULE
     void       *module_id;                              /**< id of application module */
+#endif
+#ifdef RT_USING_PROCESS
+    void       *process_id;                             /**< id of application process */
 #endif
 
     rt_list_t   list;                                   /**< the object list */
@@ -979,12 +989,10 @@ struct rt_module
 {
     struct rt_object             parent;                /**< inherit from object */
 
-    rt_uint32_t                  vstart_addr;           /**< VMA base address for the
+    rt_uint32_t                  vstart_addr;            /**< VMA base address for the
                                                           first LOAD segment. */
     rt_uint8_t                  *module_space;          /**< module memory space */
-#ifdef RT_USING_PROCESS
-    rt_uint32_t                  module_size;           /**< module memory size */
-#endif
+
     void                        *module_entry;          /**< the entry address of module */
     rt_thread_t                  module_thread;         /**< the main thread of module */
 
@@ -996,23 +1004,9 @@ struct rt_module
     void                        *mem_list;              /**< module's free memory list */
     void                        *page_array;            /**< module's using pages */
     rt_uint32_t                  page_cnt;              /**< module's using pages count */
-#ifdef RT_USING_PROCESS
-    rt_mutex_t                   mod_mutex;             /**< module's mutex */
-#endif
 #endif
 
     rt_uint16_t                  nref;                  /**< reference count */
-#ifdef RT_USING_PROCESS
-    rt_uint16_t                  pid;                   /**< mmu pid */
-    rt_uint16_t                  tpid;                  /**< process pid */
-    struct _reent               *impure_ptr;            /**< newlibc reent */
-    rt_uint16_t                  jmppid;                /**< vfork pid */
-    rt_uint16_t                  jmpsplen;              /**< vfork buf */
-    jmp_buf                      jmpbuf;                /**< vfork buf */
-    void                        *jmpsp;                 /**< vfork buf */
-    rt_uint8_t                   jmpspbuf[256];         /**< vfork buf */
-    int                          exitcode;              /**< exit code */
-#endif
 
     rt_uint16_t                  nsym;                  /**< number of symbol in the module */
     struct rt_module_symtab     *symtab;                /**< module symbol table */
@@ -1021,6 +1015,61 @@ struct rt_module
     struct rt_object_information module_object[RT_Object_Class_Unknown];
 };
 typedef struct rt_module *rt_module_t;
+
+/*@}*/
+#endif
+
+#ifdef RT_USING_PROCESS
+/**
+ * @addtogroup Process
+ */
+
+/*@{*/
+
+/*
+ * process system
+ */
+
+/**
+ * Application Process structure
+ */
+struct rt_process
+{
+    struct rt_object             parent;                /**< inherit from object */
+
+    rt_uint32_t                  vstart_addr;           /**< VMA base address for the
+                                                          first LOAD segment. */
+    rt_uint8_t                  *module_space;          /**< process memory space */
+    rt_uint32_t                  module_size;           /**< process memory size */
+
+    void                        *module_entry;          /**< the entry address of process */
+    rt_thread_t                  module_thread;         /**< the main thread of process */
+
+	rt_uint8_t*                  module_cmd_line;		/**< process command line */
+	rt_uint32_t                  module_cmd_size;		/**< the size of module command line */
+
+#ifdef RT_USING_SLAB
+    /* process memory allocator */
+    void                        *page_array;            /**< process's using pages */
+    rt_uint32_t                  page_cnt;              /**< process's using pages count */
+    rt_mutex_t                   page_mutex;            /**< process's mutex */
+#endif
+
+    rt_uint16_t                  nref;                  /**< reference count */
+    rt_uint16_t                  pid;                   /**< mmu pid */
+    rt_uint16_t                  tpid;                  /**< process pid */
+    struct _reent              **impure_ptr;            /**< newlibc reent */
+    rt_uint16_t                  jmppid;                /**< vfork pid */
+    rt_uint16_t                  jmpsplen;              /**< vfork buf */
+    jmp_buf                      jmpbuf;                /**< vfork buf */
+    void                        *jmpsp;                 /**< vfork buf */
+    rt_uint8_t                   jmpspbuf[256];         /**< vfork buf */
+    int                          exitcode;              /**< exit code */
+
+    /* object in this process, process object is the last basic object type */
+    struct rt_object_information module_object[RT_Object_Class_Unknown];
+};
+typedef struct rt_process *rt_process_t;
 
 /*@}*/
 #endif

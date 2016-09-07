@@ -139,8 +139,8 @@ void rt_hw_trap_pabt(struct rt_hw_register *regs)
 #ifdef RT_USING_FINSH
     list_thread();
 #endif
-#ifdef RT_USING_MODULE
-    if (rt_module_self() != RT_NULL)
+#ifdef RT_USING_PROCESS
+    if (rt_process_self() != RT_NULL)
         return;
 #endif
     rt_hw_cpu_shutdown();
@@ -166,8 +166,8 @@ void rt_hw_trap_dabt(struct rt_hw_register *regs)
 #ifdef RT_USING_FINSH
     list_thread();
 #endif
-#ifdef RT_USING_MODULE
-    if (rt_module_self() != RT_NULL)
+#ifdef RT_USING_PROCESS
+    if (rt_process_self() != RT_NULL)
         return;
 #endif
     rt_hw_cpu_shutdown();
@@ -175,7 +175,7 @@ void rt_hw_trap_dabt(struct rt_hw_register *regs)
 
 void rt_hw_trap_assert()
 {
-    rt_module_t module = rt_module_self();
+    rt_process_t module = rt_process_self();
     if (module == RT_NULL)
         return;
 
@@ -184,8 +184,7 @@ void rt_hw_trap_assert()
         module->tpid = module->jmppid;
         module->jmppid = 0;
     }
-    module->exitcode = SIGSEGV;
-    rt_module_unload(module);
+    rt_process_unload(module,SIGSEGV);
     rt_schedule();
 }
 

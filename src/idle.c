@@ -92,6 +92,9 @@ void rt_thread_idle_excute(void)
 #ifdef RT_USING_MODULE
         rt_module_t module = RT_NULL;
 #endif
+#ifdef RT_USING_PROCESS
+        rt_process_t process = RT_NULL;
+#endif
         RT_DEBUG_NOT_IN_INTERRUPT;
 
         /* disable interrupt */
@@ -113,6 +116,17 @@ void rt_thread_idle_excute(void)
             {
                 /* detach module's main thread */
                 module->module_thread = RT_NULL;
+            }
+#endif
+#ifdef RT_USING_PROCESS
+            /* get thread's parent process */
+            process = (rt_process_t)thread->process_id;
+
+            /* if the thread is process's main thread */
+            if (process != RT_NULL && process->module_thread == thread)
+            {
+                /* detach process's main thread */
+                process->module_thread = RT_NULL;
             }
 #endif
             /* remove defunct thread */
@@ -147,9 +161,12 @@ void rt_thread_idle_excute(void)
         /* the thread belongs to an application module */
         if (thread->flags & RT_OBJECT_FLAG_MODULE)
             rt_module_free((rt_module_t)thread->module_id, thread->stack_addr);
-#ifdef RT_USING_PROCESS
-        else if (thread->flags & RT_OBJECT_FLAG_PROCESS);
+        else
 #endif
+#if defined(RT_USING_PROCESS) && defined(RT_USING_SLAB)
+        /* the thread belongs to an application process */
+        if (thread->flags & RT_OBJECT_FLAG_PROCESS)
+            ;
         else
 #endif
         /* release thread's stack */
@@ -173,6 +190,23 @@ void rt_thread_idle_excute(void)
             /* destroy module */
             if (module->nref == 0)
                 rt_module_destroy(module);
+        }
+#endif
+#ifdef RT_USING_PROCESS
+        if (process != RT_NULL)
+        {
+            extern rt_err_t rt_process_destroy(rt_process_t process);
+
+            /* if sub thread list and main thread are all empty */
+            if ((process->module_thread == RT_NULL) &&
+                rt_list_isempty(&process->module_object[RT_Object_Class_Thread].object_list))
+            {
+                process->nref --;
+            }
+
+            /* destroy process */
+            if (process->nref == 0)
+                rt_process_destroy(process);
         }
 #endif
     }

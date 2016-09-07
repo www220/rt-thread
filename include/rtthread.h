@@ -452,6 +452,41 @@ int rt_system_module_init(void);
 /*@}*/
 #endif
 
+#ifdef RT_USING_PROCESS
+/**
+ * @addtogroup Process
+ */
+
+/*@{*/
+
+/*
+ * process interface
+ */
+rt_process_t rt_process_load(const char *name, void *module_ptr);
+rt_err_t rt_process_unload(rt_process_t process, int exitcode);
+#ifdef RT_USING_DFS
+rt_process_t rt_process_open(const char *filename);
+rt_process_t rt_process_exec_cmd(const char *path, const char* cmd_line, int size);
+#endif
+rt_process_t rt_process_self(void);
+rt_process_t rt_process_find(const char *name);
+
+#ifdef RT_USING_HOOK
+void rt_process_load_sethook(void (*hook)(rt_process_t process));
+void rt_process_unload_sethook(void (*hook)(rt_process_t process));
+#endif
+
+void rt_process_init_object_container(struct rt_process *process);
+rt_err_t rt_process_destroy(rt_process_t process);
+
+/*
+ * application process system initialization
+ */
+int rt_system_process_init(void);
+
+/*@}*/
+#endif
+
 /*
  * interrupt service
  */

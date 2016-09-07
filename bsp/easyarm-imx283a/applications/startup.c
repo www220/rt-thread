@@ -69,6 +69,11 @@ void rtthread_startup(void)
     rt_system_module_init();
 #endif
 
+#ifdef RT_USING_PROCESS
+    /* initialize module system*/
+    rt_system_process_init();
+#endif
+
     /* init scheduler system */
     rt_system_scheduler_init();
 

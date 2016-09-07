@@ -134,6 +134,13 @@ ttyname_r (int fd, char *buf, size_t buflen)
 	return _set_errno(rc);
 }
 
+int
+lutimes (const char *path, const struct timeval tvp[2])
+{
+	int rc = sys_call2(__NR_SYSCALL_BASE+1002, (uintptr_t)path, (uintptr_t)tvp);
+	return _set_errno(rc);
+}
+
 void
 __malloc_lock (struct _reent *ptr)
 {
@@ -392,6 +399,7 @@ int closedir(DIR *d)
 		return -1;
 
     rc = close(d->fd);
+    d->fd = -1;
     free(d);
 	return rc;
 }
@@ -402,12 +410,6 @@ int utimes (const char *file, const struct timeval tvp[2])
 {
 	int rc = sys_call2(__NR_utimes, (uintptr_t)file, (uintptr_t)tvp);
 	return _set_errno(rc);
-}
-
-int lutimes (const char *path, const struct timeval tvp[2])
-{
-	errno = ENOTSUP;
-	return -1;
 }
 
 unsigned sleep(unsigned int seconds)

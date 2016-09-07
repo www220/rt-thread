@@ -49,7 +49,7 @@ struct rt_thread *rt_current_thread;
 #ifdef RT_USING_PROCESS
 rt_uint32_t rt_pids_from;
 rt_uint32_t rt_pids_to;
-struct rt_module *rt_current_module;
+struct rt_process *rt_current_process;
 #endif
 
 rt_uint8_t rt_current_priority;
@@ -140,7 +140,7 @@ void rt_system_scheduler_init(void)
     rt_current_priority = RT_THREAD_PRIORITY_MAX - 1;
     rt_current_thread = RT_NULL;
 #ifdef RT_USING_PROCESS
-    rt_current_module = RT_NULL;
+    rt_current_process = RT_NULL;
     rt_pids_from = rt_pids_to = 0;
 #endif
 
@@ -182,16 +182,16 @@ void rt_system_scheduler_start(void)
 
     rt_current_thread = to_thread;
 #ifdef RT_USING_PROCESS
-    if (rt_current_module != rt_current_thread->module_id)
+    if (rt_current_process != rt_current_thread->process_id)
     {
-        rt_current_module = (rt_module_t)rt_current_thread->module_id;
-        if (rt_current_module)
-            rt_pids_to = rt_current_module->pid;
+        rt_current_process = (rt_process_t)rt_current_thread->process_id;
+        if (rt_current_process)
+            rt_pids_to = rt_current_process->pid;
     }
-    if (rt_current_module)
+    if (rt_current_process)
     {
         _impure_ptr = rt_current_thread->plib_reent;
-        rt_current_module->impure_ptr = rt_current_thread->plib_reent;
+        *rt_current_process->impure_ptr = rt_current_thread->plib_reent;
     }
     else
     {
@@ -250,16 +250,16 @@ void rt_schedule(void)
             from_thread         = rt_current_thread;
             rt_current_thread   = to_thread;
 #ifdef RT_USING_PROCESS
-            if (rt_current_module != rt_current_thread->module_id)
+            if (rt_current_process != rt_current_thread->process_id)
             {
-                rt_current_module = (rt_module_t)rt_current_thread->module_id;
-                if (rt_current_module)
-                    rt_pids_to = rt_current_module->pid;
+                rt_current_process = (rt_process_t)rt_current_thread->process_id;
+                if (rt_current_process)
+                    rt_pids_to = rt_current_process->pid;
             }
-            if (rt_current_module)
+            if (rt_current_process)
             {
                 _impure_ptr = rt_current_thread->plib_reent;
-                rt_current_module->impure_ptr = rt_current_thread->plib_reent;
+                *rt_current_process->impure_ptr = rt_current_thread->plib_reent;
             }
             else
             {

@@ -74,6 +74,10 @@ struct rt_object_information rt_object_container[RT_Object_Class_Unknown] =
     /* initialize object container - module */
     {RT_Object_Class_Module, _OBJ_CONTAINER_LIST_INIT(RT_Object_Class_Module), sizeof(struct rt_module)},
 #endif
+#ifdef RT_USING_PROCESS
+    /* initialize object container - process */
+    {RT_Object_Class_Process, _OBJ_CONTAINER_LIST_INIT(RT_Object_Class_Process), sizeof(struct rt_process)},
+#endif
 };
 
 #ifdef RT_USING_HOOK
@@ -228,6 +232,9 @@ void rt_object_init(struct rt_object         *object,
 #ifdef RT_USING_MODULE
     object->module_id = (void *)rt_module_self();
 #endif
+#ifdef RT_USING_PROCESS
+    object->process_id = 0;
+#endif
 
     /* copy name */
     rt_strncpy(object->name, name, RT_NAME_MAX);
@@ -291,7 +298,7 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
      * get module object information,
      * module object should be managed by kernel object container
      */
-    information = (rt_module_self() != RT_NULL && (type != RT_Object_Class_Module)) ?
+    information = (rt_module_self() != RT_NULL && (type != RT_Object_Class_Module) && (type != RT_Object_Class_Process)) ?
                   &rt_module_self()->module_object[type] : &rt_object_container[type];
 #else
     /* get object information */
@@ -314,13 +321,14 @@ rt_object_t rt_object_allocate(enum rt_object_class_type type, const char *name)
     object->flag = 0;
 
 #ifdef RT_USING_MODULE
-#ifndef RT_USING_PROCESS
     if (rt_module_self() != RT_NULL)
     {
         object->flag |= RT_OBJECT_FLAG_MODULE;
     }
-#endif
     object->module_id = (void *)rt_module_self();
+#endif
+#ifdef RT_USING_PROCESS
+    object->process_id = 0;
 #endif
 
     /* copy name */
@@ -469,6 +477,62 @@ rt_object_t rt_object_find(const char *name, rt_uint8_t type)
             if (*name_ptr == '\0')
             {
                 if (type == RT_Object_Class_Module) return object;
+                return RT_NULL;
+            }
+
+            /* point to the object name */
+            name = name_ptr;
+        }
+    }
+#endif
+#ifdef RT_USING_PROCESS
+    /* check whether to find a object inside a process. */
+    {
+        const char *name_ptr;
+        int module_name_length;
+
+        name_ptr = name;
+        while ((*name_ptr != '\0') && (*name_ptr != '/'))
+            name_ptr ++;
+
+        if (*name_ptr == '/')
+        {
+            struct rt_process* module = RT_NULL;
+
+            /* get the name length of process */
+            module_name_length = name_ptr - name;
+
+            /* enter critical */
+            rt_enter_critical();
+
+            /* find process */
+            information = &rt_object_container[RT_Object_Class_Process];
+            for (node = information->object_list.next;
+                node != &(information->object_list);
+                node  = node->next)
+            {
+                object = rt_list_entry(node, struct rt_object, list);
+                if ((rt_strncmp(object->name, name, module_name_length) == 0) &&
+                    (module_name_length == RT_NAME_MAX || object->name[module_name_length] == '\0'))
+                {
+                    /* get process */
+                    module = (struct rt_process*)object;
+                    break;
+                }
+            }
+            rt_exit_critical();
+
+            /* there is no this process inside the system */
+            if (module == RT_NULL) return RT_NULL;
+
+            /* get the object pool of process */
+            information = &(module->module_object[type]);
+
+            /* get object name */
+            while ((*name_ptr == '/') && (*name_ptr != '\0')) name_ptr ++;
+            if (*name_ptr == '\0')
+            {
+                if (type == RT_Object_Class_Process) return object;
                 return RT_NULL;
             }
 
