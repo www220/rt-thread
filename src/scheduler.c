@@ -190,13 +190,10 @@ void rt_system_scheduler_start(void)
     }
     if (rt_current_process)
     {
-        _impure_ptr = rt_current_thread->plib_reent;
-        if (rt_current_process->impure_ptr)
-        {
-        	//conv vmm => mm
-        	struct _reent **impure_ptr = (struct _reent **)(rt_current_process->module_space+(rt_current_process->impure_ptr-rt_current_process->vstart_addr));
-        	*impure_ptr = rt_current_thread->plib_reent;
-        }
+        if (rt_current_thread->plib_reent)
+            _impure_ptr = rt_current_thread->plib_reent;
+        else
+            _impure_ptr = &rt_current_thread->lib_reent;
     }
     else
     {
@@ -263,13 +260,10 @@ void rt_schedule(void)
             }
             if (rt_current_process)
             {
-                _impure_ptr = rt_current_thread->plib_reent;
-                if (rt_current_process->impure_ptr)
-                {
-                	//conv vmm => mm
-                	struct _reent **impure_ptr = (struct _reent **)(rt_current_process->module_space+(rt_current_process->impure_ptr-rt_current_process->vstart_addr));
-                	*impure_ptr = rt_current_thread->plib_reent;
-                }
+                if (rt_current_thread->plib_reent)
+                    _impure_ptr = rt_current_thread->plib_reent;
+                else
+                    _impure_ptr = &rt_current_thread->lib_reent;
             }
             else
             {

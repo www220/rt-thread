@@ -414,14 +414,15 @@ char *getcwd (char *pt, size_t size)
 	return (char *)sys_call2(__NR_getcwd, (uintptr_t)pt, size);
 }
 
+extern char **environ;
+static char ***p_environ = &environ;
 int clearenv (void)
 {
-	extern char **environ;
 	//make environ alloc
 	setenv("CLEAR","PASS",0);
 	//
-	free(environ);
-	environ = NULL;
+	*p_environ = realloc(*p_environ,sizeof(char *));
+	(*p_environ)[0] = NULL;
 	return 0;
 }
 

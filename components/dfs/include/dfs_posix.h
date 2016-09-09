@@ -108,6 +108,7 @@ long telldir(DIR *d);
 void seekdir(DIR *d, off_t offset);
 void rewinddir(DIR *d);
 int closedir(DIR* d);
+int getdents(int file, struct dirent *dirp, rt_size_t nbytes);
 
 #else
 /* use newlib header file */
@@ -139,6 +140,7 @@ int symlink(const char * oldpath, const char * newpath);
 int readlink(const char *path, char *buf, size_t bufsiz);
 int truncate(const char *path, rt_off_t length);
 int ftruncate(int fildes, rt_off_t length);
+int sendfile(int out_fd, int in_fd, rt_off_t *offset, rt_size_t count);
 
 /* directory api*/
 int rmdir(const char *path);

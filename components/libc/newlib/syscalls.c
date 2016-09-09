@@ -402,10 +402,15 @@ void abort(void)
 #include <rthw.h>
 #include "linux-syscall.h"
 #include "linux-usedef.h"
-extern void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_uint32_t size);
+
+#include <shell.h>
+extern struct finsh_shell *shell;
+
+extern void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_int32_t size);
 extern rt_uint32_t rt_process_brk(rt_process_t module, rt_uint32_t addr);
 extern int rt_process_fork(rt_process_t module);
 extern int rt_process_vfork(rt_process_t module);
+extern int rt_process_execve(rt_process_t module, const char*file, const char **argv, const char **envp);
 extern int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt);
 static inline int ret_err(int ret)
 {
@@ -535,7 +540,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_reboot:
     {
-        if ((parm1 != 0xfee1dead) || (parm1 != 0x28121969))
+        if ((parm1 != 0xfee1dead) || (parm2 != 0x28121969))
             return -EINVAL;
         if (parm3 == RB_ENABLE_CAD || parm3 == RB_DISABLE_CAD)
             return 0;
@@ -554,12 +559,13 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_execve:
     {
         const char *file = (const char *)rt_process_conv_ptr(module,parm1,0);
-        rt_kprintf("syscall execve %s\n",file);
-        return 0;
+        const char **argv = (parm2)?(rt_process_conv_ptr(module,parm2,-1)):(0);
+        const char **envp = (parm3)?(rt_process_conv_ptr(module,parm3,-1)):(0);
+        return rt_process_execve(module,file,argv,envp);;
     }
-    case SYS_wait4+1111:
+    case SYS_wait4:
     {
-        int *status = (parm2)?((int *)rt_process_conv_ptr(module,parm2,sizeof(int))):RT_NULL;
+        int *status = (parm2)?(rt_process_conv_ptr(module,parm2,sizeof(int *))):(0);
         return rt_process_waitpid(module,(pid_t)parm1,status,parm3);
     }
     case SYS_getuid:
@@ -586,25 +592,29 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_link:
     {
         errno = 0;
-        return ret_err(link((const char *)rt_process_conv_ptr(module,parm1,0),
-                (const char *)rt_process_conv_ptr(module,parm2,0)));
+        const char *oldpath = (const char *)rt_process_conv_ptr(module,parm1,0);
+        const char *newpath = (const char *)rt_process_conv_ptr(module,parm2,0);
+        return ret_err(link(oldpath,newpath));
     }
     case SYS_symlink:
     {
         errno = 0;
-        return ret_err(symlink((const char *)rt_process_conv_ptr(module,parm1,0),
-                (const char *)rt_process_conv_ptr(module,parm2,0)));
+        const char *oldpath = (const char *)rt_process_conv_ptr(module,parm1,0);
+        const char *newpath = (const char *)rt_process_conv_ptr(module,parm2,0);
+        return ret_err(symlink(oldpath,newpath));
     }
     case SYS_readlink:
     {
         errno = 0;
-        return ret_err(readlink((const char *)rt_process_conv_ptr(module,parm1,0),
-                (char *)rt_process_conv_ptr(module,parm2,parm3),parm3));
+        const char *file = (const char *)rt_process_conv_ptr(module,parm1,0);
+        char *buf = (char *)rt_process_conv_ptr(module,parm2,parm3);
+        return ret_err(readlink(file,buf,parm3));
     }
     case SYS_truncate:
     {
         errno = 0;
-        return ret_err(truncate((const char *)rt_process_conv_ptr(module,parm1,0),parm2));
+        const char *file = (const char *)rt_process_conv_ptr(module,parm1,0);
+        return ret_err(truncate(file,parm2));
     }
     case SYS_ftruncate:
     {
@@ -626,74 +636,85 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_rmdir:
     {
         errno = 0;
-        return ret_err(unlink((const char *)rt_process_conv_ptr(module,parm1,0)));
+        const char *file = (const char *)rt_process_conv_ptr(module,parm1,0);
+        return ret_err(unlink(file));
     }
     case SYS_rename:
     {
         errno = 0;
-        return ret_err(rename((const char *)rt_process_conv_ptr(module,parm1,0),
-                (const char *)rt_process_conv_ptr(module,parm2,0)));
+        const char *oldpath = (const char *)rt_process_conv_ptr(module,parm1,0);
+        const char *newpath = (const char *)rt_process_conv_ptr(module,parm2,0);
+        return ret_err(rename(oldpath,newpath));
     }
     case SYS_mkdir:
     {
         errno = 0;
-        return ret_err(mkdir((const char *)rt_process_conv_ptr(module,parm1,0),parm2));
+        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
+        return ret_err(mkdir(path,parm2));
     }
     case SYS_lseek:
     {
         errno = 0;
-        return ret_err(lseek(parm1, parm2, parm3));
+        return ret_err(lseek(parm1,parm2,parm3));
     }
     case SYS_stat:
     {
         errno = 0;
-        return ret_err(stat((const char *)rt_process_conv_ptr(module,parm1,0),
-                (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
+        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
+        struct stat *buf = (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat));
+        return ret_err(stat(path,buf));
     }
     case SYS_lstat:
     {
         errno = 0;
-        return ret_err(lstat((const char *)rt_process_conv_ptr(module,parm1,0),
-                (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
+        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
+        struct stat *buf = (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat));
+        return ret_err(lstat(path,buf));
     }
     case SYS_fstat:
     {
         errno = 0;
-        return ret_err(fstat(parm1, (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat))));
+        struct stat *buf = (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat));
+        return ret_err(fstat(parm1,buf));
     }
     case SYS_statfs:
     {
         errno = 0;
-        return ret_err(statfs((const char *)rt_process_conv_ptr(module,parm1,0),
-                (struct statfs *)rt_process_conv_ptr(module,parm2,sizeof(struct statfs))));
+        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
+        struct statfs *buf = (struct statfs *)rt_process_conv_ptr(module,parm2,sizeof(struct statfs));
+        return ret_err(statfs(path,buf));
     }
     case SYS_fstatfs:
     {
         errno = 0;
-        return ret_err(fstatfs(parm1,(struct statfs *)rt_process_conv_ptr(module,parm2,sizeof(struct statfs))));
+        struct statfs *buf = (struct statfs *)rt_process_conv_ptr(module,parm2,sizeof(struct statfs));
+        return ret_err(fstatfs(parm1,buf));
     }
     case SYS_creat:
     {
         errno = 0;
-        return ret_err(open((const char*)rt_process_conv_ptr(module,parm1,0), O_TRUNC|O_WRONLY|O_CREAT, parm2));
+        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
+        return ret_err(open(path,O_TRUNC|O_WRONLY|O_CREAT, parm2));
     }
     case SYS_open:
     {
        errno = 0;
-       rt_kprintf("errno:%x\n",__errno());
        if (parm1 == 0)
            return -EINVAL;
-       return ret_err(open((const char*)rt_process_conv_ptr(module,parm1,0), parm2, parm3));
+       const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
+       return ret_err(open(path,parm2,parm3));
     }
     case SYS_read:
     {
        errno = 0;
-       return ret_err(read(parm1, rt_process_conv_ptr(module,parm2,parm3), parm3));
+       void *buf = rt_process_conv_ptr(module,parm2,3);
+       return ret_err(read(parm1,buf,parm3));
     }
     case SYS_write:
     {
        errno = 0;
-       return ret_err(write(parm1, rt_process_conv_ptr(module,parm2,parm3), parm3));
+       void *buf = rt_process_conv_ptr(module,parm2,3);
+       return ret_err(write(parm1,buf,parm3));
     }
     case SYS_close:
     {
@@ -704,38 +725,14 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     {
         errno = 0;
         extern int getdents(int file, struct dirent *dirp, rt_size_t nbytes);
-        return ret_err(getdents(parm1, (struct dirent*)rt_process_conv_ptr(module,parm2,parm3), parm3));
+        struct dirent* buf = (struct dirent*)rt_process_conv_ptr(module,parm2,parm3);
+        return ret_err(getdents(parm1,buf,parm3));
     }
     case SYS_sendfile:
     {
-        char buf[4096];
-        int rc,len,readlen = 0;
+        errno = 0;
         off_t *off = (parm3)?(rt_process_conv_ptr(module,parm3,sizeof(off_t))):(0);
-        if (off)
-        {
-            errno = 0;
-            rc = lseek(parm2,*off,0);
-            if (rc < 0)
-                return ret_err(rc);
-        }
-        while (parm4)
-        {
-            errno = 0;
-            len = (parm4>sizeof(buf))?(sizeof(buf)):(parm4);
-            rc = read(parm2,buf,len);
-            if (rc < 0)
-                return ret_err(rc);
-            rc = write(parm1,buf,rc);
-            if (rc < 0)
-                return ret_err(rc);
-            readlen += rc;
-            if (rc < len)
-                break;
-            parm4 -= rc;
-        }
-        if (off)
-            *off += readlen;
-        return readlen;
+        return ret_err(sendfile(parm1,parm2,off,parm3));
     }
     case SYS_getcwd:
     {
@@ -745,7 +742,8 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_chdir:
     {
         errno = 0;
-        return ret_err(chdir((const char*)rt_process_conv_ptr(module,parm1,0)));
+        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
+        return ret_err(chdir(path));
     }
     case SYS_fsync:
     {
@@ -754,53 +752,55 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_poll:
     {
-        return parm2;
+        rt_err_t ret = rt_sem_take(&shell->rx_sem, parm3);
+        return (ret==RT_EOK)?1:0;
     }
     case SYS_gettimeofday:
     {
         errno = 0;
-        struct timezone *zone = (parm2)?((struct timezone *)rt_process_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
-        return ret_err(gettimeofday((struct timeval *)rt_process_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
+        struct timeval *tim = (struct timeval *)rt_process_conv_ptr(module,parm1,sizeof(struct timeval));
+        struct timezone *zone = (parm2)?(rt_process_conv_ptr(module,parm2,sizeof(struct timezone))):(0);
+        return ret_err(gettimeofday(tim,zone));
     }
     case SYS_settimeofday:
     {
         errno = 0;
-        struct timezone *zone = (parm2)?((struct timezone *)rt_process_conv_ptr(module,parm2,sizeof(struct timezone))):RT_NULL;
-        return ret_err(settimeofday((struct timeval *)rt_process_conv_ptr(module,parm1,sizeof(struct timeval)),zone));
+        struct timeval *tim = (struct timeval *)rt_process_conv_ptr(module,parm1,sizeof(struct timeval));
+        struct timezone *zone = (parm2)?(rt_process_conv_ptr(module,parm2,sizeof(struct timezone))):(0);
+        return ret_err(settimeofday(tim,zone));
     }
     case SYS_ioctl:
     {
-        rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
         switch(parm2)
         {
         case TIOCGWINSZ:
         {
             struct winsize *win = (struct winsize *)rt_process_conv_ptr(module,parm3,sizeof(struct winsize));
-            memset(win,0,sizeof(struct winsize));
-            win->ws_col = 80;
-            win->ws_row = 60;
-            return 0;
+            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_GETWS,win));
         }
         case TIOCSWINSZ:
         {
             struct winsize *win = (struct winsize *)rt_process_conv_ptr(module,parm3,sizeof(struct winsize));
+            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_SETWS,win));
         }
         case TCGETS:
         {
             struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
-            memset(ios,0,sizeof(struct termios));
-            ios->c_iflag = (BRKINT | ISTRIP | ICRNL | IMAXBEL);
-            ios->c_oflag = (OPOST | ONLCR);
-            ios->c_cflag = (B115200 | CS8 | CREAD | HUPCL | CLOCAL);
-            ios->c_lflag = (ICANON | ISIG | IEXTEN | ECHOE | ECHOKE | ECHOCTL);
-            ios->c_cc[VERASE] = 0177;
-            return 0;
+            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_GETS,ios));
         }
         case TCSETS:
+        case TCSETSW:
+        case TCSETSF:
         {
             struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
+            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_SETS+(parm2-TCSETS),ios));
+        }
+        case TCFLSH:
+        {
+            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_FLSH,0));
         }
         }
+        rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
         return -ENOTSUP;
     }
     case SYS_fcntl:

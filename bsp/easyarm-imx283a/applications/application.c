@@ -237,7 +237,7 @@ static void rt_thread_entry_main(void* parameter)
 
 #if defined(RT_USING_MTD_NAND) && defined(RT_USING_DFS_YAFFS2)
     if (dfs_mount("nand0", "/", "yaffs2", 0, 0) == 0) {
-        mkdir("/tmp", 666);
+        mkdir("/etc", 666);
         mkdir("/var", 666);
         mkdir("/rom", 666);
         mkdir("/dev", 666);
@@ -252,34 +252,6 @@ static void rt_thread_entry_main(void* parameter)
         mkdir("/usr/bin", 666);
         mkdir("/usr/sbin", 666);
         mkdir("/usr/lib", 666);
-
-        if (dfs_file_stat("/etc/passwd", &st) != 0)
-        {
-        	FILE *fp = fopen("/etc/passwd", "w+");
-        	if (fp)
-        	{
-        		fprintf(fp,"root:x:0:0:root:/root:/bin/sh\n");
-        		fclose(fp);
-        	}
-        }
-        if (dfs_file_stat("/etc/group", &st) != 0)
-        {
-        	FILE *fp = fopen("/etc/group", "w+");
-        	if (fp)
-        	{
-        		fprintf(fp,"root::0:root\n");
-        		fclose(fp);
-        	}
-        }
-        if (dfs_file_stat("/etc/shadow", &st) != 0)
-        {
-        	FILE *fp = fopen("/etc/shadow", "w+");
-        	if (fp)
-        	{
-        		fprintf(fp,"root:fAwTdQCthcZf2:0:0:99999:7:::\n");
-        		fclose(fp);
-        	}
-        }
         fs_system_init = 1;
         rt_kprintf("File System initialized!\n");
     } else {
@@ -318,10 +290,13 @@ static void rt_thread_entry_main(void* parameter)
     libc_system_init();
 #endif
 
+#define RTT_DEF_CONF    "/etc/syscfg.cfg"
+#define RTT_PASSWD      "/etc/passwd"
+#define RTT_GROUP       "/etc/group"
+#define RTT_SHADOW      "/etc/shadow"
 #if defined(RT_USING_DFS)
-#define RTT_DEF_CONF "/etc/syscfg.cfg"
     inittmppath();
-    if (PZ[0] && dfs_file_stat(RTT_DEF_CONF, &st) == 0)
+    if (PZ[0] && stat(RTT_DEF_CONF, &st) == 0)
     {
         char buf[100];
         memset(buf, 0, sizeof(buf));
@@ -354,6 +329,34 @@ static void rt_thread_entry_main(void* parameter)
         GetPrivateStringData("dhcp",buf,100,RTT_DEF_CONF);
         if (buf[0])
             NET_DHCP = atol(buf);
+    }
+
+    if (stat(RTT_PASSWD, &st) != 0 || st.st_size < 29)
+    {
+    	FILE *fp = fopen("/etc/passwd", "w+");
+    	if (fp)
+    	{
+    		fprintf(fp,"root:x:0:0:root:/root:/bin/sh\n");
+    		fclose(fp);
+    	}
+    }
+    if (stat(RTT_GROUP, &st) != 0 || st.st_size < 12)
+    {
+    	FILE *fp = fopen("/etc/group", "w+");
+    	if (fp)
+    	{
+    		fprintf(fp,"root::0:root\n");
+    		fclose(fp);
+    	}
+    }
+    if (stat(RTT_SHADOW, &st) != 0 || st.st_size < 10)
+    {
+    	FILE *fp = fopen("/etc/shadow", "w+");
+    	if (fp)
+    	{
+    		fprintf(fp,"root:fAwTdQCthcZf2:0:0:99999:7:::\n");
+    		fclose(fp);
+    	}
     }
 #endif
 

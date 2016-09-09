@@ -552,7 +552,10 @@ static struct rt_process *_load_exec_object(const char *name,
                 continue;
 
             if (rt_strcmp((const char *)(strtab + symtab[i].st_name), "_impure_ptr") == 0)
-                module->impure_ptr = (rt_uint32_t)symtab[i].st_value;
+            {
+                struct _reent **impure_ptr = (struct _reent **)(module->module_space+symtab[i].st_value-vstart_addr);
+                module->impure_ptr = *impure_ptr;
+            }
         }
     }
 
@@ -756,7 +759,6 @@ rt_process_t rt_process_do_main(const char *name,
             /* hold thread stack */
             mmu_userunmap(module->pid,module->vstart_addr-RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
             mmu_userunmap(module->pid,module->vstart_addr-RT_USING_PROCESS_STKSZ-2*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
-            mmu_userunmap(module->pid,module->vstart_addr-RT_USING_PROCESS_STKSZ-RT_ALIGN(sizeof(struct _reent),1024)-3*RT_MM_PAGE_SIZE,RT_MM_PAGE_SIZE,0);
         }
         else
         {
@@ -855,7 +857,7 @@ rt_process_t rt_process_do_main(const char *name,
     module->module_thread->process_id = (void *)module;
     module->module_thread->sp = (void *)module->vstart_addr-(module->module_thread->stack_addr+module->module_thread->stack_size-module->module_thread->sp)-RT_MM_PAGE_SIZE;
     module->module_thread->stack_addr = (void *)module->vstart_addr-RT_USING_PROCESS_STKSZ-RT_MM_PAGE_SIZE;
-    module->module_thread->plib_reent = (struct _reent *)(module->vstart_addr-RT_USING_PROCESS_STKSZ-RT_ALIGN(sizeof(struct _reent),1024)-2*RT_MM_PAGE_SIZE);
+    module->module_thread->plib_reent = module->impure_ptr;
     struct process_main_info *main_info = (struct process_main_info*)module->module_cmd_line;
     main_info->module_cmd_line = module->module_thread->parameter+sizeof(struct process_main_info);
     main_info->module_env_line = main_info->module_cmd_line+main_info->module_cmd_size+1;
@@ -1434,12 +1436,14 @@ rt_uint32_t rt_process_brk(rt_process_t module, rt_uint32_t addr)
     return addr;
 }
 
-void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_uint32_t size)
+void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_int32_t size)
 {
     rt_uint32_t inmem = module->vstart_addr+module->module_size+module->page_cnt*RT_MM_PAGE_SIZE;
     rt_uint32_t base = RT_ALIGN_DOWN(ptr,RT_MM_PAGE_SIZE);
     do
     {
+        if (ptr == 0)
+            break;
         if (base < module->vstart_addr - RT_PROCESS_MEMMAKE - RT_USING_PROCESS_STKSZ)
             break;
         if (base > inmem)
@@ -1462,7 +1466,30 @@ void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_uint32_t size
                 break;
             size++;
         }
-        //--calc strlen
+        //calc char** buflen
+        else if (size == -1)
+        {
+            char **buf = (char **)ptr;
+            while (*buf)
+            {
+                if ((rt_uint32_t)buf > inmem)
+                {
+                    buf = RT_NULL;
+                    break;
+                }
+                buf++;
+                size+=sizeof(char *);
+            }
+            if (buf == RT_NULL)
+                break;
+            size+=sizeof(char *);
+        }
+        //err parm
+        else if (size < -1)
+        {
+        	break;
+        }
+        //--calc real buflen
         rt_uint32_t end = RT_ALIGN(ptr+size,RT_MM_PAGE_SIZE);
         if (end > inmem)
             break;
@@ -1705,6 +1732,11 @@ int rt_process_vfork(rt_process_t module)
     	return -ENOMEM;
     }
     return 0;
+}
+
+int rt_process_execve(rt_process_t module, const char*file, const char **argv, const char **envp)
+{
+	return 0;
 }
 
 int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)

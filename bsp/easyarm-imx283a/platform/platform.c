@@ -8,7 +8,11 @@
 
 void inittmppath(void)
 {
-    mkdir("/var/tmp", 666);
+    struct stat st;
+    if (stat("/var/tmp",&st) != 0)
+        mkdir("/var/tmp", 666);
+    if (stat("/tmp",&st) != 0)
+        symlink("/var/tmp","/tmp");
     cleartmppath();
 }
 

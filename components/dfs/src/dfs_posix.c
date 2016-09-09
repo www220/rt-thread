@@ -574,6 +574,41 @@ int truncate(const char *path, off_t length)
 }
 RTM_EXPORT(truncate);
 
+int sendfile(int out_fd, int in_fd, rt_off_t *offset, rt_size_t count)
+{
+    char buf[4096];
+    int result;
+    int readlen;
+
+    if (offset)
+    {
+        result = lseek(in_fd,*offset,0);
+        if (result < 0)
+            return -1;
+    }
+
+    readlen = 0;
+    while (count)
+    {
+        errno = 0;
+        int len = (count>sizeof(buf))?(sizeof(buf)):(count);
+        result = read(in_fd,buf,len);
+        if (result < 0)
+            return -1;
+        result = write(out_fd,buf,result);
+        if (result < 0)
+            return -1;
+        readlen += result;
+        if (result < len)
+            break;
+        count -= result;
+    }
+    if (offset)
+        *offset += readlen;
+    return readlen;
+}
+RTM_EXPORT(sendfile);
+
 /**
  * this function is a POSIX compliant version, which will return the
  * information about a mounted file system.

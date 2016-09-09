@@ -142,14 +142,9 @@ static rt_err_t _rt_thread_init(struct rt_thread *thread,
     {
         extern void rt_hw_stack_swiuser(void *stack_addr);
         rt_hw_stack_swiuser(thread->sp);
-        _REENT_INIT_PTR(thread->plib_reent);
-        _REENT_INIT_PTR(&thread->lib_reent);
     }
-    else
-    {
-        thread->plib_reent = RT_NULL;
-        _REENT_INIT_PTR(&thread->lib_reent);
-    }
+    thread->plib_reent = RT_NULL;
+    _REENT_INIT_PTR(&thread->lib_reent);
 #endif
 
     /* priority init */
@@ -392,7 +387,7 @@ rt_thread_t rt_thread_create2(const char *name,
         return RT_NULL;
 
     thread->flags |= RT_OBJECT_FLAG_PROCESS;
-    thread->plib_reent = stack_start-RT_ALIGN(sizeof(struct _reent), 1024)-RT_MM_PAGE_SIZE;
+    thread->plib_reent = RT_NULL;
 
     _rt_thread_init(thread,
                     name,

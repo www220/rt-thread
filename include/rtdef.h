@@ -826,11 +826,18 @@ enum rt_device_class_type
  * special device commands
  */
 #define RT_DEVICE_CTRL_CHAR_STREAM      0x10            /**< stream mode on char device */
-#define RT_DEVICE_CTRL_CHAR_SETFILE     0xF0            /**< set devfs file */
-#define RT_DEVICE_CTRL_CHAR_GETFILE     0xF1            /**< get devfs file */
-#define RT_DEVICE_CTRL_CHAR_CLRFILE     0xF2            /**< clr devfs file */
-#define RT_DEVICE_CTRL_CHAR_GETREAD     0xE0            /**< read already byte */
-#define RT_DEVICE_CTRL_CHAR_GETWRITE    0xE1            /**< write remaining byte */
+#define RT_DEVICE_CTRL_CHAR_SETFILE     0x11            /**< set devfs file */
+#define RT_DEVICE_CTRL_CHAR_GETFILE     0x12            /**< get devfs file */
+#define RT_DEVICE_CTRL_CHAR_CLRFILE     0x13            /**< clr devfs file */
+#define RT_DEVICE_CTRL_CHAR_GETREAD     0x14            /**< read already byte */
+#define RT_DEVICE_CTRL_CHAR_GETWRITE    0x15            /**< write remaining byte */
+#define RT_DEVICE_CTRL_GETS             0xE0            /**< ioctl TCGETS */
+#define RT_DEVICE_CTRL_SETS             0xE1            /**< ioctl TCSETS */
+#define RT_DEVICE_CTRL_SETSW            0xE2            /**< ioctl TCSETSW */
+#define RT_DEVICE_CTRL_SETSF            0xE3            /**< ioctl TCSETSF */
+#define RT_DEVICE_CTRL_GETWS            0xE4            /**< ioctl TIOCGWINSZ */
+#define RT_DEVICE_CTRL_SETWS            0xE5            /**< ioctl TIOCSWINSZ */
+#define RT_DEVICE_CTRL_FLSH             0xE6            /**< ioctl TCSETSF */
 #define RT_DEVICE_CTRL_BLK_GETGEOME     0x10            /**< get geometry information   */
 #define RT_DEVICE_CTRL_BLK_SYNC         0x11            /**< flush data to block device */
 #define RT_DEVICE_CTRL_BLK_ERASE        0x12            /**< erase block on block device */
@@ -1063,7 +1070,7 @@ struct rt_process
     rt_uint16_t                  nref;                  /**< reference count */
     rt_uint16_t                  pid;                   /**< mmu pid */
     rt_uint16_t                  tpid;                  /**< process pid */
-    rt_uint32_t                  impure_ptr;            /**< newlibc reent */
+    struct _reent               *impure_ptr;            /**< newlibc reent */
     rt_uint16_t                  jmppid;                /**< vfork pid */
     rt_uint16_t                  jmpsplen;              /**< vfork buf */
     jmp_buf                      jmpbuf;                /**< vfork buf */
