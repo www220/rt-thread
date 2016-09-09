@@ -28,7 +28,8 @@ OBJS = main.o \
 	linux/termios.o \
 	linux/cfspeed.o \
 	linux/tcdrain.o \
-	linux/tcsendbrk.o
+	linux/tcsendbrk.o \
+	libbb/pwd_grp.o
 
 %.o:%.c
 	@echo CC $<
@@ -46,5 +47,6 @@ clean:
 	rm -f *.o
 	rm -f posix/*.o
 	rm -f linux/*.o
+	rm -f libbb/*.o
 	rm -f rtt_syscall.a rtt_do.mo
 

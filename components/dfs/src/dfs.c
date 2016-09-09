@@ -452,8 +452,9 @@ static struct dfs_fd *dfs_file_isdevfs(int fileno)
 		fd_put(d);
 		return RT_NULL;
 	}
-	//设备必须打开
-	if ((device->open_flag & RT_DEVICE_OFLAG_OPEN) != RT_DEVICE_OFLAG_OPEN)
+	//设备必须打开且有中断，否则wait不了
+	if ((device->open_flag & (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_FLAG_INT_RX))
+			!= (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_FLAG_INT_RX))
 	{
 		fd_put(d);
 		return RT_NULL;
@@ -476,20 +477,20 @@ int dfs_file_select(int maxfdp,
 {
 	register rt_base_t temp;
 	dfs_select_info_t sel;
-	rt_err_t tak;
 	int i,j,count[3];
-	int status,ret;
-	struct dfs_fd *d;
+	rt_err_t ret;
+	int result;
 
 	if (maxfdp <= 0 || maxfdp > DFS_FD_MAX
 		|| (readset == RT_NULL && writeset == RT_NULL && exceptset == RT_NULL))
 		return -1;
 
-	ret = 0;
-	status = RT_EOK;
+	result = 0;
 	count[0] = count[1] = count[2] = 0;
 	//先读取一次别浪费了
 	{rt_uint32_t recvset[3][DFS_FD_MAX+31/32] = {{0}};
+	int status = RT_EOK;
+	struct dfs_fd *d = RT_NULL;
 	for (i=0; i<maxfdp; i++)
 	{
 		if (readset && (readset[i/32] & (1<<(i%32))))
@@ -559,12 +560,12 @@ int dfs_file_select(int maxfdp,
 		}
 	}
 	//取最大值
-	ret = count[0];
-	if (ret < count[1])
-		ret = count[1];
-	if (ret < count[2])
-		ret = count[2];
-	if (ret > 0)
+	result = count[0];
+	if (result < count[1])
+		result = count[1];
+	if (result < count[2])
+		result = count[2];
+	if (result > 0)
 	{
 		//复制触发数据
 		if (readset)
@@ -573,7 +574,7 @@ int dfs_file_select(int maxfdp,
 			rt_memcpy(writeset,recvset[1],maxfdp+31/32);
 		if (exceptset)
 			rt_memcpy(exceptset,recvset[2],maxfdp+31/32);
-		return ret;
+		return result;
 	}}
 
 	//创建对象
@@ -599,10 +600,10 @@ int dfs_file_select(int maxfdp,
     /* unlock interrupt */
     rt_hw_interrupt_enable(temp);
 
-	ret = 0;
+    result = 0;
 	count[0] = count[1] = count[2] = 0;
 	//等待别人触发
-	tak = rt_sem_take(&sel->sem,timeout);
+	ret = rt_sem_take(&sel->sem,timeout);
 	/* lock interrupt */
 	temp = rt_hw_interrupt_disable();
 	/* remove object into information object list */
@@ -610,7 +611,7 @@ int dfs_file_select(int maxfdp,
 	/* unlock interrupt */
 	rt_hw_interrupt_enable(temp);
 
-	if (tak == RT_EOK)
+	if (ret == RT_EOK)
 	{
 		//复制触发数据
 		for (i=0; i<3; i++)
@@ -628,16 +629,16 @@ int dfs_file_select(int maxfdp,
 			}
 		}
 		//取最大值
-		ret = count[0];
-		if (ret < count[1])
-			ret = count[1];
-		if (ret < count[2])
-			ret = count[2];
+		result = count[0];
+		if (result < count[1])
+			result = count[1];
+		if (result < count[2])
+			result = count[2];
 	}
 
 	rt_sem_detach(&(sel->sem));
 	rt_free(sel);
-    return ret;
+    return result;
 }
 RTM_EXPORT(dfs_file_select);
 #endif

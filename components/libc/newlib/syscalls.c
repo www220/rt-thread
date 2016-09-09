@@ -399,6 +399,7 @@ void abort(void)
 }
 
 #ifdef RT_USING_PROCESS
+#include <rthw.h>
 #include "linux-syscall.h"
 #include "linux-usedef.h"
 extern void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_uint32_t size);
@@ -423,6 +424,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         rt_uint32_t parm4, rt_uint32_t parm5,
         rt_uint32_t parm6)
 {
+	register rt_base_t temp;
 	rt_process_t module = rt_process_self();
 
     RT_ASSERT(module != RT_NULL);
@@ -449,7 +451,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_fchown:
     case SYS_lchown:
     {
-        return -EPERM;
+        return 0;
     }
     case SYS_nanosleep:
     {
@@ -516,14 +518,19 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     		return -EINVAL;
     	if (pidinfo[parm2-1][0] < 100)
     		return -ESRCH;
-    	return pidinfo[parm1-1][2] = parm2;
+    	temp = rt_hw_interrupt_disable();
+    	pidinfo[parm1-1][2] = parm2;
+    	rt_hw_interrupt_enable(temp);
+    	return parm2;
     }
     case SYS_setsid:
     {
     	if (module->tpid == pidinfo[module->tpid-1][2])
     		return -EPERM;
+    	temp = rt_hw_interrupt_disable();
     	pidinfo[module->tpid-1][2] = module->tpid;
     	pidinfo[module->tpid-1][3] = module->tpid;
+    	rt_hw_interrupt_enable(temp);
     	return module->tpid;
     }
     case SYS_reboot:
@@ -563,13 +570,9 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         return 0;
     }
     case SYS_setuid:
-    {
-        rt_kprintf("setuid %d\n",parm1);
-        return 0;
-    }
     case SYS_setgid:
+    case SYS_setgroups:
     {
-        rt_kprintf("setgid %d\n",parm1);
         return 0;
     }
     case SYS_getgroups:
@@ -579,15 +582,6 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         gid_t *groups = rt_process_conv_ptr(module,parm2,parm1*sizeof(gid_t));
         groups[0] = 0;
         return 1;
-    }
-    case SYS_setgroups:
-    {
-        gid_t *groups = rt_process_conv_ptr(module,parm2,parm1*sizeof(gid_t));
-        if (parm1 >= 1)
-            rt_kprintf("setgroups [%d] %s\n",groups[0],((parm1==1)?"":"..."));
-        else
-        	rt_kprintf("setgroups no\n");
-        return 0;
     }
     case SYS_link:
     {
@@ -686,6 +680,9 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_open:
     {
        errno = 0;
+       rt_kprintf("errno:%x\n",__errno());
+       if (parm1 == 0)
+           return -EINVAL;
        return ret_err(open((const char*)rt_process_conv_ptr(module,parm1,0), parm2, parm3));
     }
     case SYS_read:
@@ -787,22 +784,21 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         case TIOCSWINSZ:
         {
             struct winsize *win = (struct winsize *)rt_process_conv_ptr(module,parm3,sizeof(struct winsize));
-            return 0;
         }
         case TCGETS:
         {
             struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
             memset(ios,0,sizeof(struct termios));
-            ios->c_iflag = ICRNL | IXON | IXOFF;
-            ios->c_oflag = OPOST | ONLCR;
-            ios->c_cflag = B115200 | CS8 | CREAD | HUPCL | CLOCAL;
-            ios->c_lflag = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | IEXTEN;
+            ios->c_iflag = (BRKINT | ISTRIP | ICRNL | IMAXBEL);
+            ios->c_oflag = (OPOST | ONLCR);
+            ios->c_cflag = (B115200 | CS8 | CREAD | HUPCL | CLOCAL);
+            ios->c_lflag = (ICANON | ISIG | IEXTEN | ECHOE | ECHOKE | ECHOCTL);
+            ios->c_cc[VERASE] = 0177;
             return 0;
         }
         case TCSETS:
         {
             struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
-            return 0;
         }
         }
         return -ENOTSUP;

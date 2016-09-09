@@ -117,6 +117,12 @@ int dfs_device_fs_close(struct dfs_fd *file)
     dev_id = (rt_device_t)file->data;
     RT_ASSERT(dev_id != RT_NULL);
 
+    // clr device fileno
+    extern struct dfs_fd fd_table[];
+    int fileno = file-fd_table;
+    rt_device_control(dev_id, RT_DEVICE_CTRL_CHAR_CLRFILE, &fileno);
+    //
+
     /* close device handler */
     result = rt_device_close(dev_id);
     if (result == RT_EOK)
@@ -132,6 +138,7 @@ int dfs_device_fs_close(struct dfs_fd *file)
 int dfs_device_fs_open(struct dfs_fd *file)
 {
     rt_err_t result;
+    rt_uint16_t oflag;
     rt_device_t device;
 
     if (file->flags & DFS_O_CREAT)
@@ -188,7 +195,12 @@ int dfs_device_fs_open(struct dfs_fd *file)
         return -DFS_STATUS_ENODEV;
 
     /* to open device */
-    result = rt_device_open(device, RT_DEVICE_OFLAG_RDWR);
+    oflag = RT_DEVICE_OFLAG_RDWR;
+    if (file->flags == DFS_O_RDONLY)
+        oflag = RT_DEVICE_OFLAG_RDONLY;
+    else if (file->flags == DFS_O_WRONLY)
+        oflag = RT_DEVICE_OFLAG_WRONLY;
+    result = rt_device_open(device, oflag);
     if (result == RT_EOK || result == -RT_ENOSYS)
     {
         // set device fileno

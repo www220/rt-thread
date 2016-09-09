@@ -73,16 +73,7 @@ static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_si
 	{
 		int ret = rt_device_read(device->device, pos, buffer, size);
 		if (ret > 0)
-		{
-			size = ret;
-			while (ret--)
-			{
-				if (((unsigned char *)buffer)[ret] == '\r')
-					((unsigned char *)buffer)[ret] = '\n';
-			}
-			rt_device_write(device->device, pos, buffer, size);
-			return size;
-		}
+			return ret;
 		rt_thread_delay(10);
 	} while (1);
 }

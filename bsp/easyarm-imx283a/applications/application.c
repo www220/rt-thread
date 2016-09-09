@@ -252,6 +252,34 @@ static void rt_thread_entry_main(void* parameter)
         mkdir("/usr/bin", 666);
         mkdir("/usr/sbin", 666);
         mkdir("/usr/lib", 666);
+
+        if (dfs_file_stat("/etc/passwd", &st) != 0)
+        {
+        	FILE *fp = fopen("/etc/passwd", "w+");
+        	if (fp)
+        	{
+        		fprintf(fp,"root:x:0:0:root:/root:/bin/sh\n");
+        		fclose(fp);
+        	}
+        }
+        if (dfs_file_stat("/etc/group", &st) != 0)
+        {
+        	FILE *fp = fopen("/etc/group", "w+");
+        	if (fp)
+        	{
+        		fprintf(fp,"root::0:root\n");
+        		fclose(fp);
+        	}
+        }
+        if (dfs_file_stat("/etc/shadow", &st) != 0)
+        {
+        	FILE *fp = fopen("/etc/shadow", "w+");
+        	if (fp)
+        	{
+        		fprintf(fp,"root:fAwTdQCthcZf2:0:0:99999:7:::\n");
+        		fclose(fp);
+        	}
+        }
         fs_system_init = 1;
         rt_kprintf("File System initialized!\n");
     } else {

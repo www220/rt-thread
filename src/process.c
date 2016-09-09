@@ -527,15 +527,15 @@ static struct rt_process *_load_exec_object(const char *name,
     /* construct process symbol table */
     for (index = 0; index < elf_module->e_shnum; index ++)
     {
-        /* find .dynsym section */
+        /* find .symtab section */
         rt_uint8_t *shstrab;
         shstrab = (rt_uint8_t *)module_ptr +
             shdr[elf_module->e_shstrndx].sh_offset;
-        if (rt_strcmp((const char *)(shstrab + shdr[index].sh_name), ELF_DYNSYM) == 0)
+        if (rt_strcmp((const char *)(shstrab + shdr[index].sh_name), ELF_SYMTAB) == 0)
             break;
     }
 
-    /* found .dynsym section */
+    /* found .symtab section */
     if (index != elf_module->e_shnum)
     {
         int i, count = 0;
@@ -548,11 +548,11 @@ static struct rt_process *_load_exec_object(const char *name,
         for (i = 0, count = 0; i < shdr[index].sh_size/sizeof(Elf32_Sym); i++)
         {
             if ((ELF_ST_BIND(symtab[i].st_info) != STB_GLOBAL) ||
-                (ELF_ST_TYPE(symtab[i].st_info) != STT_FUNC))
+                (ELF_ST_TYPE(symtab[i].st_info) != STT_OBJECT))
                 continue;
 
             if (rt_strcmp((const char *)(strtab + symtab[i].st_name), "_impure_ptr") == 0)
-                module->impure_ptr = (struct _reent **)(module->module_space + symtab[i].st_value);
+                module->impure_ptr = (rt_uint32_t)symtab[i].st_value;
         }
     }
 

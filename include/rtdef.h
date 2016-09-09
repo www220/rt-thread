@@ -826,10 +826,11 @@ enum rt_device_class_type
  * special device commands
  */
 #define RT_DEVICE_CTRL_CHAR_STREAM      0x10            /**< stream mode on char device */
-#define RT_DEVICE_CTRL_CHAR_SETFILE     0x80            /**< set devfs file */
-#define RT_DEVICE_CTRL_CHAR_GETFILE     0x81            /**< get devfs file */
-#define RT_DEVICE_CTRL_CHAR_GETREAD     0x82            /**< read already byte */
-#define RT_DEVICE_CTRL_CHAR_GETWRITE    0x83            /**< write remaining byte */
+#define RT_DEVICE_CTRL_CHAR_SETFILE     0xF0            /**< set devfs file */
+#define RT_DEVICE_CTRL_CHAR_GETFILE     0xF1            /**< get devfs file */
+#define RT_DEVICE_CTRL_CHAR_CLRFILE     0xF2            /**< clr devfs file */
+#define RT_DEVICE_CTRL_CHAR_GETREAD     0xE0            /**< read already byte */
+#define RT_DEVICE_CTRL_CHAR_GETWRITE    0xE1            /**< write remaining byte */
 #define RT_DEVICE_CTRL_BLK_GETGEOME     0x10            /**< get geometry information   */
 #define RT_DEVICE_CTRL_BLK_SYNC         0x11            /**< flush data to block device */
 #define RT_DEVICE_CTRL_BLK_ERASE        0x12            /**< erase block on block device */
@@ -1062,7 +1063,7 @@ struct rt_process
     rt_uint16_t                  nref;                  /**< reference count */
     rt_uint16_t                  pid;                   /**< mmu pid */
     rt_uint16_t                  tpid;                  /**< process pid */
-    struct _reent              **impure_ptr;            /**< newlibc reent */
+    rt_uint32_t                  impure_ptr;            /**< newlibc reent */
     rt_uint16_t                  jmppid;                /**< vfork pid */
     rt_uint16_t                  jmpsplen;              /**< vfork buf */
     jmp_buf                      jmpbuf;                /**< vfork buf */

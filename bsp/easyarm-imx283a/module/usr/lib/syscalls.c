@@ -167,175 +167,22 @@ __env_unlock (struct _reent *ptr)
 
 //#include<pwd.h>
 
-#define duser "root"
-#define dgroup "system"
-static struct passwd defpass = {duser, "", 0, 0, "", duser, "/root", "/bin/sh"};
-struct passwd *getpwuid (uid_t pid)
-{
-	if (pid != defpass.pw_uid)
-	{
-		errno = ENOENT;
-		return NULL;
-	}
-	return &defpass;
-}
-
-int getpwuid_r (__uid_t __uid,
-       struct passwd *__restrict __resultbuf,
-       char *__restrict __buffer, size_t __buflen,
-       struct passwd **__restrict __result)
-{
-	if (__resultbuf == NULL || __uid != defpass.pw_uid)
-	{
-		errno = ENOENT;
-		if (__result)
-			*__result = NULL;
-		return -1;
-	}
-	*__resultbuf = defpass;
-	if (__result)
-		*__result = __resultbuf;
-	return 0;
-}
-
-struct passwd *getpwnam (const char *name)
-{
-	if (name == NULL || strcmp(name,defpass.pw_name) != 0)
-	{
-		errno = ENOENT;
-		return NULL;
-	}
-	return &defpass;
-}
-
-int getpwnam_r (__const char *__restrict __name,
-       struct passwd *__restrict __resultbuf,
-       char *__restrict __buffer, size_t __buflen,
-       struct passwd **__restrict __result)
-{
-	if (__resultbuf == NULL || __name == NULL || strcmp(__name,defpass.pw_name) != 0)
-	{
-		errno = ENOENT;
-		if (__result)
-			*__result = NULL;
-		return -1;
-	}
-	*__resultbuf = defpass;
-	if (__result)
-		*__result = __resultbuf;
-	return 0;
-}
-
 int fchmod (int filedes, mode_t mode)
 {
-	return 0;
-}
-
-char *getlogin (void)
-{
-	return defpass.pw_name;
-}
-
-int getlogin_r (char *__name, size_t __name_len)
-{
-	if (__name == NULL || __name_len <= strlen(defpass.pw_name))
-	{
-		errno = ERANGE;
-		return -1;
-	}
-	strcpy(__name,defpass.pw_name);
-	return 0;
-}
-
-//#include<grp.h>
-static char *defgroupuser[] = {duser, NULL};
-static struct group defgroup = {dgroup, "", 0, defgroupuser};
-struct group *getgrgid (gid_t gid)
-{
-	if (gid != defgroup.gr_gid)
-	{
-		errno = ENOENT;
-		return NULL;
-	}
-	return &defgroup;
-}
-
-struct group *getgrnam (const char *name)
-{
-	if (name == NULL || strcmp(name,defgroup.gr_name) != 0)
-	{
-		errno = ENOENT;
-		return NULL;
-	}
-	return &defgroup;
-}
-
-int getgrgid_r (__gid_t __gid, struct group *__restrict __resultbuf,
-       char *__restrict __buffer, size_t __buflen,
-       struct group **__restrict __result)
-{
-	if (__resultbuf == NULL || __gid != defgroup.gr_gid)
-	{
-		errno = ENOENT;
-		if (__result)
-			*__result = NULL;
-		return -1;
-	}
-	*__resultbuf = defgroup;
-	if (__result)
-		*__result = __resultbuf;
-	return 0;
-}
-
-int getgrnam_r (__const char *__restrict __name,
-       struct group *__restrict __resultbuf,
-       char *__restrict __buffer, size_t __buflen,
-       struct group **__restrict __result)
-{
-	if (__resultbuf == NULL || __name == NULL || strcmp(__name,defgroup.gr_name) != 0)
-	{
-		errno = ENOENT;
-		if (__result)
-			*__result = NULL;
-		return -1;
-	}
-	*__resultbuf = defgroup;
-	if (__result)
-		*__result = __resultbuf;
-	return 0;
-}
-
-int initgroups (__const char *__user, __gid_t __group)
-{
-	return 0;
-}
-
-int	setgroups (int ngroups, const gid_t *grouplist)
-{
-	int rc = sys_call2(__NR_setgroups, ngroups, (uintptr_t)grouplist);
+	int rc = sys_call2(__NR_fchmod, filedes, mode);
 	return _set_errno(rc);
-}
-
-int getgrouplist (const char *user, gid_t group, gid_t *groups, int *ngroups)
-{
-	if (groups == NULL || ngroups == NULL 
-		|| user == NULL || strcmp(user,defgroup.gr_name) != 0
-		|| group != defgroup.gr_gid)
-	{
-		errno = ENOENT;
-		if (ngroups)
-			*ngroups = 0;
-		return -1;
-	}
-	groups[0] = defgroup.gr_gid;
-	*ngroups = 1;
-	return 0;
 }
 
 int fchown (int __filedes, uid_t __owner, gid_t __group)
 {
-	errno = EPERM;
-	return -1;
+	int rc = sys_call3(__NR_fchown, __filedes, __owner, __group);
+	return _set_errno(rc);
+}
+
+int setgroups (int ngroups, const gid_t *grouplist)
+{
+	int rc = sys_call2(__NR_setgroups, ngroups, (uintptr_t)grouplist);
+	return _set_errno(rc);
 }
 
 //#include<dirent.h>
