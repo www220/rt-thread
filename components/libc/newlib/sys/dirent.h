@@ -14,15 +14,19 @@
 #define FT_DIRECTORY	2	/* directory    */
 #define FT_USER			3	/* user defined */
 
+#define O_NDELAY        0x001000
+#define O_BINARY        0x010000
+#define O_TEXT          0x020000
+#define O_CLOEXEC       0x040000
+#define O_DIRECT        0x080000
 #define O_DIRECTORY     0x200000
-#define O_EXEC          0x400000
 
-#define DT_UNKNOWN		0
+#define DT_UNKNOWN      0
 #define DT_FIFO         1
 #define DT_CHR          2
-#define DT_REG			8
+#define DT_REG          8
 #define DT_BLK          6
-#define DT_DIR			4
+#define DT_DIR          4
 #define DT_LNK          10
 #define DT_SOCK         12
 #define DT_WHT          14

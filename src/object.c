@@ -525,9 +525,6 @@ rt_object_t rt_object_find(const char *name, rt_uint8_t type)
             /* there is no this process inside the system */
             if (module == RT_NULL) return RT_NULL;
 
-            /* get the object pool of process */
-            information = &(module->module_object[type]);
-
             /* get object name */
             while ((*name_ptr == '/') && (*name_ptr != '\0')) name_ptr ++;
             if (*name_ptr == '\0')
@@ -538,6 +535,28 @@ rt_object_t rt_object_find(const char *name, rt_uint8_t type)
 
             /* point to the object name */
             name = name_ptr;
+            if (type != RT_Object_Class_Thread) return RT_NULL;
+
+            /* enter critical */
+            rt_enter_critical();
+
+            for (node  = module->thread_list.next;
+                 node != &(module->thread_list);
+                 node  = node->next)
+            {
+                object = rt_list_entry(node, struct rt_object, list);
+                if (rt_strncmp(object->name, name, RT_NAME_MAX) == 0)
+                {
+                    /* leave critical */
+                    rt_exit_critical();
+
+                    return object;
+                }
+            }
+            /* leave critical */
+            rt_exit_critical();
+
+            return RT_NULL;
         }
     }
 #endif

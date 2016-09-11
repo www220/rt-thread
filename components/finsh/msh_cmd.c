@@ -359,6 +359,7 @@ int cmd_ps(int argc, char **argv)
     extern long list_thread(void);
     extern int list_module(void);
     extern int list_proc(void);
+    extern int list_file(void);
 
 #ifdef RT_USING_MODULE
     if ((argc == 2) && (strcmp(argv[1], "-m") == 0))
@@ -368,6 +369,11 @@ int cmd_ps(int argc, char **argv)
 #ifdef RT_USING_PROCESS
     if ((argc == 2) && (strcmp(argv[1], "-p") == 0))
         list_proc();
+    else
+#endif
+#ifdef RT_USING_DFS
+    if ((argc == 2) && (strcmp(argv[1], "-l") == 0))
+        list_file();
     else
 #endif
         list_thread();

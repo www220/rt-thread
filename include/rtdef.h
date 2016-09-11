@@ -828,9 +828,10 @@ enum rt_device_class_type
 #define RT_DEVICE_CTRL_CHAR_STREAM      0x10            /**< stream mode on char device */
 #define RT_DEVICE_CTRL_CHAR_SETFILE     0x11            /**< set devfs file */
 #define RT_DEVICE_CTRL_CHAR_GETFILE     0x12            /**< get devfs file */
-#define RT_DEVICE_CTRL_CHAR_CLRFILE     0x13            /**< clr devfs file */
-#define RT_DEVICE_CTRL_CHAR_GETREAD     0x14            /**< read already byte */
-#define RT_DEVICE_CTRL_CHAR_GETWRITE    0x15            /**< write remaining byte */
+#define RT_DEVICE_CTRL_CHAR_CHKFILE     0x13            /**< chk devfs file */
+#define RT_DEVICE_CTRL_CHAR_CLRFILE     0x14            /**< clr devfs file */
+#define RT_DEVICE_CTRL_CHAR_GETREAD     0x15            /**< read already byte */
+#define RT_DEVICE_CTRL_CHAR_GETWRITE    0x16            /**< write remaining byte */
 #define RT_DEVICE_CTRL_GETS             0xE0            /**< ioctl TCGETS */
 #define RT_DEVICE_CTRL_SETS             0xE1            /**< ioctl TCSETS */
 #define RT_DEVICE_CTRL_SETSW            0xE2            /**< ioctl TCSETSW */
@@ -1067,19 +1068,18 @@ struct rt_process
     rt_mutex_t                   page_mutex;            /**< process's mutex */
 #endif
 
-    rt_uint16_t                  nref;                  /**< reference count */
+    rt_list_t                    thread_list;           /**< process's thread list */
+    int                          file_list[DFS_FD_MAX]; /**< process's file list */
+
     rt_uint16_t                  pid;                   /**< mmu pid */
     rt_uint16_t                  tpid;                  /**< process pid */
     struct _reent               *impure_ptr;            /**< newlibc reent */
     rt_uint16_t                  jmppid;                /**< vfork pid */
-    rt_uint16_t                  jmpsplen;              /**< vfork buf */
-    jmp_buf                      jmpbuf;                /**< vfork buf */
-    void                        *jmpsp;                 /**< vfork buf */
-    rt_uint8_t                   jmpspbuf[256];         /**< vfork buf */
+    rt_uint16_t                  jmpsplen;              /**< vfork spbuf len */
+    jmp_buf                      jmpbuf;                /**< vfork jmpbuf */
+    void                        *jmpsp;                 /**< vfork jmpsp */
+    rt_uint8_t                   jmpspbuf[256];         /**< vfork spbuf */
     int                          exitcode;              /**< exit code */
-
-    /* object in this process, process object is the last basic object type */
-    struct rt_object_information module_object[RT_Object_Class_Unknown];
 };
 typedef struct rt_process *rt_process_t;
 

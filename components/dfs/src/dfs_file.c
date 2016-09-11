@@ -114,12 +114,8 @@ int dfs_file_open(struct dfs_fd *fd, const char *path, int flags)
         return result;
     }
 
-    fd->flags |= DFS_F_OPEN;
     if (flags & DFS_O_DIRECTORY)
-    {
         fd->type = FT_DIRECTORY;
-        fd->flags |= DFS_F_DIRECTORY;
-    }
 
     dfs_log(DFS_DEBUG_INFO, ("open successful"));
     return 0;
@@ -194,10 +190,7 @@ int dfs_file_read(struct dfs_fd *fd, void *buf, rt_size_t len)
     if (fs->ops->read == RT_NULL)
         return -DFS_STATUS_ENOSYS;
 
-    if ((result = fs->ops->read(fd, buf, len)) < 0)
-        fd->flags |= DFS_F_EOF;
-
-    return result;
+    return fs->ops->read(fd, buf, len);
 }
 
 /**

@@ -37,8 +37,9 @@ struct console_device
 	rt_device_t device; /* the actual device */
 	struct winsize win;
 	struct termios ios;
+	int file[32];
 };
-struct console_device _console;
+struct console_device _console,_tty;
 
 /* common device interface */
 static rt_err_t console_init(rt_device_t dev)
@@ -59,6 +60,8 @@ static rt_err_t console_init(rt_device_t dev)
     device->ios.c_cflag = (B115200 | CS8 | CREAD | HUPCL | CLOCAL);
     device->ios.c_lflag = (ICANON | ISIG | ECHO | IEXTEN | ECHOE|ECHOKE|ECHOCTL);
     memcpy(device->ios.c_cc,def_c_cc,sizeof(def_c_cc));
+
+    memset(&device->file,0,sizeof(device->file));
 	return ret;
 }
 
@@ -71,19 +74,18 @@ static rt_err_t console_open(rt_device_t dev, rt_uint16_t oflag)
 	RT_ASSERT(device != RT_NULL);
 
 	/* open this device and set the new device in finsh shell */
-	if (!(dev->flag & RT_DEVICE_FLAG_ACTIVATED)
-		|| (dev->open_flag & (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX))
-			!= (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX))
-	{
-		ret = rt_device_close(device->device);
-		ret = rt_device_open(device->device, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX);
-	}
-	return ret;
+	return rt_device_open(device->device, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
 }
 
 static rt_err_t console_close(rt_device_t dev)
 {
-	return RT_EOK;
+	rt_err_t ret = RT_EOK;
+	struct console_device* device;
+
+	device = (struct console_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	return rt_device_close(device->device);
 }
 
 #include <shell.h>
@@ -92,7 +94,7 @@ extern struct finsh_shell *shell;
 
 static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
 {
-	int ret;
+	int ret = 0;
 	struct console_device* device;
 
 	device = (struct console_device*)dev;
@@ -136,6 +138,12 @@ static rt_size_t console_write(rt_device_t dev, rt_off_t pos, const void* buffer
 	device = (struct console_device*)dev;
 	RT_ASSERT(device != RT_NULL);
 
+	//回车换行的转换
+	if (device->ios.c_oflag & ONLCR)
+		device->parent.open_flag |= RT_DEVICE_FLAG_STREAM;
+	else
+		device->parent.open_flag &= ~RT_DEVICE_FLAG_STREAM;
+
 	return rt_device_write(device->device, pos, buffer, size);
 }
 
@@ -161,10 +169,6 @@ static rt_err_t console_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 	case RT_DEVICE_CTRL_SETSW:
 	case RT_DEVICE_CTRL_SETSF:
 		rt_memcpy(&device->ios,args,sizeof(device->ios));
-		if (device->ios.c_oflag & ONLCR)
-			device->parent.open_flag |= RT_DEVICE_FLAG_STREAM;
-		else
-			device->parent.open_flag &= ~RT_DEVICE_FLAG_STREAM;
 		return RT_EOK;
 	}
 	return rt_device_control(device->device, cmd, args);
@@ -174,7 +178,7 @@ struct null_device
 {
 	struct rt_device parent;
 };
-struct null_device _nulldev;
+struct null_device _nulldev,_zerodev;
 
 /* common device interface */
 static rt_err_t nulldev_init(rt_device_t dev)
@@ -194,6 +198,16 @@ static rt_err_t nulldev_close(rt_device_t dev)
 
 static rt_size_t nulldev_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
 {
+	struct null_dev* device;
+
+	device = (struct null_dev*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	if (dev->parent.name[0] == 'z' && dev->parent.name[1] == 'e')
+	{
+		rt_memset(buffer, 0, size);
+		return size;
+	}
 	return 0;
 }
 
@@ -229,11 +243,30 @@ void rt_console_init(const char* device_name)
 		console->device = device;
 
 		rt_device_register(&console->parent, "console", RT_DEVICE_FLAG_RDWR);
+
+		/* get tty device */
+		console = &_tty;
+		rt_memset(console, 0, sizeof(_tty));
+
+		/* device initialization */
+		console->parent.type = RT_Device_Class_Char;
+		/* set device interface */
+		console->parent.init 	= console_init;
+		console->parent.open 	= console_open;
+		console->parent.close   = console_close;
+		console->parent.read 	= console_read;
+		console->parent.write   = console_write;
+		console->parent.control	= console_control;
+		console->parent.user_data = RT_NULL;
+
+		console->device = device;
+
+		rt_device_register(&console->parent, "tty", RT_DEVICE_FLAG_RDWR);
 	}
 
 	{
 		struct null_device* nulldev;
-		/* get console device */
+		/* get null device */
 		nulldev = &_nulldev;
 		rt_memset(nulldev, 0, sizeof(_nulldev));
 
@@ -248,6 +281,22 @@ void rt_console_init(const char* device_name)
 		nulldev->parent.user_data = RT_NULL;
 
 		rt_device_register(&nulldev->parent, "null", RT_DEVICE_FLAG_RDWR);
+
+		/* get zero device */
+		nulldev = &_zerodev;
+		rt_memset(nulldev, 0, sizeof(_nulldev));
+
+		/* device initialization */
+		nulldev->parent.type = RT_Device_Class_Char;
+		/* set device interface */
+		nulldev->parent.init 	= nulldev_init;
+		nulldev->parent.open 	= nulldev_open;
+		nulldev->parent.close   = nulldev_close;
+		nulldev->parent.read 	= nulldev_read;
+		nulldev->parent.write   = nulldev_write;
+		nulldev->parent.user_data = RT_NULL;
+
+		rt_device_register(&nulldev->parent, "zero", RT_DEVICE_FLAG_RDWR);
 	}
 }
 

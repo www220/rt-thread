@@ -702,7 +702,9 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
        if (parm1 == 0)
            return -EINVAL;
        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
-       return ret_err(open(path,parm2,parm3));
+       int ret = ret_err(open(path,parm2,parm3));
+       rt_kprintf("syscall pid:%d/%d open  file %3d lnk %s\n",module->pid,module->tpid,ret,path);
+       return ret;
     }
     case SYS_read:
     {
@@ -719,7 +721,9 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_close:
     {
        errno = 0;
-       return ret_err(close(parm1));
+       int ret = ret_err(close(parm1));
+       rt_kprintf("syscall pid:%d/%d close file %3d ret %d\n",module->pid,module->tpid,parm1,ret);
+       return ret;
     }
     case SYS_getdents:
     {
@@ -823,7 +827,17 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_BASE+1001:
     {
         char *name = (char *)rt_process_conv_ptr(module,parm2,parm3);
-        rt_strncpy(name,"/dev/console",parm3);
+    	struct dfs_fd *d = fd_get(parm1);
+    	//必须是devfs
+    	if (d == RT_NULL || d->fs == RT_NULL || rt_strcmp(d->fs->path,"/dev") != 0)
+    	{
+    		if (d)
+    			fd_put(d);
+    		return -ENOTTY;
+    	}
+    	//复制设备名称/dev
+        rt_snprintf(name,parm3,"/dev%s",d->path);
+        fd_put(d);
         return 0;
     }
     }

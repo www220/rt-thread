@@ -435,7 +435,7 @@ RTM_EXPORT(dfs_normalize_path);
 #ifdef DFS_USING_SELECT
 static struct dfs_fd *dfs_file_isdevfs(int fileno)
 {
-	int devfiles;
+	int devfiles = fileno;
 	rt_err_t ret;
 	rt_device_t device;
 	struct dfs_fd *d = fd_get(fileno);
@@ -459,8 +459,8 @@ static struct dfs_fd *dfs_file_isdevfs(int fileno)
 		fd_put(d);
 		return RT_NULL;
 	}
-	//设备必须支持GETFILE而且文件句柄需要一致
-	ret = rt_device_control(device,RT_DEVICE_CTRL_CHAR_GETFILE,&devfiles);
+	//设备必须支持CHKFILE而且文件句柄需要一致
+	ret = rt_device_control(device,RT_DEVICE_CTRL_CHAR_CHKFILE,&devfiles);
 	if (ret != RT_EOK || devfiles != fileno)
 	{
 		fd_put(d);

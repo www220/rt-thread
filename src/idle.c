@@ -198,15 +198,11 @@ void rt_thread_idle_excute(void)
             extern rt_err_t rt_process_destroy(rt_process_t process);
 
             /* if sub thread list and main thread are all empty */
-            if ((process->module_thread == RT_NULL) &&
-                rt_list_isempty(&process->module_object[RT_Object_Class_Thread].object_list))
+            if ((process->module_thread == RT_NULL) && (rt_list_isempty(&process->thread_list)))
             {
-                process->nref --;
-            }
-
-            /* destroy process */
-            if (process->nref == 0)
+                /* destroy process */
                 rt_process_destroy(process);
+            }
         }
 #endif
     }

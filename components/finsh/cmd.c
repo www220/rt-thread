@@ -163,6 +163,33 @@ long list_thread(void)
 FINSH_FUNCTION_EXPORT(list_thread, list thread);
 MSH_CMD_EXPORT(list_thread, list thread);
 
+#ifdef RT_USING_DFS
+#include <dfs_def.h>
+#include <dfs_fs.h>
+#include <dfs.h>
+long list_file(void)
+{
+	int i;
+	struct dfs_fd *fd;
+
+    rt_kprintf("fileno  ref  status     link\n");
+    rt_kprintf("------  ---  ----------  -----------------\n");
+    for (i=0; i<DFS_FD_MAX; i++)
+    {
+        fd = fd_get(i);
+        if (fd == RT_NULL)
+            continue;
+        rt_kprintf("%-6d  %-3d  0x%08x  %s%s\n",
+                   i,fd->ref_count,fd->flags,
+                   fd->fs->path,fd->path);
+    }
+
+    return 0;
+}
+FINSH_FUNCTION_EXPORT(list_file, list file);
+MSH_CMD_EXPORT(list_file, list file);
+#endif
+
 static void show_wait_queue(struct rt_list_node *list)
 {
     struct rt_thread *thread;
@@ -719,14 +746,14 @@ int list_proc(void)
 
     maxlen = object_name_maxlen(list);
 
-    rt_kprintf("%-*.s  ref     address \n", maxlen, "process"); object_split(maxlen);
-    rt_kprintf(         "  ------- -----------\n");
+    rt_kprintf("%-*.s  pid/tpid  address \n", maxlen, "process"); object_split(maxlen);
+    rt_kprintf(         "  --------  -----------\n");
     for (node = list->next; node != list; node = node->next)
     {
         module = (struct rt_process *)(rt_list_entry(node, struct rt_object, list));
-        rt_kprintf("%-*.*s %-04d  0x%08x\n",
+        rt_kprintf("%-*.*s %-02d/%-04d   0x%08x\n",
                    maxlen, RT_NAME_MAX,
-                   module->parent.name, module->nref, module->module_space);
+                   module->parent.name, module->pid, module->tpid, module->vstart_addr);
     }
 
     return 0;
@@ -765,51 +792,8 @@ int list_proc_detail(const char *name)
                    thread->error);
 
         /* list sub thread in process */
-        tlist = &module->module_object[RT_Object_Class_Thread].object_list;
+        tlist = &module->thread_list;
         if (!rt_list_isempty(tlist)) _list_thread(tlist);
-#ifdef RT_USING_SEMAPHORE
-        /* list semaphored in process */
-        tlist = &module->module_object[RT_Object_Class_Semaphore].object_list;
-        if (!rt_list_isempty(tlist)) _list_sem(tlist);
-#endif
-#ifdef RT_USING_MUTEX
-        /* list mutex in process */
-        tlist = &module->module_object[RT_Object_Class_Mutex].object_list;
-        if (!rt_list_isempty(tlist)) _list_mutex(tlist);
-#endif
-#ifdef RT_USING_EVENT
-        /* list event in process */
-        tlist = &module->module_object[RT_Object_Class_Event].object_list;
-        if (!rt_list_isempty(tlist)) _list_event(tlist);
-#endif
-#ifdef RT_USING_MAILBOX
-        /* list mailbox in process */
-        tlist = &module->module_object[RT_Object_Class_MailBox].object_list;
-        if (!rt_list_isempty(tlist)) _list_mailbox(tlist);
-#endif
-#ifdef RT_USING_MESSAGEQUEUE
-        /* list message queue in process */
-        tlist = &module->module_object[RT_Object_Class_MessageQueue].object_list;
-        if (!rt_list_isempty(tlist)) _list_msgqueue(tlist);
-#endif
-#ifdef RT_USING_MEMHEAP
-        /* list memory heap in process */
-        tlist = &module->module_object[RT_Object_Class_MemHeap].object_list;
-        if (!rt_list_isempty(tlist)) _list_memheap(tlist);
-#endif
-#ifdef RT_USING_MEMPOOL
-        /* list memory pool in process */
-        tlist = &module->module_object[RT_Object_Class_MemPool].object_list;
-        if (!rt_list_isempty(tlist)) _list_mempool(tlist);
-#endif
-#ifdef RT_USING_DEVICE
-        /* list device in process */
-        tlist = &module->module_object[RT_Object_Class_Device].object_list;
-        if (!rt_list_isempty(tlist)) _list_device(tlist);
-#endif
-        /* list timer in process */
-        tlist = &module->module_object[RT_Object_Class_Timer].object_list;
-        if (!rt_list_isempty(tlist)) _list_timer(tlist);
 
         if (module->page_cnt > 0)
         {

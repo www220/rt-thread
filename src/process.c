@@ -290,70 +290,10 @@ void rt_process_init_object_container(struct rt_process *module)
     RT_ASSERT(module != RT_NULL);
 
     /* initialize object container - thread */
-    rt_list_init(&(module->module_object[RT_Object_Class_Thread].object_list));
-    module->module_object[RT_Object_Class_Thread].object_size = sizeof(struct rt_thread);
-    module->module_object[RT_Object_Class_Thread].type = RT_Object_Class_Thread;
+    rt_list_init(&(module->thread_list));
 
-#ifdef RT_USING_SEMAPHORE
-    /* initialize object container - semaphore */
-    rt_list_init(&(module->module_object[RT_Object_Class_Semaphore].object_list));
-    module->module_object[RT_Object_Class_Semaphore].object_size = sizeof(struct rt_semaphore);
-    module->module_object[RT_Object_Class_Semaphore].type = RT_Object_Class_Semaphore;
-#endif
-
-#ifdef RT_USING_MUTEX
-    /* initialize object container - mutex */
-    rt_list_init(&(module->module_object[RT_Object_Class_Mutex].object_list));
-    module->module_object[RT_Object_Class_Mutex].object_size = sizeof(struct rt_mutex);
-    module->module_object[RT_Object_Class_Mutex].type = RT_Object_Class_Mutex;
-#endif
-
-#ifdef RT_USING_EVENT
-    /* initialize object container - event */
-    rt_list_init(&(module->module_object[RT_Object_Class_Event].object_list));
-    module->module_object[RT_Object_Class_Event].object_size = sizeof(struct rt_event);
-    module->module_object[RT_Object_Class_Event].type = RT_Object_Class_Event;
-#endif
-
-#ifdef RT_USING_MAILBOX
-    /* initialize object container - mailbox */
-    rt_list_init(&(module->module_object[RT_Object_Class_MailBox].object_list));
-    module->module_object[RT_Object_Class_MailBox].object_size = sizeof(struct rt_mailbox);
-    module->module_object[RT_Object_Class_MailBox].type = RT_Object_Class_MailBox;
-#endif
-
-#ifdef RT_USING_MESSAGEQUEUE
-    /* initialize object container - message queue */
-    rt_list_init(&(module->module_object[RT_Object_Class_MessageQueue].object_list));
-    module->module_object[RT_Object_Class_MessageQueue].object_size = sizeof(struct rt_messagequeue);
-    module->module_object[RT_Object_Class_MessageQueue].type = RT_Object_Class_MessageQueue;
-#endif
-
-#ifdef RT_USING_MEMHEAP
-    /* initialize object container - memory heap */
-    rt_list_init(&(module->module_object[RT_Object_Class_MemHeap].object_list));
-    module->module_object[RT_Object_Class_MemHeap].object_size = sizeof(struct rt_memheap);
-    module->module_object[RT_Object_Class_MemHeap].type = RT_Object_Class_MemHeap;
-#endif
-
-#ifdef RT_USING_MEMPOOL
-    /* initialize object container - memory pool */
-    rt_list_init(&(module->module_object[RT_Object_Class_MemPool].object_list));
-    module->module_object[RT_Object_Class_MemPool].object_size = sizeof(struct rt_mempool);
-    module->module_object[RT_Object_Class_MemPool].type = RT_Object_Class_MemPool;
-#endif
-
-#ifdef RT_USING_DEVICE
-    /* initialize object container - device */
-    rt_list_init(&(module->module_object[RT_Object_Class_Device].object_list));
-    module->module_object[RT_Object_Class_Device].object_size = sizeof(struct rt_device);
-    module->module_object[RT_Object_Class_Device].type = RT_Object_Class_Device;
-#endif
-
-    /* initialize object container - timer */
-    rt_list_init(&(module->module_object[RT_Object_Class_Timer].object_list));
-    module->module_object[RT_Object_Class_Timer].object_size = sizeof(struct rt_timer);
-    module->module_object[RT_Object_Class_Timer].type = RT_Object_Class_Timer;
+    /* initialisz file */
+    rt_memset(module->file_list, 0, sizeof(module->file_list));
 }
 
 #ifdef RT_USING_HOOK
@@ -460,7 +400,6 @@ static struct rt_process *_load_exec_object(const char *name,
     module->vstart_addr = vstart_addr;
     module->module_size = module_size;
 
-    module->nref = 0;
     module->page_array = RT_NULL;
     module->page_cnt = 0;
     module->page_mutex = RT_NULL;
@@ -783,9 +722,6 @@ rt_process_t rt_process_do_main(const char *name,
         module->module_cmd_size = 0;
     }
 
-    /* increase process reference count */
-    module->nref ++;
-
 #ifdef RT_USING_SLAB
     /* create page array */
     module->page_array = (void *)rt_malloc(PAGE_COUNT_MAX*sizeof(rt_uint32_t));
@@ -1093,158 +1029,17 @@ rt_err_t rt_process_destroy(rt_process_t module)
 
     /* check parameter */
     RT_ASSERT(module != RT_NULL);
-    RT_ASSERT(module->nref == 0);
     RT_ASSERT(module->pid != 0);
+    RT_ASSERT(module->tpid != 0);
 
     RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("rt_process_destroy: %8.*s\n",
                                    RT_NAME_MAX, module->parent.name));
 
-#ifdef RT_USING_SEMAPHORE
-    /* delete semaphores */
-    list = &module->module_object[RT_Object_Class_Semaphore].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_sem_detach((rt_sem_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_sem_delete((rt_sem_t)object);
-        }
-    }
-#endif
-
-#ifdef RT_USING_MUTEX
-    /* delete mutexs*/
-    list = &module->module_object[RT_Object_Class_Mutex].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_mutex_detach((rt_mutex_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_mutex_delete((rt_mutex_t)object);
-        }
-    }
-#endif
-
-#ifdef RT_USING_EVENT
-    /* delete mailboxs */
-    list = &module->module_object[RT_Object_Class_Event].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_event_detach((rt_event_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_event_delete((rt_event_t)object);
-        }
-    }
-#endif
-
-#ifdef RT_USING_MAILBOX
-    /* delete mailboxs */
-    list = &module->module_object[RT_Object_Class_MailBox].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_mb_detach((rt_mailbox_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_mb_delete((rt_mailbox_t)object);
-        }
-    }
-#endif
-
-#ifdef RT_USING_MESSAGEQUEUE
-    /* delete msgqueues */
-    list = &module->module_object[RT_Object_Class_MessageQueue].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_mq_detach((rt_mq_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_mq_delete((rt_mq_t)object);
-        }
-    }
-#endif
-
-#ifdef RT_USING_MEMPOOL
-    /* delete mempools */
-    list = &module->module_object[RT_Object_Class_MemPool].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_mp_detach((rt_mp_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_mp_delete((rt_mp_t)object);
-        }
-    }
-#endif
-
-#ifdef RT_USING_DEVICE
-    /* delete devices */
-    list = &module->module_object[RT_Object_Class_Device].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        rt_device_unregister((rt_device_t)object);
-    }
-#endif
-
-    /* delete timers */
-    list = &module->module_object[RT_Object_Class_Timer].object_list;
-    while (list->next != list)
-    {
-        object = rt_list_entry(list->next, struct rt_object, list);
-        if (rt_object_is_systemobject(object) == RT_TRUE)
-        {
-            /* detach static object */
-            rt_timer_detach((rt_timer_t)object);
-        }
-        else
-        {
-            /* delete dynamic object */
-            rt_timer_delete((rt_timer_t)object);
-        }
-    }
-
     /* delete command line */
-    if (module->module_cmd_line != RT_NULL)
-    {
-        rt_page_free(module->module_cmd_line,module->module_cmd_size/RT_MM_PAGE_SIZE);
-    }
+    rt_page_free(module->module_cmd_line,module->module_cmd_size/RT_MM_PAGE_SIZE);
+
+    /* release process space memory */
+    rt_page_free(module->module_space,module->module_size/RT_MM_PAGE_SIZE);
 
 #ifdef RT_USING_SLAB
     if (module->page_cnt > 0)
@@ -1254,12 +1049,6 @@ rt_err_t rt_process_destroy(rt_process_t module)
             rt_page_free(((void **)module->page_array)[i],1);
         module->page_cnt = 0;
     }
-#endif
-
-    /* release process space memory */
-    rt_page_free(module->module_space,module->module_size/RT_MM_PAGE_SIZE);
-
-#ifdef RT_USING_SLAB
     if (module->page_array != RT_NULL)
         rt_free(module->page_array);
     if (module->page_mutex != RT_NULL)
@@ -1317,7 +1106,7 @@ rt_err_t rt_process_unload(rt_process_t module, int exitcode)
 
     rt_enter_critical();
     /* delete all sub-threads */
-    list = &module->module_object[RT_Object_Class_Thread].object_list;
+    list = &module->thread_list;
     while (list->next != list)
     {
         object = rt_list_entry(list->next, struct rt_object, list);
@@ -1736,13 +1525,30 @@ int rt_process_vfork(rt_process_t module)
 
 int rt_process_execve(rt_process_t module, const char*file, const char **argv, const char **envp)
 {
-	return 0;
+	const char **env = argv;
+	rt_kprintf("execve %s argv ",file);
+    while (*env)
+    {
+        rt_kprintf("%s ",*env);
+        env++;
+    }
+	env = envp;
+	rt_kprintf("envp ",file);
+    while (*env)
+    {
+        rt_kprintf("%s ",*env);
+        env++;
+    }
+    rt_kprintf("\n");
+    return 0;
 }
 
 int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 {
 	int i,waitpid = 0,wait = opt & WNOHANG;
 	int find = 0,ret = 0;
+	return -1;
+
 	register rt_ubase_t temp = rt_hw_interrupt_disable();
 	for(i=0; i<MAX_PID_SIZE; i++)
 	{
