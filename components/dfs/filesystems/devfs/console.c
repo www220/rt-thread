@@ -73,6 +73,10 @@ static rt_err_t console_open(rt_device_t dev, rt_uint16_t oflag)
 	device = (struct console_device*)dev;
 	RT_ASSERT(device != RT_NULL);
 
+	//设备已经打开了，不要重复打开了
+	if (device->parent.ref_count)
+		return RT_EOK;
+
 	/* open this device and set the new device in finsh shell */
 	return rt_device_open(device->device, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
 }

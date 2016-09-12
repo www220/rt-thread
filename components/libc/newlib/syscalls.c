@@ -412,6 +412,10 @@ extern int rt_process_fork(rt_process_t module);
 extern int rt_process_vfork(rt_process_t module);
 extern int rt_process_execve(rt_process_t module, const char*file, const char **argv, const char **envp);
 extern int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt);
+extern int rt_process_savefile(rt_process_t module, int fileno);
+extern int rt_process_convfile(rt_process_t module, int fileno);
+extern int rt_process_setfile(rt_process_t module, int fileno, int newfileno);
+extern int rt_process_clearfile(rt_process_t module, int fileno);
 static inline int ret_err(int ret)
 {
     if (ret < 0)
@@ -464,7 +468,14 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         struct timespec *tim2 = (parm2)?(rt_process_conv_ptr(module,parm2,sizeof(struct timespec))):(0);
         if (tim1 == RT_NULL)
             return -EINVAL;
+        //长时间休眠，分段休眠
         extern void __udelay(unsigned long usecs);
+        while (tim1->tv_sec > 10*24*3600)
+        {
+            rt_thread_delay(10*24*3600*1000);
+            tim1->tv_sec -= 10*24*3600;
+        }
+        //休息剩下的时间
         int ms = tim1->tv_sec*1000+tim1->tv_nsec/1000000l;
         if (ms <= 0)
             __udelay(tim1->tv_nsec/1000l+1);
@@ -619,7 +630,10 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_ftruncate:
     {
         errno = 0;
-        return ret_err(ftruncate(parm1,parm2));
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
+        return ret_err(ftruncate(fileno,parm2));
     }
     case SYS_uname:
     {
@@ -655,7 +669,10 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_lseek:
     {
         errno = 0;
-        return ret_err(lseek(parm1,parm2,parm3));
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
+        return ret_err(lseek(fileno,parm2,parm3));
     }
     case SYS_stat:
     {
@@ -674,8 +691,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_fstat:
     {
         errno = 0;
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
         struct stat *buf = (struct stat *)rt_process_conv_ptr(module,parm2,sizeof(struct stat));
-        return ret_err(fstat(parm1,buf));
+        return ret_err(fstat(fileno,buf));
     }
     case SYS_statfs:
     {
@@ -687,14 +707,15 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_fstatfs:
     {
         errno = 0;
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
         struct statfs *buf = (struct statfs *)rt_process_conv_ptr(module,parm2,sizeof(struct statfs));
-        return ret_err(fstatfs(parm1,buf));
+        return ret_err(fstatfs(fileno,buf));
     }
     case SYS_creat:
     {
-        errno = 0;
-        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
-        return ret_err(open(path,O_TRUNC|O_WRONLY|O_CREAT, parm2));
+        return sys_call_switch(SYS_open,parm1,O_TRUNC|O_WRONLY|O_CREAT,0,0,0,0);
     }
     case SYS_open:
     {
@@ -702,41 +723,135 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
        if (parm1 == 0)
            return -EINVAL;
        const char *path = (const char *)rt_process_conv_ptr(module,parm1,0);
-       int ret = ret_err(open(path,parm2,parm3));
-       rt_kprintf("syscall pid:%d/%d open  file %3d lnk %s\n",module->pid,module->tpid,ret,path);
-       return ret;
+       int fileno = ret_err(open(path,parm2,0));
+       int retno = fileno;
+       if (retno >= 0)
+       {
+           retno = rt_process_savefile(module,fileno);
+           if (retno < 0)
+               close(fileno);
+       }
+       rt_kprintf("syscall pid:%d/%d open  file %3d/%3d lnk %s\n",module->pid,module->tpid,retno,fileno,path);
+       return retno;
+    }
+    case SYS_dup:
+    {
+        errno = 0;
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
+        struct dfs_fd *d = fd_get(fileno);
+        if (d == NULL)
+        {
+            rt_process_clearfile(module,parm1);
+            return -EBADF;
+        }
+        int retno = rt_process_savefile(module,fileno);
+        if (retno < 0)
+        {
+            fd_put(d);
+            return -ENOMEM;
+        }
+        rt_kprintf("syscall pid:%d/%d dup   file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,retno);
+        return retno;
+    }
+    case SYS_dup2:
+    {
+        errno = 0;
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
+        struct dfs_fd *d = fd_get(fileno);
+        if (d == NULL)
+        {
+            rt_process_clearfile(module,parm1);
+            return -EBADF;
+        }
+        if (parm1 == parm2)
+        {
+            fd_put(d);
+            return parm1;
+        }
+        //关闭原有打开的文件
+        if (rt_process_convfile(module,parm2) >= 0)
+        {
+            if (sys_call_switch(SYS_close,parm2,0,0,0,0,0) != 0)
+                return -EBADF;
+        }
+        if (rt_process_setfile(module,parm2,fileno) < 0)
+        {
+            fd_put(d);
+            return -ENOMEM;
+        }
+        rt_kprintf("syscall pid:%d/%d dup2  file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,parm2);
+        return parm2;
     }
     case SYS_read:
     {
        errno = 0;
+       int fileno = rt_process_convfile(module,parm1);
+       if (fileno < 0)
+           return -EBADF;
        void *buf = rt_process_conv_ptr(module,parm2,3);
-       return ret_err(read(parm1,buf,parm3));
+       return ret_err(read(fileno,buf,parm3));
     }
     case SYS_write:
     {
        errno = 0;
+       int fileno = rt_process_convfile(module,parm1);
+       if (fileno < 0)
+           return -EBADF;
        void *buf = rt_process_conv_ptr(module,parm2,3);
-       return ret_err(write(parm1,buf,parm3));
+       return ret_err(write(fileno,buf,parm3));
     }
     case SYS_close:
     {
        errno = 0;
-       int ret = ret_err(close(parm1));
-       rt_kprintf("syscall pid:%d/%d close file %3d ret %d\n",module->pid,module->tpid,parm1,ret);
+       int fileno = rt_process_convfile(module,parm1);
+       if (fileno < 0)
+          return -EBADF;
+       struct dfs_fd *d = fd_get(fileno);
+       if (d == NULL)
+       {
+           rt_process_clearfile(module,parm1);
+           return -EBADF;
+       }
+       fd_put(d);
+       //多个连接不能真正关闭
+       if (d->ref_count >= 2)
+       {
+           int ret = rt_process_clearfile(module,parm1);
+           if (ret == 0)
+               fd_put(d);
+           return ret;
+       }
+       //真正关闭
+       int ret = ret_err(close(fileno));
+       if (ret == 0)
+          ret = rt_process_clearfile(module,parm1);
+       rt_kprintf("syscall pid:%d/%d close file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,ret);
        return ret;
     }
     case SYS_getdents:
     {
         errno = 0;
-        extern int getdents(int file, struct dirent *dirp, rt_size_t nbytes);
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
         struct dirent* buf = (struct dirent*)rt_process_conv_ptr(module,parm2,parm3);
-        return ret_err(getdents(parm1,buf,parm3));
+        return ret_err(getdents(fileno,buf,parm3));
     }
     case SYS_sendfile:
     {
         errno = 0;
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
+        int fileno2 = rt_process_convfile(module,parm2);
+        if (fileno2 < 0)
+            return -EBADF;
         off_t *off = (parm3)?(rt_process_conv_ptr(module,parm3,sizeof(off_t))):(0);
-        return ret_err(sendfile(parm1,parm2,off,parm3));
+        return ret_err(sendfile(fileno,fileno2,off,parm4));
     }
     case SYS_getcwd:
     {
@@ -752,7 +867,10 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     case SYS_fsync:
     {
         errno = 0;
-        return ret_err(fsync(parm1));
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
+        return ret_err(fsync(fileno));
     }
     case SYS_poll:
     {
@@ -775,41 +893,49 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_ioctl:
     {
+        errno = 0;
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
         switch(parm2)
         {
         case TIOCGWINSZ:
         {
             struct winsize *win = (struct winsize *)rt_process_conv_ptr(module,parm3,sizeof(struct winsize));
-            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_GETWS,win));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_GETWS,win));
         }
         case TIOCSWINSZ:
         {
             struct winsize *win = (struct winsize *)rt_process_conv_ptr(module,parm3,sizeof(struct winsize));
-            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_SETWS,win));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_SETWS,win));
         }
         case TCGETS:
         {
             struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
-            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_GETS,ios));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_GETS,ios));
         }
         case TCSETS:
         case TCSETSW:
         case TCSETSF:
         {
             struct termios *ios = (struct termios *)rt_process_conv_ptr(module,parm3,sizeof(struct termios));
-            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_SETS+(parm2-TCSETS),ios));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_SETS+(parm2-TCSETS),ios));
         }
         case TCFLSH:
         {
-            return ret_err(ioctl(parm1,RT_DEVICE_CTRL_FLSH,0));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_FLSH,0));
         }
         }
-        rt_kprintf("ioctl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
+        rt_kprintf("syscall pid:%d/%d ioctl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
         return -ENOTSUP;
     }
     case SYS_fcntl:
     {
-        rt_kprintf("fcntl file:%d cmd:0x%x data:0x%x\n",parm1,parm2,parm3);
+        errno = 0;
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
+        rt_kprintf("syscall pid:%d/%d fcntl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
         return -ENOTSUP;
     }
     case SYS_BASE+901:
@@ -826,16 +952,19 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_BASE+1001:
     {
+        int fileno = rt_process_convfile(module,parm1);
+        if (fileno < 0)
+            return -EBADF;
         char *name = (char *)rt_process_conv_ptr(module,parm2,parm3);
-    	struct dfs_fd *d = fd_get(parm1);
-    	//必须是devfs
-    	if (d == RT_NULL || d->fs == RT_NULL || rt_strcmp(d->fs->path,"/dev") != 0)
+        struct dfs_fd *d = fd_get(fileno);
+        //必须是devfs
+        if (d == RT_NULL || d->fs == RT_NULL || rt_strcmp(d->fs->path,"/dev") != 0)
     	{
     		if (d)
     			fd_put(d);
     		return -ENOTTY;
     	}
-    	//复制设备名称/dev
+        //复制设备名称/dev
         rt_snprintf(name,parm3,"/dev%s",d->path);
         fd_put(d);
         return 0;

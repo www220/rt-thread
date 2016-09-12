@@ -172,7 +172,7 @@ long list_file(void)
 	int i;
 	struct dfs_fd *fd;
 
-    rt_kprintf("fileno  ref  status     link\n");
+    rt_kprintf("fileno  ref  status      link\n");
     rt_kprintf("------  ---  ----------  -----------------\n");
     for (i=0; i<DFS_FD_MAX; i++)
     {
@@ -180,8 +180,9 @@ long list_file(void)
         if (fd == RT_NULL)
             continue;
         rt_kprintf("%-6d  %-3d  0x%08x  %s%s\n",
-                   i,fd->ref_count,fd->flags,
+                   i,fd->ref_count-1,fd->flags,
                    fd->fs->path,fd->path);
+        fd_put(fd);
     }
 
     return 0;
@@ -751,9 +752,10 @@ int list_proc(void)
     for (node = list->next; node != list; node = node->next)
     {
         module = (struct rt_process *)(rt_list_entry(node, struct rt_object, list));
-        rt_kprintf("%-*.*s %-02d/%-04d   0x%08x\n",
+        rt_kprintf("%-*.*s  %-02d/%-04d   0x%08x/0x%08x\n",
                    maxlen, RT_NAME_MAX,
-                   module->parent.name, module->pid, module->tpid, module->vstart_addr);
+                   module->parent.name, module->pid, module->tpid,
+                   module->module_space, module->module_cmd_line);
     }
 
     return 0;

@@ -30,9 +30,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
+#endif
+
+#ifdef RT_USING_DFS
+#include <dfs.h>
 #endif
 
 #ifdef RT_USING_PROCESS
@@ -95,12 +100,13 @@ volatile int pidbuf[MAX_PID_SIZE];
 //pz:[0],ppid:[1],pgid[2],sid[3]
 volatile unsigned short pidinfo[MAX_PID_SIZE][4];
 static int current_tpid = 0;
+static int sum_tpid = 0;
 //pid
 static volatile rt_uint32_t pidid[1+PROCESS_MAX/32];
 static int current_pid = 0;
 //wait
-static rt_uint32_t mod_waitp[1+PROCESS_MAX/32];
-static struct rt_event mod_eventp[1+PROCESS_MAX/32];
+static rt_uint32_t mod_waitp;
+static struct rt_event mod_eventp;
 
 static unsigned short getempty_pid()
 {
@@ -146,6 +152,7 @@ static unsigned short getempty_tpid(unsigned short parent)
 			}
 			if (++current_tpid >= MAX_PID_SIZE)
 				current_tpid = 0;
+			sum_tpid++;
 			return ret;
 		}
 	}
@@ -157,6 +164,9 @@ static void free_tpid(unsigned short tpid)
 		return;
 	pidinfo[tpid-1][0] = 0;
 	pidbuf[tpid-1] = 0;
+	//没有进程的时候清理
+	if (--sum_tpid == 0)
+		current_tpid = 0;
 }
 static void release_tpid(unsigned short tpid, int exitcode)
 {
@@ -165,8 +175,7 @@ static void release_tpid(unsigned short tpid, int exitcode)
 		return;
 	pidinfo[tpid-1][0] = 102;
 	pidbuf[tpid-1] = exitcode;
-	for(i=0; i<1+PROCESS_MAX/32; i++)
-		rt_event_send(&mod_eventp[i], 0xffffffff);
+	rt_event_send(&mod_eventp, 0xffffffff);
 }
 static int find_tpid(unsigned short tpid, unsigned short tme)
 {
@@ -189,29 +198,33 @@ static int find_tpid(unsigned short tpid, unsigned short tme)
 extern struct rt_object_information rt_object_container[];
 rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 {
-	int i,make = 0,type = src->type&0x7f;
+	int i,type = src->type&0x7f;
 	register rt_base_t temp;
 	struct rt_object_information *information;
 	if (desc == RT_NULL)
 	{
 		desc = rt_object_allocate(type,"");
-		make = 1;
+	}
+	else
+	{
+		temp = rt_hw_interrupt_disable();
+		/* insert object into information object list */
+		rt_list_insert_after(&(src->list), &(desc->list));
+		rt_hw_interrupt_enable(temp);
 	}
 	if (desc == RT_NULL)
 		return desc;
-	if (make)
-	{
-		/* remove object into information object list */
-		temp = rt_hw_interrupt_disable();
-		rt_list_remove(&(desc->list));
-		rt_hw_interrupt_enable(temp);
-	}
 	information = &rt_object_container[type];
+	rt_enter_critical();
 	rt_memcpy(desc,src,information->object_size);
-	/* insert object into information object list */
-	temp = rt_hw_interrupt_disable();
-	rt_list_insert_after(&(src->list), &(desc->list));
-	rt_hw_interrupt_enable(temp);
+	/* remove thread from run list */
+	if (type == RT_Object_Class_Thread)
+	{
+		rt_thread_t src_thread = (rt_thread_t)src;
+		rt_thread_t desc_thread = (rt_thread_t)desc;
+		rt_list_init(&(desc_thread->tlist));
+	}
+	rt_exit_critical();
 	/* dump object */
 	switch(type)
 	{
@@ -234,7 +247,6 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 	{
 		rt_thread_t src_thread = (rt_thread_t)src;
 		rt_thread_t desc_thread = (rt_thread_t)desc;
-		rt_list_init(&(desc_thread->tlist));
 		//timer
 		rt_process_copy_object(&desc_thread->thread_timer.parent, &src_thread->thread_timer.parent);
 		desc_thread->thread_timer.parameter = desc_thread;
@@ -252,17 +264,8 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
  */
 int rt_system_process_init(void)
 {
-	int i;
-	char buf[20];
-	for(i=0; i<PROCESS_MAX; i++)
-	{
-		mod_waitp[i/32] |= (1<<(i%32));
-		if ((i%32) == 0)
-		{
-			sprintf(buf,"process%d",i/32);
-			rt_event_init(&mod_eventp[i/32], buf, RT_IPC_FLAG_FIFO);
-		}
-	}
+	mod_waitp = 0xffffffff;
+	rt_event_init(&mod_eventp, "process", RT_IPC_FLAG_FIFO);
 	return 0;
 }
 INIT_COMPONENT_EXPORT(rt_system_process_init);
@@ -294,6 +297,14 @@ void rt_process_init_object_container(struct rt_process *module)
 
     /* initialisz file */
     rt_memset(module->file_list, 0, sizeof(module->file_list));
+    if (module->tpid == 1)
+    {
+    	//对于init程序要打开标准的三个文件流
+        module->file_list[0] = 1;
+        module->file_list[1] = 2;
+        module->file_list[2] = 3;
+        fd_get(0);fd_get(1);fd_get(2);
+    }
 }
 
 #ifdef RT_USING_HOOK
@@ -332,7 +343,8 @@ void rt_process_unload_sethook(void (*hook)(rt_process_t process))
 #endif
 
 static struct rt_process *_load_exec_object(const char *name,
-                                             void       *module_ptr)
+                                             void      *module_ptr,
+                                             int        tpid)
 {
     rt_process_t module = RT_NULL;
     rt_uint32_t index, module_size = 0;
@@ -414,7 +426,7 @@ static struct rt_process *_load_exec_object(const char *name,
     if (module->pid)
     {
         rt_process_t parent = rt_process_self();
-        module->tpid = getempty_tpid(parent?parent->tpid:0);
+        module->tpid = (tpid>0)?(tpid):(getempty_tpid(parent?parent->tpid:0));
         if (module->tpid == 0)
         {
             free_pid(module->pid);
@@ -610,8 +622,9 @@ static void process_main_entry(void* parameter)
  */
 rt_process_t rt_process_do_main(const char *name,
                               void *module_ptr,
-                              const char* cmd_line,
-                              int line_size)
+                              const char** argv,
+                              int tpid,
+                              const char** envp)
 {
     int i;
     rt_process_t module;
@@ -639,7 +652,7 @@ rt_process_t rt_process_do_main(const char *name,
 
     if (elf_module->e_type == ET_EXEC && elf_module->e_entry != 0)
     {
-        module = _load_exec_object(name, module_ptr);
+        module = _load_exec_object(name, module_ptr, tpid);
     }
     else
     {
@@ -654,16 +667,23 @@ rt_process_t rt_process_do_main(const char *name,
     /* init process object container */
     rt_process_init_object_container(module);
 
-    if (line_size && cmd_line)
+    if (*argv && tpid!=0)
     {
         /* set process argument */
         extern char **environ;
         struct process_main_info main_info;
+        int line_size = (tpid>0)?0:-tpid;
+        const char **arg = argv;
+        while (tpid>0 && *arg)
+        {
+            line_size += ((arg != argv)?1:0)+rt_strlen(*arg);
+            arg++;
+        }
         int env_size = 0;
-        char **env = environ;
+        const char **env = envp?envp:(const char **)environ;
         while (*env)
         {
-            env_size += ((env != environ)?3:2)+rt_strlen(*env);
+            env_size += ((env != (envp?envp:(const char **)environ))?3:2)+rt_strlen(*env);
             env++;
         }
         module->module_cmd_size = RT_ALIGN(RT_PROCESS_MEMMAKE+RT_USING_PROCESS_STKSZ,RT_MM_PAGE_SIZE);
@@ -677,15 +697,30 @@ rt_process_t rt_process_do_main(const char *name,
             main_info.module_entry = module->module_entry;
 
             rt_memcpy(module->module_cmd_line, &main_info, sizeof(main_info));
-            rt_memcpy(main_info.module_cmd_line, cmd_line, line_size);
-            main_info.module_cmd_line[line_size] = '\0';
+            if (tpid>0){
+            arg = argv;
+            line_size = 0;
+            while (*arg)
+            {
+                int strlen = rt_strlen(*arg);
+                if(arg != argv)
+                    main_info.module_cmd_line[line_size++] = ' ';
+                rt_memcpy(&main_info.module_cmd_line[line_size], *arg, strlen);line_size += strlen;
+                arg++;
+            }
+            main_info.module_cmd_line[line_size] = '\0';}
+            else
+            {
+                rt_memcpy(main_info.module_cmd_line, *argv, line_size);
+                main_info.module_cmd_line[line_size] = '\0';
+            }
 
-            env = environ;
+            env = envp?envp:(const char **)environ;
             env_size = 0;
             while (*env)
             {
                 int strlen = rt_strlen(*env);
-                if(env != environ)
+                if(env != (envp?envp:(const char **)environ))
                     main_info.module_env_line[env_size++] = ' ';
                 main_info.module_env_line[env_size++] = '"';
                 rt_memcpy(&main_info.module_env_line[env_size], *env, strlen);env_size += strlen;
@@ -808,21 +843,7 @@ rt_process_t rt_process_do_main(const char *name,
     }
 #endif
 
-    rt_event_recv(&mod_eventp[0],1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
     return module;
-}
-
-/**
- * This function will load a process from memory and create a thread for it
- *
- * @param name the name of process, which shall be unique
- * @param module_ptr the memory address of process image
- *
- * @return the process object
- */
-rt_process_t rt_process_load(const char *name, void *module_ptr)
-{
-    return rt_process_do_main(name, module_ptr, name, rt_strlen(name));
 }
 
 #ifdef RT_USING_DFS
@@ -857,13 +878,15 @@ static char* _process_name(const char *path)
 }
 
 /**
- * This function will load a process from a file
+ * This function will do a excutable program with main function and parameters.
  *
  * @param path the full path of application process
+ * @param cmd_line the command line of program
+ * @param size the size of command line of program
  *
  * @return the process object
  */
-rt_process_t rt_process_open(const char *path)
+rt_process_t rt_process_exec_env(const char *path, const char** argv, int tpid, const char **envp)
 {
     int fd, length;
     struct rt_process *module;
@@ -882,95 +905,21 @@ rt_process_t rt_process_open(const char *path)
 
         return RT_NULL;
     }
-    buffer = (char *)rt_malloc(s.st_size);
-    if (buffer == RT_NULL)
-    {
-        rt_kprintf("Module: out of memory\n");
-
-        return RT_NULL;
-    }
-
-    offset_ptr = buffer;
-    fd = open(path, O_RDONLY, 0);
-    if (fd < 0)
-    {
-        rt_kprintf("Module: open %s failed\n", path);
-        rt_free(buffer);
-
-        return RT_NULL;
-    }
-
-    do
-    {
-        length = read(fd, offset_ptr, 4096);
-        if (length > 0)
-        {
-            offset_ptr += length;
-        }
-    }while (length > 0);
-
-    /* close fd */
-    close(fd);
-
-    if ((rt_uint32_t)offset_ptr - (rt_uint32_t)buffer != s.st_size)
-    {
-        rt_kprintf("Module: read file failed\n");
-        rt_free(buffer);
-
-        return RT_NULL;
-    }
-
-    name   = _process_name(path);
-    module = rt_process_load(name, (void *)buffer);
-    rt_free(buffer);
-    rt_free(name);
-
-    return module;
-}
-
-/**
- * This function will do a excutable program with main function and parameters.
- *
- * @param path the full path of application process
- * @param cmd_line the command line of program
- * @param size the size of command line of program
- *
- * @return the process object
- */
-rt_process_t rt_process_exec_cmd(const char *path, const char* cmd_line, int size)
-{
-    struct stat s;
-    int fd, length;
-    char *name, *buffer, *offset_ptr;
-    struct rt_process *module = RT_NULL;
-
-    name = buffer = RT_NULL;
-
-    RT_DEBUG_NOT_IN_INTERRUPT;
-
-    /* check parameters */
-    RT_ASSERT(path != RT_NULL);
-
-    /* get file size */
-    if (stat(path, &s) !=0)
-    {
-        rt_kprintf("Module: access %s failed\n", path);
-        goto __exit;
-    }
-
-    /* allocate buffer to save program */
     offset_ptr = buffer = (char *)rt_malloc(s.st_size);
     if (buffer == RT_NULL)
     {
         rt_kprintf("Module: out of memory\n");
-        goto __exit;
+
+        return RT_NULL;
     }
 
     fd = open(path, O_RDONLY, 0);
     if (fd < 0)
     {
         rt_kprintf("Module: open %s failed\n", path);
-        goto __exit;
+        rt_free(buffer);
+
+        return RT_NULL;
     }
 
     do
@@ -981,32 +930,39 @@ rt_process_t rt_process_exec_cmd(const char *path, const char* cmd_line, int siz
             offset_ptr += length;
         }
     }while (length > 0);
+
     /* close fd */
     close(fd);
 
     if ((rt_uint32_t)offset_ptr - (rt_uint32_t)buffer != s.st_size)
     {
         rt_kprintf("Module: read file failed\n");
-        goto __exit;
+        rt_free(buffer);
+
+        return RT_NULL;
     }
 
-    /* get process */
     name   = _process_name(path);
-    /* execute process */
-    if (size == -1)
-        size = rt_strlen(cmd_line);
-    module = rt_process_do_main(name, (void *)buffer, cmd_line, size);
-
-__exit:
+    module = rt_process_do_main(name, (void *)buffer, argv, tpid, envp);
+    if (module != RT_NULL && tpid < 0)
+        rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,120000,0);
     rt_free(buffer);
     rt_free(name);
 
     return module;
 }
 
+rt_process_t rt_process_exec_cmd(const char *path, const char* cmd_line, int size)
+{
+	if (size == -1)
+		size = rt_strlen(cmd_line);
+	else if (size == 0)
+		return RT_NULL;
+	return rt_process_exec_env(path,&cmd_line,-size,0);
+}
+
 #if defined(RT_USING_FINSH)
 #include <finsh.h>
-FINSH_FUNCTION_EXPORT_ALIAS(rt_process_open, execv, exec process from a file);
 FINSH_FUNCTION_EXPORT_ALIAS(rt_process_exec_cmd, execp, exec process from a file);
 #endif
 
@@ -1036,17 +992,22 @@ rt_err_t rt_process_destroy(rt_process_t module)
                                    RT_NAME_MAX, module->parent.name));
 
     /* delete command line */
-    rt_page_free(module->module_cmd_line,module->module_cmd_size/RT_MM_PAGE_SIZE);
+    if (module->module_cmd_line)
+        rt_page_free(module->module_cmd_line,module->module_cmd_size/RT_MM_PAGE_SIZE);
 
     /* release process space memory */
-    rt_page_free(module->module_space,module->module_size/RT_MM_PAGE_SIZE);
+    if (module->module_space)
+        rt_page_free(module->module_space,module->module_size/RT_MM_PAGE_SIZE);
 
 #ifdef RT_USING_SLAB
     if (module->page_cnt > 0)
     {
         rt_kprintf("Module: warning - memory still hasn't been free finished\n");
         for (i = 0; i < module->page_cnt; i ++)
-            rt_page_free(((void **)module->page_array)[i],1);
+        {
+            if (((void **)module->page_array)[i])
+                rt_page_free(((void **)module->page_array)[i],1);
+        }
         module->page_cnt = 0;
     }
     if (module->page_array != RT_NULL)
@@ -1054,6 +1015,31 @@ rt_err_t rt_process_destroy(rt_process_t module)
     if (module->page_mutex != RT_NULL)
         rt_mutex_delete(module->page_mutex);
 #endif
+
+    //关闭打开的文件
+    int showclosemsg = 0;
+	for (i=0; i<DFS_FD_MAX; i++)
+	{
+		if (module->file_list[i] != 0)
+		{
+			int fileno = module->file_list[i]-1;
+			struct dfs_fd *d = fd_get(fileno);
+			if (d == NULL)
+				continue;
+			fd_put(d);
+			if (d->ref_count >= 2)
+			{
+				fd_put(d);
+				continue;
+			}
+			if (!showclosemsg)
+			{
+				rt_kprintf("Module: warning - file still hasn't been close finished\n");
+				showclosemsg = 1;
+			}
+			close(fileno);
+		}
+	}
 
     /* switch tls */
     if (rt_pids_to == module->pid)
@@ -1067,6 +1053,7 @@ rt_err_t rt_process_destroy(rt_process_t module)
     free_pid(module->pid);
     release_tpid(module->tpid,module->exitcode);
     rt_hw_interrupt_enable(temp);}
+    free_tpid(module->tpid);
 
     /* delete process object */
     rt_object_delete((rt_object_t)module);
@@ -1468,6 +1455,17 @@ int rt_process_fork(rt_process_t module)
         forkmod->page_cnt++;
     }
 
+    /* dump open file */
+	for (i=0; i<DFS_FD_MAX; i++)
+	{
+		if (module->file_list[i] != 0)
+		{
+			int fileno = module->file_list[i]-1;
+			forkmod->file_list[i] = module->file_list[i];
+			fd_get(fileno);
+		}
+	}
+
     /* dump thread stack */
     extern int rt_hw_context_save(rt_uint32_t ret, rt_uint32_t to);
     ret = rt_hw_context_save(0, (rt_uint32_t)&forkmod->module_thread->sp);
@@ -1525,22 +1523,29 @@ int rt_process_vfork(rt_process_t module)
 
 int rt_process_execve(rt_process_t module, const char*file, const char **argv, const char **envp)
 {
-	const char **env = argv;
-	rt_kprintf("execve %s argv ",file);
-    while (*env)
-    {
-        rt_kprintf("%s ",*env);
-        env++;
-    }
-	env = envp;
-	rt_kprintf("envp ",file);
-    while (*env)
-    {
-        rt_kprintf("%s ",*env);
-        env++;
-    }
-    rt_kprintf("\n");
-    return 0;
+	struct stat st;
+	if (lstat(file,&st) != 0)
+		return -ENOENT;
+
+	const char *realfile = file;
+	char filename[200];
+	if (S_ISLNK(st.st_mode))
+	{
+		int ret = readlink(file,filename,sizeof(filename));
+		if (ret < 0)
+			return ret;
+		filename[ret] = 0;
+		realfile = filename;
+	}
+
+	rt_process_t process = rt_process_exec_env(realfile,argv,module->tpid,envp);
+	if (process != RT_NULL);
+	{
+		module->tpid = 0;
+		rt_process_unload(module,SIGQUIT);
+		rt_schedule();
+	}
+    return -1;
 }
 
 int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
@@ -1600,14 +1605,6 @@ int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 	waitpid = 0;
 	if (wait && find)
 	{
-		for (i=0;i<1+PROCESS_MAX/32;i++)
-		{
-			if (mod_waitp[i] == 0)
-				continue;
-			waitpid = __rt_ffs(mod_waitp[i]);
-			waitpid += i*32;
-			break;
-		}
 	}
 	//没有子进程
 	else if (wait)
@@ -1620,12 +1617,49 @@ int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 	if (waitpid)
 	{
 		--waitpid;
-		rt_event_recv(&mod_eventp[waitpid/32],(1<<waitpid%32),RT_NULL,
-				RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0);
-		rt_event_recv(&mod_eventp[waitpid/32],(1<<waitpid%32),RT_NULL,
-				RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0);
 	}
 	return ret;
+}
+
+int rt_process_savefile(rt_process_t module, int fileno)
+{
+	int i=0;
+	for (i=0; i<DFS_FD_MAX; i++)
+	{
+		if (module->file_list[i] == 0)
+		{
+			module->file_list[i] = fileno+1;
+			return i;
+		}
+	}
+	return -1;
+}
+
+int rt_process_convfile(rt_process_t module, int fileno)
+{
+	if (fileno >= 0 && fileno< DFS_FD_MAX)
+		return module->file_list[fileno]-1;
+	return -1;
+}
+
+int rt_process_setfile(rt_process_t module, int fileno, int newfileno)
+{
+	if (fileno >= 0 && fileno< DFS_FD_MAX)
+	{
+		module->file_list[fileno] = newfileno+1;
+		return newfileno;
+	}
+	return -1;
+}
+
+int rt_process_clearfile(rt_process_t module, int fileno)
+{
+	if (fileno >= 0 && fileno< DFS_FD_MAX)
+	{
+		module->file_list[fileno] = 0;
+		return 0;
+	}
+	return -1;
 }
 
 #endif
