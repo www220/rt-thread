@@ -50,5 +50,7 @@ tcgetsid (fd)
      int fd;
 {
 	pid_t sid;
-	return ioctl (fd, TIOCGSID, &sid);
+	if (ioctl (fd, TIOCGSID, &sid) < 0)
+		return -1;
+	return sid;
 }

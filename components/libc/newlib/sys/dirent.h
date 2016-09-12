@@ -62,7 +62,7 @@ int            readdir_r(DIR *, struct dirent *, struct dirent **);
 void           rewinddir(DIR *);
 void           seekdir(DIR *, long int);
 long           telldir(DIR *);
-int            getdents(int, struct dirent *, long int);
+int            getdents(int, struct dirent *, unsigned long);
 
 #ifdef __cplusplus
 }

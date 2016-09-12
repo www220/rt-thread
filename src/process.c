@@ -38,6 +38,7 @@
 
 #ifdef RT_USING_DFS
 #include <dfs.h>
+#include <dfs_def.h>
 #endif
 
 #ifdef RT_USING_PROCESS
@@ -166,7 +167,10 @@ static void free_tpid(unsigned short tpid)
 	pidbuf[tpid-1] = 0;
 	//没有进程的时候清理
 	if (--sum_tpid == 0)
+	{
+		RT_ASSERT(tpid == 1);
 		current_tpid = 0;
+	}
 }
 static void release_tpid(unsigned short tpid, int exitcode)
 {
@@ -175,7 +179,21 @@ static void release_tpid(unsigned short tpid, int exitcode)
 		return;
 	pidinfo[tpid-1][0] = 102;
 	pidbuf[tpid-1] = exitcode;
-	rt_event_send(&mod_eventp, 0xffffffff);
+	if (tpid == 1)
+	{
+		RT_ASSERT(sum_tpid == 1);
+		rt_event_send(&mod_eventp, 1);
+		return;
+	}
+	//托付孤儿进程
+	for(i=0; i<MAX_PID_SIZE; i++)
+	{
+		if (pidinfo[i][0] < 100)
+			continue;
+		if (pidinfo[i][1] == tpid)
+			pidinfo[i][1] = 1;
+	}
+	rt_event_send(&mod_eventp, 0xfffffffe);
 }
 static int find_tpid(unsigned short tpid, unsigned short tme)
 {
@@ -214,6 +232,7 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 	}
 	if (desc == RT_NULL)
 		return desc;
+
 	information = &rt_object_container[type];
 	rt_enter_critical();
 	rt_memcpy(desc,src,information->object_size);
@@ -225,6 +244,7 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 		rt_list_init(&(desc_thread->tlist));
 	}
 	rt_exit_critical();
+
 	/* dump object */
 	switch(type)
 	{
@@ -264,7 +284,7 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
  */
 int rt_system_process_init(void)
 {
-	mod_waitp = 0xffffffff;
+	mod_waitp = 0xfffffffe;
 	rt_event_init(&mod_eventp, "process", RT_IPC_FLAG_FIFO);
 	return 0;
 }
@@ -342,9 +362,9 @@ void rt_process_unload_sethook(void (*hook)(rt_process_t process))
 /*@}*/
 #endif
 
-static struct rt_process *_load_exec_object(const char *name,
-                                             void      *module_ptr,
-                                             int        tpid)
+static struct rt_process *_load_exec_object(rt_process_t process,
+                                             const char *name,
+                                             void      *module_ptr)
 {
     rt_process_t module = RT_NULL;
     rt_uint32_t index, module_size = 0;
@@ -393,12 +413,12 @@ static struct rt_process *_load_exec_object(const char *name,
     module_size = vend_addr - vstart_addr;
     module_size = RT_ALIGN(module_size,64*RT_MM_PAGE_SIZE);
 
-    RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("module size: %d, vstart_addr: 0x%p\n",
+    RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("process size: %d, vstart_addr: 0x%p\n",
                                    module_size, vstart_addr));
 
     if (module_size == 0)
     {
-        rt_kprintf("Module: size error\n");
+        rt_kprintf("Process: size error\n");
 
         return RT_NULL;
     }
@@ -426,7 +446,7 @@ static struct rt_process *_load_exec_object(const char *name,
     if (module->pid)
     {
         rt_process_t parent = rt_process_self();
-        module->tpid = (tpid>0)?(tpid):(getempty_tpid(parent?parent->tpid:0));
+        module->tpid = (process)?(process->tpid):(getempty_tpid(parent?parent->tpid:0));
         if (module->tpid == 0)
         {
             free_pid(module->pid);
@@ -436,7 +456,7 @@ static struct rt_process *_load_exec_object(const char *name,
     rt_hw_interrupt_enable(temp);}
     if (module->pid == 0)
     {
-        rt_kprintf("Module: allocate pid failed.\n");
+        rt_kprintf("Process: allocate pid failed.\n");
         rt_object_delete(&(module->parent));
 
         return RT_NULL;
@@ -451,7 +471,7 @@ static struct rt_process *_load_exec_object(const char *name,
         free_tpid(module->tpid);
         rt_hw_interrupt_enable(temp);}
 
-        rt_kprintf("Module: allocate space failed.\n");
+        rt_kprintf("Process: allocate space failed.\n");
         rt_object_delete(&(module->parent));
 
         return RT_NULL;
@@ -620,10 +640,10 @@ static void process_main_entry(void* parameter)
  *
  * @return the process object
  */
-rt_process_t rt_process_do_main(const char *name,
+rt_process_t rt_process_do_main(rt_process_t process,
+                              const char *name,
                               void *module_ptr,
                               const char** argv,
-                              int tpid,
                               const char** envp)
 {
     int i;
@@ -637,7 +657,7 @@ rt_process_t rt_process_do_main(const char *name,
     if (rt_memcmp(elf_module->e_ident, RTMMAG, SELFMAG) != 0 &&
         rt_memcmp(elf_module->e_ident, ELFMAG, SELFMAG) != 0)
     {
-        rt_kprintf("Module: magic error\n");
+        rt_kprintf("Process: magic error\n");
 
         return RT_NULL;
     }
@@ -645,18 +665,18 @@ rt_process_t rt_process_do_main(const char *name,
     /* check ELF class */
     if (elf_module->e_ident[EI_CLASS] != ELFCLASS32)
     {
-        rt_kprintf("Module: ELF class error\n");
+        rt_kprintf("Process: ELF class error\n");
 
         return RT_NULL;
     }
 
     if (elf_module->e_type == ET_EXEC && elf_module->e_entry != 0)
     {
-        module = _load_exec_object(name, module_ptr, tpid);
+        module = _load_exec_object(process, name, module_ptr);
     }
     else
     {
-        rt_kprintf("Module: unsupported elf type\n");
+        rt_kprintf("Process: unsupported elf type\n");
 
         return RT_NULL;
     }
@@ -667,14 +687,14 @@ rt_process_t rt_process_do_main(const char *name,
     /* init process object container */
     rt_process_init_object_container(module);
 
-    if (*argv && tpid!=0)
+    if (*argv && (*argv)[0])
     {
         /* set process argument */
         extern char **environ;
         struct process_main_info main_info;
-        int line_size = (tpid>0)?0:-tpid;
+        int line_size = process?0:rt_strlen(*argv);
         const char **arg = argv;
-        while (tpid>0 && *arg)
+        while (process && *arg)
         {
             line_size += ((arg != argv)?1:0)+rt_strlen(*arg);
             arg++;
@@ -697,7 +717,7 @@ rt_process_t rt_process_do_main(const char *name,
             main_info.module_entry = module->module_entry;
 
             rt_memcpy(module->module_cmd_line, &main_info, sizeof(main_info));
-            if (tpid>0){
+            if (process){
             arg = argv;
             line_size = 0;
             while (*arg)
@@ -728,6 +748,10 @@ rt_process_t rt_process_do_main(const char *name,
                 env++;
             }
             main_info.module_env_line[env_size] = '\0';
+
+            RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("argv : %s \n",main_info.module_cmd_line));
+            RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("envp : %s \n",main_info.module_env_line));
+
             mmu_usermap(module->pid,(rt_uint32_t)module->module_cmd_line,
                     module->vstart_addr-module->module_cmd_size,module->module_cmd_size,0);
             /* hold thread stack */
@@ -744,7 +768,7 @@ rt_process_t rt_process_do_main(const char *name,
             free_tpid(module->tpid);
             rt_hw_interrupt_enable(temp);}
 
-            rt_kprintf("Module: allocate cmd buffer failed.\n");
+            rt_kprintf("Process: allocate cmd buffer failed.\n");
             rt_object_delete(&(module->parent));
 
             return RT_NULL;
@@ -783,7 +807,7 @@ rt_process_t rt_process_do_main(const char *name,
         free_tpid(module->tpid);
         rt_hw_interrupt_enable(temp);}
 
-        rt_kprintf("Module: allocate mem manager failed.\n");
+        rt_kprintf("Process: allocate mem manager failed.\n");
         rt_object_delete(&(module->parent));
 
         return RT_NULL;
@@ -815,14 +839,11 @@ rt_process_t rt_process_do_main(const char *name,
         free_tpid(module->tpid);
         rt_hw_interrupt_enable(temp);}
 
-        rt_kprintf("Module: allocate thread failed.\n");
+        rt_kprintf("Process: allocate thread failed.\n");
         rt_object_delete(&(module->parent));
 
         return RT_NULL;
     }
-
-    RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("thread entry 0x%x\n",
-                                   module->module_entry));
 
     /* set process id */
     module->module_thread->process_id = (void *)module;
@@ -832,6 +853,24 @@ rt_process_t rt_process_do_main(const char *name,
     struct process_main_info *main_info = (struct process_main_info*)module->module_cmd_line;
     main_info->module_cmd_line = module->module_thread->parameter+sizeof(struct process_main_info);
     main_info->module_env_line = main_info->module_cmd_line+main_info->module_cmd_size+1;
+
+    /* dump open file */
+	for (i=0; process && i<DFS_FD_MAX; i++)
+	{
+		if (process->file_list[i] != 0)
+		{
+			int fileno = process->file_list[i]-1;
+			struct dfs_fd * fd = fd_get(fileno);
+			if (fd == RT_NULL)
+				continue;
+			if (fd->flags & O_CLOEXEC)
+			{
+				fd_put(fd);
+				continue;
+			}
+			module->file_list[i] = process->file_list[i];
+		}
+	}
 
     /* startup process thread */
     rt_thread_startup(module->module_thread);
@@ -886,7 +925,7 @@ static char* _process_name(const char *path)
  *
  * @return the process object
  */
-rt_process_t rt_process_exec_env(const char *path, const char** argv, int tpid, const char **envp)
+rt_process_t rt_process_exec_env(rt_process_t process, const char *path, const char** argv, const char **envp)
 {
     int fd, length;
     struct rt_process *module;
@@ -901,14 +940,14 @@ rt_process_t rt_process_exec_env(const char *path, const char** argv, int tpid, 
 
     if (stat(path, &s) !=0)
     {
-        rt_kprintf("Module: access %s failed\n", path);
+        rt_kprintf("Process: access %s failed\n", path);
 
         return RT_NULL;
     }
     offset_ptr = buffer = (char *)rt_malloc(s.st_size);
     if (buffer == RT_NULL)
     {
-        rt_kprintf("Module: out of memory\n");
+        rt_kprintf("Process: out of memory\n");
 
         return RT_NULL;
     }
@@ -916,7 +955,7 @@ rt_process_t rt_process_exec_env(const char *path, const char** argv, int tpid, 
     fd = open(path, O_RDONLY, 0);
     if (fd < 0)
     {
-        rt_kprintf("Module: open %s failed\n", path);
+        rt_kprintf("Process: open %s failed\n", path);
         rt_free(buffer);
 
         return RT_NULL;
@@ -936,16 +975,19 @@ rt_process_t rt_process_exec_env(const char *path, const char** argv, int tpid, 
 
     if ((rt_uint32_t)offset_ptr - (rt_uint32_t)buffer != s.st_size)
     {
-        rt_kprintf("Module: read file failed\n");
+        rt_kprintf("Process: read file failed\n");
         rt_free(buffer);
 
         return RT_NULL;
     }
 
     name   = _process_name(path);
-    module = rt_process_do_main(name, (void *)buffer, argv, tpid, envp);
-    if (module != RT_NULL && tpid < 0)
-        rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,120000,0);
+    module = rt_process_do_main(process, name, (void *)buffer, argv, envp);
+    if (module != RT_NULL && process == RT_NULL)
+    {
+        rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
+        free_tpid(1);
+    }
     rt_free(buffer);
     rt_free(name);
 
@@ -956,9 +998,9 @@ rt_process_t rt_process_exec_cmd(const char *path, const char* cmd_line, int siz
 {
 	if (size == -1)
 		size = rt_strlen(cmd_line);
-	else if (size == 0)
+	if (size == 0)
 		return RT_NULL;
-	return rt_process_exec_env(path,&cmd_line,-size,0);
+	return rt_process_exec_env(RT_NULL,path,&cmd_line,0);
 }
 
 #if defined(RT_USING_FINSH)
@@ -986,7 +1028,6 @@ rt_err_t rt_process_destroy(rt_process_t module)
     /* check parameter */
     RT_ASSERT(module != RT_NULL);
     RT_ASSERT(module->pid != 0);
-    RT_ASSERT(module->tpid != 0);
 
     RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("rt_process_destroy: %8.*s\n",
                                    RT_NAME_MAX, module->parent.name));
@@ -1002,11 +1043,13 @@ rt_err_t rt_process_destroy(rt_process_t module)
 #ifdef RT_USING_SLAB
     if (module->page_cnt > 0)
     {
-        rt_kprintf("Module: warning - memory still hasn't been free finished\n");
         for (i = 0; i < module->page_cnt; i ++)
         {
             if (((void **)module->page_array)[i])
+            {
+                rt_kprintf("Process: warning - memory leak 0x%08x\n",module->vstart_addr+module->module_size+i*RT_MM_PAGE_SIZE);
                 rt_page_free(((void **)module->page_array)[i],1);
+            }
         }
         module->page_cnt = 0;
     }
@@ -1017,7 +1060,6 @@ rt_err_t rt_process_destroy(rt_process_t module)
 #endif
 
     //关闭打开的文件
-    int showclosemsg = 0;
 	for (i=0; i<DFS_FD_MAX; i++)
 	{
 		if (module->file_list[i] != 0)
@@ -1032,11 +1074,7 @@ rt_err_t rt_process_destroy(rt_process_t module)
 				fd_put(d);
 				continue;
 			}
-			if (!showclosemsg)
-			{
-				rt_kprintf("Module: warning - file still hasn't been close finished\n");
-				showclosemsg = 1;
-			}
+			rt_kprintf("Process: warning - file leak %d/%d\n",i,fileno);
 			close(fileno);
 		}
 	}
@@ -1053,7 +1091,9 @@ rt_err_t rt_process_destroy(rt_process_t module)
     free_pid(module->pid);
     release_tpid(module->tpid,module->exitcode);
     rt_hw_interrupt_enable(temp);}
-    free_tpid(module->tpid);
+
+    RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("rt_process_destroy: %8.*s finished\n",
+                                   RT_NAME_MAX, module->parent.name));
 
     /* delete process object */
     rt_object_delete((rt_object_t)module);
@@ -1307,7 +1347,7 @@ int rt_process_fork(rt_process_t module)
     rt_hw_interrupt_enable(temp);}
     if (forkmod->pid == 0)
     {
-        rt_kprintf("Module: allocate pid failed.\n");
+        rt_kprintf("Process: allocate pid failed.\n");
         rt_object_delete(&(forkmod->parent));
 
         return -ENOMEM;
@@ -1322,7 +1362,7 @@ int rt_process_fork(rt_process_t module)
         free_tpid(forkmod->tpid);
         rt_hw_interrupt_enable(temp);}
 
-        rt_kprintf("Module: allocate space failed.\n");
+        rt_kprintf("Process: allocate space failed.\n");
         rt_object_delete(&(forkmod->parent));
 
         return -ENOMEM;
@@ -1347,7 +1387,7 @@ int rt_process_fork(rt_process_t module)
         free_tpid(forkmod->tpid);
         rt_hw_interrupt_enable(temp);}
 
-        rt_kprintf("Module: allocate cmd buffer failed.\n");
+        rt_kprintf("Process: allocate cmd buffer failed.\n");
         rt_object_delete(&(forkmod->parent));
 
         return -ENOMEM;
@@ -1385,7 +1425,7 @@ int rt_process_fork(rt_process_t module)
         free_tpid(forkmod->tpid);
         rt_hw_interrupt_enable(temp);}
 
-        rt_kprintf("Module: allocate mem manager failed.\n");
+        rt_kprintf("Process: allocate mem manager failed.\n");
         rt_object_delete(&(forkmod->parent));
 
         return -ENOMEM;
@@ -1411,7 +1451,7 @@ int rt_process_fork(rt_process_t module)
         free_tpid(forkmod->tpid);
         rt_hw_interrupt_enable(temp);}
 
-        rt_kprintf("Module: allocate thread failed.\n");
+        rt_kprintf("Process: allocate thread failed.\n");
         rt_object_delete(&(forkmod->parent));
 
         return -ENOMEM;
@@ -1444,7 +1484,7 @@ int rt_process_fork(rt_process_t module)
             free_tpid(forkmod->tpid);
             rt_hw_interrupt_enable(temp);}
 
-            rt_kprintf("Module: allocate failed.\n");
+            rt_kprintf("Process: allocate failed.\n");
             rt_thread_delete(forkmod->module_thread);
             rt_object_delete(&(forkmod->parent));
 
@@ -1538,10 +1578,11 @@ int rt_process_execve(rt_process_t module, const char*file, const char **argv, c
 		realfile = filename;
 	}
 
-	rt_process_t process = rt_process_exec_env(realfile,argv,module->tpid,envp);
+	rt_process_t process = rt_process_exec_env(module,realfile,argv,envp);
 	if (process != RT_NULL);
 	{
-		module->tpid = 0;
+		if (!module->jmppid && !module->jmpsp && !module->jmpsplen)
+			module->tpid = 0;
 		rt_process_unload(module,SIGQUIT);
 		rt_schedule();
 	}
@@ -1550,11 +1591,26 @@ int rt_process_execve(rt_process_t module, const char*file, const char **argv, c
 
 int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 {
-	int i,waitpid = 0,wait = opt & WNOHANG;
-	int find = 0,ret = 0;
-	return -1;
+	int i;
+	int waitid = 0,wait = ((opt&WNOHANG) != WNOHANG);
+	int find;
+	int result;
 
-	register rt_ubase_t temp = rt_hw_interrupt_disable();
+	//需要等待时分配等待事件
+	if (wait)
+	{
+		register rt_ubase_t temp = rt_hw_interrupt_disable();
+		waitid = __rt_ffs(mod_waitp);
+		RT_ASSERT(waitid != 0);
+		mod_waitp &= ~(1<<(waitid-1));
+		rt_event_recv(&mod_eventp,(1<<(waitid-1)),RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0,0);
+		rt_hw_interrupt_enable(temp);
+	}
+
+	do {
+	find = 0;
+	result = -1;
+	rt_enter_critical();
 	for(i=0; i<MAX_PID_SIZE; i++)
 	{
 		if (pidinfo[i][0] < 100)
@@ -1577,7 +1633,7 @@ int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 		}
 		else
 		{
-			if (i != pid-1)
+			if (i+1 != pid)
 				continue;
 		}
 		find = 1;
@@ -1590,35 +1646,43 @@ int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 			pidinfo[i][0] = 1;
 			if (!find_tpid(i+1,i+1))
 				pidinfo[i][0] = 0;
-			if (pidinfo[pidinfo[i][1]-1][0] < 100 && !find_tpid(pidinfo[i][1],i+1))
-				pidinfo[pidinfo[i][1]-1][0] = 0;
 			if (pidinfo[pidinfo[i][2]-1][0] < 100 && !find_tpid(pidinfo[i][2],i+1))
 				pidinfo[pidinfo[i][2]-1][0] = 0;
 			if (pidinfo[pidinfo[i][3]-1][0] < 100 && !find_tpid(pidinfo[i][3],i+1))
 				pidinfo[pidinfo[i][3]-1][0] = 0;
-			wait = 0;
-			ret = i+1;
+			result = i+1;
 			break;
 		}
 	}
-	//需要等待
-	waitpid = 0;
-	if (wait && find)
+	rt_exit_critical();
+
+	//没有子进程或者已经找到子进程
+	if (find == 0 || result != -1)
 	{
+		if (find == 0)
+			result = -ECHILD;
+		break;
 	}
-	//没有子进程
-	else if (wait)
+
+	//是否需要进行等待
+	if (!wait)
+		break;
+	rt_event_recv(&mod_eventp,(1<<(waitid-1)),RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,30000,0);
+	}while (1);
+
+	//释放已经分配的事件
+	if (wait)
 	{
-		waitpid = 0;
-		ret = -ECHILD;
+		register rt_ubase_t temp = rt_hw_interrupt_disable();
+		mod_waitp |= (1<<(waitid-1));
+		rt_hw_interrupt_enable(temp);
 	}
-	rt_hw_interrupt_enable(temp);
-	//等待
-	if (waitpid)
+	if (result > 0)
 	{
-		--waitpid;
+        RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("waitpid: %8.*s wait chile:%d\n",
+                                       RT_NAME_MAX, module->parent.name,result));
 	}
-	return ret;
+	return result;
 }
 
 int rt_process_savefile(rt_process_t module, int fileno)

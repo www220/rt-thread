@@ -753,6 +753,12 @@ int dfs_elm_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
             st->st_mode &= ~(DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH);
 
         st->st_size  = file_info.fsize;
+#if _MAX_SS != 512
+        st->st_blksize = SS((FATFS *)fs->data)
+#else
+        st->st_blksize = 512;
+#endif
+        st->st_blocks = (st->st_size+st->st_blksize-1)/st->st_blksize;
 
         /* get st_mtime. */
         {

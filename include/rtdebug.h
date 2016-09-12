@@ -39,6 +39,10 @@
 #define RT_DEBUG_MODULE                0
 #endif
 
+#ifndef RT_DEBUG_PROCESS
+#define RT_DEBUG_PROCESS               0
+#endif
+
 #ifndef RT_DEBUG_SCHEDULER
 #define RT_DEBUG_SCHEDULER             0
 #endif

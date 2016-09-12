@@ -369,7 +369,6 @@ static int dfs_yaffs_stat(struct dfs_filesystem* fs, const char *path, struct st
 {
 	int result;
 	struct yaffs_stat s;
-	struct rt_mtd_nand_device * mtd;
 	
 	result = yaffs_stat(path, &s);
 	if (result < 0)
@@ -380,9 +379,8 @@ static int dfs_yaffs_stat(struct dfs_filesystem* fs, const char *path, struct st
 	st->st_mode = s.st_mode;
 	st->st_size = s.st_size;
 	st->st_mtime = s.yst_mtime;
-
-	mtd = RT_MTD_NAND_DEVICE(fs->dev_id);
-	st->st_blksize = mtd->page_size;
+	st->st_blksize = s.st_blksize;
+	st->st_blocks = s.st_blocks;
 
 	return 0;
 }
@@ -409,7 +407,6 @@ static int dfs_yaffs_lstat(struct dfs_filesystem* fs, const char *path, struct s
 {
 	int result;
 	struct yaffs_stat s;
-	struct rt_mtd_nand_device * mtd;
 
 	result = yaffs_lstat(path, &s);
 	if (result < 0)
@@ -420,9 +417,8 @@ static int dfs_yaffs_lstat(struct dfs_filesystem* fs, const char *path, struct s
 	st->st_mode = s.st_mode;
 	st->st_size = s.st_size;
 	st->st_mtime = s.yst_mtime;
-
-	mtd = RT_MTD_NAND_DEVICE(fs->dev_id);
-	st->st_blksize = mtd->page_size;
+	st->st_blksize = s.st_blksize;
+	st->st_blocks = s.st_blocks;
 
 	return 0;
 }
@@ -431,12 +427,8 @@ static int dfs_yaffs_fstat(struct dfs_fd* file, struct stat *st)
 {
 	int result,fd;
 	struct yaffs_stat s;
-	struct rt_mtd_nand_device * mtd;
-    struct dfs_filesystem *fs;
 
 	fd = (int)(file->data);
-	fs = file->fs;
-
 	result = yaffs_fstat(fd, &s);
 	if (result < 0)
 		return yaffsfs_GetLastError();
@@ -446,9 +438,8 @@ static int dfs_yaffs_fstat(struct dfs_fd* file, struct stat *st)
 	st->st_mode = s.st_mode;
 	st->st_size = s.st_size;
 	st->st_mtime = s.yst_mtime;
-
-	mtd = RT_MTD_NAND_DEVICE(fs->dev_id);
-	st->st_blksize = mtd->page_size;
+	st->st_blksize = s.st_blksize;
+	st->st_blocks = s.st_blocks;
 
 	return 0;
 }

@@ -399,6 +399,22 @@ void abort(void)
 }
 
 #ifdef RT_USING_PROCESS
+#if 0
+#define PRESS_DEBUG_FILE rt_kprintf
+#else
+#define PRESS_DEBUG_FILE(...)
+#endif
+#if 0
+#define PRESS_DEBUG_NOSYS rt_kprintf
+#else
+#define PRESS_DEBUG_NOSYS(...)
+#endif
+#if 0
+#define PRESS_DEBUG_IOCTL rt_kprintf
+#else
+#define PRESS_DEBUG_IOCTL(...)
+#endif
+
 #include <rthw.h>
 #include "linux-syscall.h"
 #include "linux-usedef.h"
@@ -731,7 +747,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
            if (retno < 0)
                close(fileno);
        }
-       rt_kprintf("syscall pid:%d/%d open  file %3d/%3d lnk %s\n",module->pid,module->tpid,retno,fileno,path);
+       PRESS_DEBUG_FILE("syscall pid:%d/%d open  file %3d/%3d lnk %s\n",module->pid,module->tpid,retno,fileno,path);
        return retno;
     }
     case SYS_dup:
@@ -752,7 +768,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             fd_put(d);
             return -ENOMEM;
         }
-        rt_kprintf("syscall pid:%d/%d dup   file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,retno);
+        PRESS_DEBUG_FILE("syscall pid:%d/%d dup   file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,retno);
         return retno;
     }
     case SYS_dup2:
@@ -783,7 +799,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             fd_put(d);
             return -ENOMEM;
         }
-        rt_kprintf("syscall pid:%d/%d dup2  file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,parm2);
+        PRESS_DEBUG_FILE("syscall pid:%d/%d dup2  file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,parm2);
         return parm2;
     }
     case SYS_read:
@@ -829,7 +845,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
        int ret = ret_err(close(fileno));
        if (ret == 0)
           ret = rt_process_clearfile(module,parm1);
-       rt_kprintf("syscall pid:%d/%d close file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,ret);
+       PRESS_DEBUG_FILE("syscall pid:%d/%d close file %3d/%3d ret %d\n",module->pid,module->tpid,parm1,fileno,ret);
        return ret;
     }
     case SYS_getdents:
@@ -925,8 +941,17 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         {
             return ret_err(ioctl(fileno,RT_DEVICE_CTRL_FLSH,0));
         }
+        case TIOCGSID:
+        {
+            int fileno = rt_process_convfile(module,parm1);
+            if (fileno < 0)
+                return -EBADF;
+            pid_t *tsid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
+            *tsid = pidinfo[module->tpid-1][3];
+            return 0;
         }
-        rt_kprintf("syscall pid:%d/%d ioctl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
+        }
+        PRESS_DEBUG_IOCTL("syscall pid:%d/%d ioctl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
         return -ENOTSUP;
     }
     case SYS_fcntl:
@@ -935,7 +960,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         int fileno = rt_process_convfile(module,parm1);
         if (fileno < 0)
             return -EBADF;
-        rt_kprintf("syscall pid:%d/%d fcntl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
+        PRESS_DEBUG_IOCTL("syscall pid:%d/%d fcntl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
         return -ENOTSUP;
     }
     case SYS_BASE+901:
@@ -970,7 +995,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         return 0;
     }
     }
-    rt_kprintf("syscall %d not supported\n",nbr-SYS_BASE);
+    PRESS_DEBUG_NOSYS("syscall %d not supported\n",nbr-SYS_BASE);
     return -ENOTSUP;
 }
 #endif

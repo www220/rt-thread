@@ -30,6 +30,8 @@ OBJS = main.o \
 	linux/cfspeed.o \
 	linux/tcdrain.o \
 	linux/tcsendbrk.o \
+	linux/getopt.o \
+	linux/getopt1.o \
 	libbb/pwd_grp.o
 
 %.o:%.c
