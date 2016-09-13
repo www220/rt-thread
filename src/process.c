@@ -1046,11 +1046,12 @@ rt_err_t rt_process_destroy(rt_process_t module)
         for (i = 0; i < module->page_cnt; i ++)
         {
             if (((void **)module->page_array)[i])
-            {
-                rt_kprintf("Process: warning - memory leak 0x%08x\n",module->vstart_addr+module->module_size+i*RT_MM_PAGE_SIZE);
                 rt_page_free(((void **)module->page_array)[i],1);
-            }
         }
+        rt_kprintf("Process: warning - memory leak 0x%08x-0x%08x %dk\n",
+                module->vstart_addr+module->module_size,
+                module->vstart_addr+module->module_size+module->page_cnt*RT_MM_PAGE_SIZE,
+                module->page_cnt*4);
         module->page_cnt = 0;
     }
     if (module->page_array != RT_NULL)

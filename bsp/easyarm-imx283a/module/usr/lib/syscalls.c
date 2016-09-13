@@ -21,6 +21,7 @@
 
 extern int _set_errno(int n);
 extern int _getdents(int file, struct dirent *dirp, size_t nbytes);
+extern int _fcntl(int fd, int flag, int arg);
 extern pid_t _getpid(void);
 
 /* SWI with SYS_ call number and no parameters */
@@ -125,6 +126,18 @@ _isatty(int fd)
     if (fstat(fd, &buf) == 0 && S_ISCHR(buf.st_mode))
         return 1;
     return 0;
+}
+
+int
+fcntl(int fd, int flag, ...)
+{
+	int arg;
+	va_list ap;
+
+	va_start(ap, flag);
+	arg = va_arg(ap, int);
+	int rc = _fcntl(fd, flag, arg);
+	return _set_errno(rc);
 }
 
 int

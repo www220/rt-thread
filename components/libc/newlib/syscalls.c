@@ -409,7 +409,7 @@ void abort(void)
 #else
 #define PRESS_DEBUG_NOSYS(...)
 #endif
-#if 0
+#if 1
 #define PRESS_DEBUG_IOCTL rt_kprintf
 #else
 #define PRESS_DEBUG_IOCTL(...)
@@ -950,6 +950,30 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             *tsid = pidinfo[module->tpid-1][3];
             return 0;
         }
+        case TIOCGPGRP:
+        {
+            int fileno = rt_process_convfile(module,parm1);
+            if (fileno < 0)
+                return -EBADF;
+            pid_t *tgid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
+            *tgid = pidinfo[module->tpid-1][2];
+            return 0;
+        }
+        case TIOCSPGRP:
+        {
+            int fileno = rt_process_convfile(module,parm1);
+            if (fileno < 0)
+                return -EBADF;
+            pid_t *tgid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
+            temp = rt_hw_interrupt_disable();
+            pidinfo[module->tpid-1][2] = *tgid;
+            rt_hw_interrupt_enable(temp);
+            return 0;
+        }
+        case TCSBRK:
+        {
+            return 0;
+        }
         }
         PRESS_DEBUG_IOCTL("syscall pid:%d/%d ioctl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
         return -ENOTSUP;
@@ -960,6 +984,48 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         int fileno = rt_process_convfile(module,parm1);
         if (fileno < 0)
             return -EBADF;
+        switch(parm2)
+        {
+        case F_DUPFD:
+        {
+        	return sys_call_switch(SYS_dup2,parm1,parm3,0,0,0,0);
+        }
+        case F_GETFD:
+        {
+        	struct dfs_fd *d = fd_get(fileno);
+        	if (d == NULL)
+        		return -EBADF;
+        	fd_put(d);
+        	return (d->flags&O_CLOEXEC)?(FD_CLOEXEC):0;
+        }
+        case F_GETFL:
+        {
+        	struct dfs_fd *d = fd_get(fileno);
+        	if (d == NULL)
+        		return -EBADF;
+        	fd_put(d);
+        	return d->flags;
+        }
+        case F_SETFD:
+        {
+        	struct dfs_fd *d = fd_get(fileno);
+        	if (d == NULL)
+        		return -EBADF;
+        	if (parm3 == FD_CLOEXEC)
+        		d->flags |= O_CLOEXEC;
+        	fd_put(d);
+        	return 0;
+        }
+        case F_SETFL:
+        {
+        	struct dfs_fd *d = fd_get(fileno);
+        	if (d == NULL)
+        		return -EBADF;
+        	d->flags = parm3;
+        	fd_put(d);
+        	return 0;
+        }
+        }
         PRESS_DEBUG_IOCTL("syscall pid:%d/%d fcntl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
         return -ENOTSUP;
     }
