@@ -34,6 +34,7 @@
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
+#include <shell.h>
 #endif
 
 #ifdef RT_USING_DFS
@@ -43,6 +44,7 @@
 
 #ifdef RT_USING_PROCESS
 #include "module.h"
+#include "board.h"
 
 #define elf_module        ((Elf32_Ehdr *)module_ptr)
 #define shdr              ((Elf32_Shdr *)((rt_uint8_t *)module_ptr + elf_module->e_shoff))
@@ -983,13 +985,12 @@ rt_process_t rt_process_exec_env(rt_process_t process, const char *path, const c
 
     name   = _process_name(path);
     module = rt_process_do_main(process, name, (void *)buffer, argv, envp);
-    if (module != RT_NULL && process == RT_NULL)
-    {
-        rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
-        free_tpid(1);
-    }
     rt_free(buffer);
     rt_free(name);
+
+    //启动程序以后终止msh的输入
+    if (module != RT_NULL && process == RT_NULL)
+        tty_rx_inxpz = 0;
 
     return module;
 }
@@ -1646,11 +1647,13 @@ int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 			//搜索进程是否还有被占用的存在
 			pidinfo[i][0] = 1;
 			if (!find_tpid(i+1,i+1))
-				pidinfo[i][0] = 0;
-			if (pidinfo[pidinfo[i][2]-1][0] < 100 && !find_tpid(pidinfo[i][2],i+1))
-				pidinfo[pidinfo[i][2]-1][0] = 0;
-			if (pidinfo[pidinfo[i][3]-1][0] < 100 && !find_tpid(pidinfo[i][3],i+1))
-				pidinfo[pidinfo[i][3]-1][0] = 0;
+				free_tpid(i+1);
+			if (pidinfo[pidinfo[i][2]-1][0] < 100 && pidinfo[pidinfo[i][2]-1][0] > 0
+					&& !find_tpid(pidinfo[i][2],i+1))
+				free_tpid(pidinfo[i][2]);
+			if (pidinfo[pidinfo[i][3]-1][0] < 100 && pidinfo[pidinfo[i][2]-1][0] > 0
+					&& !find_tpid(pidinfo[i][3],i+1))
+				free_tpid(pidinfo[i][3]);
 			result = i+1;
 			break;
 		}
@@ -1727,4 +1730,19 @@ int rt_process_clearfile(rt_process_t module, int fileno)
 	return -1;
 }
 
+void rt_process_wait(int delay)
+{
+    if (tty_rx_inxpz == 0)
+    {
+        if (rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,delay,0) != RT_EOK)
+            return;
+        free_tpid(1);
+        tty_rx_inxpz = 1;
+        rt_kprintf(FINSH_PROMPT);
+    }
+    else
+    {
+        rt_thread_delay(delay);
+    }
+}
 #endif

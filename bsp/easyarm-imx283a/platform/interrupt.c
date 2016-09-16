@@ -176,12 +176,12 @@ void rt_hw_interrupt_ack(rt_uint32_t fiq_irq, rt_uint32_t id)
 void list_irq(void)
 {
     int irq;
-    rt_kprintf("number\tcount\tname\n");
+    rt_kprintf("number\tcount\t name\n");
     for (irq = 0; irq < MAX_HANDLERS; irq++)
     {
         if (rt_strncmp(irq_desc[irq].name, "null", sizeof("null")))
         {
-            rt_kprintf("%02ld: %10ld  %s\n",
+            rt_kprintf("%3ld: %10ld  %s\n",
                        irq, irq_desc[irq].counter, irq_desc[irq].name);
         }
     }

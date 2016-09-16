@@ -25,6 +25,7 @@
 #ifndef __DFS_H__
 #define __DFS_H__
 
+#include <dfs_def.h>
 #include <string.h>
 
 #ifdef __cplusplus
@@ -41,6 +42,11 @@ int fd_new(void);
 struct dfs_fd *fd_get(int fd);
 void fd_put(struct dfs_fd *fd);
 int fd_is_open(const char *pathname);
+
+int dfs_file_select(int maxfdp,
+		rt_uint32_t *readset, rt_uint32_t *writeset, rt_uint32_t *exceptset,
+		rt_int32_t timeout);
+extern struct dfs_select_info dfs_select_list;
 
 #ifdef __cplusplus
 }

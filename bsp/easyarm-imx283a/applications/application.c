@@ -378,18 +378,22 @@ static void rt_thread_entry_main(void* parameter)
     finsh_system_init();
     finsh_set_device(FINSH_DEVICE_NAME);
    	rt_thread_delay(100);
-#else
-#ifdef RT_USING_PROCESS
-#define bupath "/mnt/mmc/busybox.mo"
-#define buargc "ls -l"
-   	rt_process_exec_cmd(bupath, bupath " " buargc, -1);
 #endif
+#if 0
+#define bupath "/bin/busybox"
+#define buargc "init"
+   	rt_process_exec_cmd(bupath, bupath " " buargc, -1);
 #endif
 
     while (1)
     {
         uptime_count++;
+#ifdef RT_USING_PROCESS
+        extern void rt_process_wait(int delay);
+        rt_process_wait(1000);
+#else
         rt_thread_delay(1000);
+#endif
     }
 }
 

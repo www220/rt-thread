@@ -28,9 +28,28 @@
 #include <rtdevice.h>
 #include <stdint.h>
 #include "board.h"
+#include "linux-syscall.h"
+#include "linux-usedef.h"
+#include <errno.h>
+#include <dfs_def.h>
+#include <dfs.h>
 
 #define CONFIG_UART_CLK		24000000
 #define CONFIG_INT_MASK		BM_UARTAPP_INTR_RXIEN|BM_UARTAPP_INTR_RTIEN
+
+struct tty_device
+{
+	struct rt_device parent;
+
+	rt_device_t device; /* the actual device */
+	struct winsize win;
+	struct termios ios;
+	int file[32];
+	pid_t tpid[2];
+};
+static struct rt_event rx_sem;
+static void rt_tty_init(rt_device_t device, struct tty_device* tty, const char* att_name);
+extern int __rt_ffs(int value);
 
 struct at91_uart {
 	u32 membase;
@@ -39,6 +58,7 @@ struct at91_uart {
 	char* name;
 	struct pin_group* pin;
 	struct rt_serial_device* dev;
+	struct tty_device* tty;
 };
 
 #if defined(RT_USING_UART1)
@@ -98,73 +118,85 @@ static struct pin_group uart5_pins = {
 
 #if defined(RT_USING_DBGU)
 static struct rt_serial_device serial_dbgu;
+static struct tty_device tty_dbgu;
 static struct at91_uart dbgu = {
 	REGS_UARTDBG_BASE,
 	IRQ_DUART,
 	0,
 	"DbgU",
 	0,
-	&serial_dbgu
+	&serial_dbgu,
+	&tty_dbgu
 };
 #endif
 
 #if defined(RT_USING_UART1)
 static struct rt_serial_device serial_uart1;
+static struct tty_device tty_uart1;
 static struct at91_uart uart1 = {
 	REGS_UARTAPP0_BASE,
 	IRQ_AUART0,
 	PIN_UART1,
 	"Uart1",
 	&uart1_pins,
-	&serial_uart1
+	&serial_uart1,
+	&tty_uart1
 };
 #endif
 
 #if defined(RT_USING_UART2)
 static struct rt_serial_device serial_uart2;
+static struct tty_device tty_uart2;
 static struct at91_uart uart2 = {
 	REGS_UARTAPP1_BASE,
 	IRQ_AUART1,
 	PIN_UART2,
 	"Uart2",
 	&uart2_pins,
-	&serial_uart2
+	&serial_uart2,
+	&tty_uart2
 };
 #endif
 
 #if defined(RT_USING_UART3)
 static struct rt_serial_device serial_uart3;
+static struct tty_device tty_uart3;
 static struct at91_uart uart3 = {
 	REGS_UARTAPP2_BASE,
 	IRQ_AUART2,
 	PIN_UART3,
 	"Uart3",
 	&uart3_pins,
-	&serial_uart3
+	&serial_uart3,
+	&tty_uart3
 };
 #endif
 
 #if defined(RT_USING_UART4)
 static struct rt_serial_device serial_uart4;
+static struct tty_device tty_uart4;
 static struct at91_uart uart4 = {
 	REGS_UARTAPP3_BASE,
 	IRQ_AUART3,
 	PIN_UART4,
 	"Uart4",
 	&uart4_pins,
-	&serial_uart4
+	&serial_uart4,
+	&tty_uart4
 };
 #endif
 
 #if defined(RT_USING_UART5)
 static struct rt_serial_device serial_uart5;
+static struct tty_device tty_uart5;
 static struct at91_uart uart5 = {
 	REGS_UARTAPP4_BASE,
 	IRQ_AUART4,
 	0,
 	"Uart5",
 	&uart5_pins,
-	&serial_uart5
+	&serial_uart5,
+	&tty_uart5
 };
 #endif
 
@@ -344,6 +376,13 @@ static rt_err_t at91_usart_control(struct rt_serial_device *serial,
     		writel(CONFIG_INT_MASK, uart->membase + HW_UARTAPP_INTR_SET);
         }
         break;
+    case RT_DEVICE_CTRL_CHAR_GETREAD: {
+        struct rt_serial_rx_fifo* rx_fifo = (struct rt_serial_rx_fifo*) serial->serial_rx;
+        *((int *)arg) = (rx_fifo && (rx_fifo->get_index!=rx_fifo->put_index))?1:0;
+        break; }
+    case RT_DEVICE_CTRL_CHAR_GETWRITE:
+        *((int *)arg) = 0;
+        break;
     }
 
     return RT_EOK;
@@ -477,6 +516,7 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_dbgu, "dbgu", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &dbgu);
+    rt_tty_init(&serial_dbgu.parent, &tty_dbgu, "tty0");
 #endif
 
 #if defined(RT_USING_UART1)
@@ -489,6 +529,7 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_uart1, "uart1", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart1);
+    rt_tty_init(&serial_uart1.parent, &tty_uart1, "ttyS0");
 #endif
 
 #if defined(RT_USING_UART2)
@@ -501,6 +542,7 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_uart2, "uart2", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart2);
+    rt_tty_init(&serial_uart2.parent, &tty_uart2, "ttyS1");
 #endif
 
 #if defined(RT_USING_UART3)
@@ -513,6 +555,7 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_uart3, "uart3", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart3);
+    rt_tty_init(&serial_uart3.parent, &tty_uart3, "ttyS2");
 #endif
 
 #if defined(RT_USING_UART4)
@@ -525,6 +568,7 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_uart4, "uart4", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart4);
+    rt_tty_init(&serial_uart4.parent, &tty_uart4, "ttyS3");
 #endif
 
 #if defined(RT_USING_UART5)
@@ -537,7 +581,10 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_uart5, "uart5", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart5);
+    rt_tty_init(&serial_uart5.parent, &tty_uart5, "ttyS4");
 #endif
+
+    rt_event_init(&rx_sem, "uartrx", 0);
 }
 
 rt_size_t rt_device_write_485(rt_device_t dev,
@@ -563,3 +610,306 @@ rt_size_t rt_device_write_485(rt_device_t dev,
 	return ret;
 }
 RTM_EXPORT(rt_device_write_485);
+
+volatile int tty_rx_inxpz = 1;
+static rt_err_t tty_rx_ind(rt_device_t dev, rt_size_t size)
+{
+    struct at91_uart *uart;
+    struct tty_device* device;
+
+    uart = (struct at91_uart *)dev->user_data;
+    RT_ASSERT(uart != RT_NULL);
+    device = (struct tty_device*)uart->tty;
+    RT_ASSERT(device != RT_NULL);
+
+    /* release semaphore to let finsh thread rx data */
+    if (device->parent.rx_indicate && tty_rx_inxpz)
+    {
+        device->parent.rx_indicate(&device->parent, size);
+        return RT_EOK;
+    }
+
+    //发出事件信号
+    if (uart->irq == IRQ_DUART)
+        rt_event_send(&rx_sem, 0x01);
+    else
+        rt_event_send(&rx_sem, (1<<(uart->irq-IRQ_AUART0+1)));
+
+    /* lock interrupt */
+    {register rt_base_t temp = rt_hw_interrupt_disable();
+    struct rt_list_node *n;
+    struct dfs_select_info *sinfo;
+    /* find a suitable position */
+    for (n = dfs_select_list.list.next; n != &dfs_select_list.list; n = n->next)
+    {
+    	int i,pz = 0;
+    	sinfo = rt_list_entry(n, struct dfs_select_info, list);
+    	//遍历找到是否关注该句柄
+    	for (i=0; i<32; i++)
+    	{
+    		if (device->file[i] == 0)
+    			continue;
+    		if (device->file[i] > sinfo->maxfdp)
+    			continue;
+    		int fileno = device->file[i]-1;
+    		if (sinfo->reqset[0] && (sinfo->reqset[0][fileno/32] & (1<<(fileno%32))))
+    		{
+    			sinfo->recvset[0][fileno/32] |= (1<<(fileno%32));
+    			pz = 1;
+    		}
+    	}
+    	//释放对象
+    	if (pz)
+    	{
+    		rt_sem_release(&sinfo->sem);
+    		pz = 0;
+    	}
+    }
+    /* unlock interrupt */
+    rt_hw_interrupt_enable(temp);}
+
+    return RT_EOK;
+}
+
+/* common device interface */
+static rt_err_t tty_init(rt_device_t dev)
+{
+	rt_err_t ret = RT_EOK;
+	struct tty_device* device;
+
+	device = (struct tty_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	memset(&device->win,0,sizeof(struct winsize));
+	device->win.ws_col = 132;
+	device->win.ws_row = 43;
+
+    memset(&device->ios,0,sizeof(struct termios));
+    device->ios.c_iflag = (BRKINT | ISTRIP | ICRNL | IMAXBEL | IXON | IXANY);
+    device->ios.c_oflag = (OPOST | ONLCR);
+    device->ios.c_cflag = (B115200 | CS8 | CREAD | HUPCL | CLOCAL);
+    device->ios.c_lflag = (ICANON | ISIG | IEXTEN | ECHOE|ECHOKE|ECHOCTL);
+
+    static cc_t def_c_cc[NCCS] = {CINTR,CQUIT,CERASE,CKILL,CEOF,CTIME,CMIN,0,CSTART,CSTOP,CSUSP,
+    														 0,CREPRINT,CDISCARD,CWERASE,CLNEXT};
+    memcpy(device->ios.c_cc,def_c_cc,sizeof(def_c_cc));
+    memset(&device->file,0,sizeof(device->file));
+    memset(&device->tpid,0,sizeof(device->tpid));
+	return ret;
+}
+
+static rt_err_t tty_open(rt_device_t dev, rt_uint16_t oflag)
+{
+	rt_err_t ret = RT_EOK;
+	struct tty_device* device;
+
+	device = (struct tty_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	//设备已经打开了，不要重复打开了,系统初始化的时候不能开中断
+	if (device->parent.ref_count && (device->device->open_flag&RT_DEVICE_FLAG_INT_RX))
+		return RT_EOK;
+
+	if (oflag&RT_DEVICE_FLAG_INT_RX)
+		rt_device_set_rx_indicate(device->device, tty_rx_ind);
+
+	/* open this device and set the new device in finsh shell */
+	return rt_device_open(device->device, oflag);
+}
+
+static rt_err_t tty_close(rt_device_t dev)
+{
+	rt_err_t ret = RT_EOK;
+	struct tty_device* device;
+
+	device = (struct tty_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	return rt_device_close(device->device);
+}
+
+static rt_size_t tty_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
+{
+	int ret = 0,set = 0;
+	struct tty_device* device;
+	struct at91_uart *uart;
+
+	device = (struct tty_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+	uart = (struct at91_uart *)device->device->user_data;
+	RT_ASSERT(uart != RT_NULL);
+
+	if (uart->irq == IRQ_DUART)
+		set = 0x01;
+	else
+		set = (1<<(uart->irq-IRQ_AUART0+1));
+	//接受前清理事件信号
+	rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0,0);
+	ret = rt_device_read(device->device, pos, buffer, size);
+	if (ret <= 0)
+	{
+		//msh使用的是异步读取
+		if (device->parent.rx_indicate && tty_rx_inxpz)
+			return ret;
+		//等待事件信号
+		rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
+		ret = rt_device_read(device->device, pos, buffer, size);
+	}
+	if (ret>0 && device->ios.c_lflag & ECHO && tty_rx_inxpz==0)
+	{
+		//回车换行的转换
+		if (device->ios.c_iflag & (ICRNL|INLCR))
+		{
+			char read = '\r',write = '\n';
+			if (device->ios.c_iflag & INLCR)
+			{
+				read = '\n';
+				write = '\r';
+			}
+			size = ret;
+			while (size--)
+			{
+				if (((char *)buffer)[size] == read)
+					((char *)buffer)[size] = write;
+			}
+		}
+		rt_device_write(device->device, pos, buffer, ret);
+	}
+	return ret;
+}
+
+static rt_size_t tty_write(rt_device_t dev, rt_off_t pos, const void* buffer, rt_size_t size)
+{
+	struct tty_device* device;
+
+	device = (struct tty_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+
+	//回车换行的转换
+	if (device->ios.c_oflag & ONLCR)
+		device->device->open_flag |= RT_DEVICE_FLAG_STREAM;
+	else
+		device->device->open_flag &= ~RT_DEVICE_FLAG_STREAM;
+
+	return rt_device_write(device->device, pos, buffer, size);
+}
+
+static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
+{
+	struct tty_device* device;
+
+	device = (struct tty_device*)dev;
+	RT_ASSERT(device != RT_NULL);
+	RT_ASSERT(device->device != RT_NULL);
+
+	switch(cmd)
+	{
+	case RT_DEVICE_CTRL_GETWS:
+		rt_memcpy(args,&device->win,sizeof(device->win));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_SETWS:
+		rt_memcpy(&device->win,args,sizeof(device->win));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_GETS:
+		rt_memcpy(args,&device->ios,sizeof(device->ios));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_SETS:
+	case RT_DEVICE_CTRL_SETSW:
+	case RT_DEVICE_CTRL_SETSF:
+		rt_memcpy(&device->ios,args,sizeof(device->ios));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_GPGRP:
+		rt_memcpy(args,&device->tpid[0],sizeof(pid_t));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_SPGRP:
+		rt_memcpy(&device->tpid[0],args,sizeof(pid_t));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_GSID:
+		rt_memcpy(args,&device->tpid[1],sizeof(pid_t));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_SSID:
+		rt_memcpy(&device->tpid[1],args,sizeof(pid_t));
+		return RT_EOK;
+	case RT_DEVICE_CTRL_CHAR_SETFILE:
+	{
+		int i;
+		register rt_base_t temp = rt_hw_interrupt_disable();
+		for (i=0; i<32; i++)
+		{
+			if (device->file[i] == 0)
+			{
+				device->file[i] = *((int *)args)+1;
+				break;
+			}
+		}
+		RT_ASSERT(i != 32);
+		rt_hw_interrupt_enable(temp);
+		return RT_EOK;
+	}
+	case RT_DEVICE_CTRL_CHAR_GETFILE:
+	{
+		int i;
+		register rt_base_t temp = rt_hw_interrupt_disable();
+		for (i=0; i<32; i++)
+		{
+			if (device->file[i] != 0)
+			{
+				*((int *)args) = device->file[i]-1;
+				break;
+			}
+		}
+		rt_hw_interrupt_enable(temp);
+		return (i==32)?RT_ERROR:RT_EOK;
+	}
+	case RT_DEVICE_CTRL_CHAR_CHKFILE:
+	{
+		int i;
+		register rt_base_t temp = rt_hw_interrupt_disable();
+		for (i=0; i<32; i++)
+		{
+			if (device->file[i] == *((int *)args))
+			{
+				*((int *)args) = device->file[i]-1;
+				break;
+			}
+		}
+		rt_hw_interrupt_enable(temp);
+		return (i==32)?RT_ERROR:RT_EOK;
+	}
+	case RT_DEVICE_CTRL_CHAR_CLRFILE:
+	{
+		int i;
+		register rt_base_t temp = rt_hw_interrupt_disable();
+		for (i=0; i<32; i++)
+		{
+			if (device->file[i] == *((int *)args)+1)
+			{
+				device->file[i] = 0;
+				break;
+			}
+		}
+		rt_hw_interrupt_enable(temp);
+		return RT_EOK;
+	}
+	}
+	return rt_device_control(device->device, cmd, args);
+}
+
+static void rt_tty_init(rt_device_t device, struct tty_device* tty, const char* att_name)
+{
+	rt_memset(tty, 0, sizeof(struct tty_device));
+
+	/* device initialization */
+	tty->parent.type = RT_Device_Class_Char;
+	/* set device interface */
+	tty->parent.init 	= tty_init;
+	tty->parent.open 	= tty_open;
+	tty->parent.close   = tty_close;
+	tty->parent.read 	= tty_read;
+	tty->parent.write   = tty_write;
+	tty->parent.control	= tty_control;
+	tty->parent.user_data = RT_NULL;
+
+	tty->device = device;
+	rt_device_register(&tty->parent, att_name, RT_DEVICE_FLAG_RDWR);
+}

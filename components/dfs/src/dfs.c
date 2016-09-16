@@ -46,7 +46,7 @@ struct dfs_fd fd_table[DFS_FD_MAX];
 #ifdef DFS_USING_SELECT
 #include <rthw.h>
 static int dfs_select_semindex;
-static struct dfs_select_info dfs_select_list;
+struct dfs_select_info dfs_select_list;
 #endif
 
 /**
@@ -435,7 +435,7 @@ RTM_EXPORT(dfs_normalize_path);
 #ifdef DFS_USING_SELECT
 static struct dfs_fd *dfs_file_isdevfs(int fileno)
 {
-	int devfiles = fileno;
+	int devfiles = fileno+1;
 	rt_err_t ret;
 	rt_device_t device;
 	struct dfs_fd *d = fd_get(fileno);
@@ -448,13 +448,6 @@ static struct dfs_fd *dfs_file_isdevfs(int fileno)
 	}
 	device = (rt_device_t)d->data;
 	if (device == RT_NULL || device->type != RT_Device_Class_Char)
-	{
-		fd_put(d);
-		return RT_NULL;
-	}
-	//设备必须打开且有中断，否则wait不了
-	if ((device->open_flag & (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_FLAG_INT_RX))
-			!= (RT_DEVICE_OFLAG_OPEN|RT_DEVICE_FLAG_INT_RX))
 	{
 		fd_put(d);
 		return RT_NULL;
@@ -523,10 +516,10 @@ int dfs_file_select(int maxfdp,
 			d = dfs_file_isdevfs(i);
 			if (d != RT_NULL)
 			{
-				int writebyte = 0;
+				int writebyte = 1;
 				rt_device_t device = (rt_device_t)d->data;
 				status = rt_device_control(device,RT_DEVICE_CTRL_CHAR_GETWRITE,&writebyte);
-				if (status == RT_EOK && writebyte > 0)
+				if (status == RT_EOK && writebyte == 0)
 				{
 					recvset[1][i/32] |= (1<<(i%32));
 					count[1]++;
@@ -616,16 +609,14 @@ int dfs_file_select(int maxfdp,
 		//复制触发数据
 		for (i=0; i<3; i++)
 		{
-			if (sel->reqset[i])
-				rt_memcpy(sel->reqset[i],sel->recvset[0],maxfdp+31/32);
-		}
-		//计算返回个数
-		for (i=0; i<maxfdp; i++)
-		{
-			for (j=0; j<3; j++)
+			if (sel->reqset[i] == RT_NULL)
+				continue;
+			//计算返回个数
+			rt_memcpy(sel->reqset[i],sel->recvset[i],maxfdp+31/32);
+			for (j=0; j<maxfdp; j++)
 			{
-				if (sel->reqset[j][i/32] & (1<<(i%32)))
-					count[j]++;
+				if (sel->reqset[i][j/32] & (1<<(j%32)))
+					count[i]++;
 			}
 		}
 		//取最大值

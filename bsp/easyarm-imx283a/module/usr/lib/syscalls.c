@@ -136,8 +136,7 @@ fcntl(int fd, int flag, ...)
 
 	va_start(ap, flag);
 	arg = va_arg(ap, int);
-	int rc = _fcntl(fd, flag, arg);
-	return _set_errno(rc);
+	return _fcntl(fd, flag, arg);
 }
 
 int
@@ -239,10 +238,7 @@ struct dirent *readdir(DIR *d)
         /* get a new entry */
         rc = _getdents(d->fd,(struct dirent*)&d->buf,sizeof(d->buf)-1);
         if (rc <= 0)
-        {
-            _set_errno(rc);
             return NULL;
-        }
 
         d->num = rc;
         d->cur = 0; /* current entry index */

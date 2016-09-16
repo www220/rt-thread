@@ -838,7 +838,12 @@ enum rt_device_class_type
 #define RT_DEVICE_CTRL_SETSF            0xE3            /**< ioctl TCSETSF */
 #define RT_DEVICE_CTRL_GETWS            0xE4            /**< ioctl TIOCGWINSZ */
 #define RT_DEVICE_CTRL_SETWS            0xE5            /**< ioctl TIOCSWINSZ */
-#define RT_DEVICE_CTRL_FLSH             0xE6            /**< ioctl TCSETSF */
+#define RT_DEVICE_CTRL_FLSH             0xE6            /**< ioctl TCFLSH */
+#define RT_DEVICE_CTRL_BRK              0xE7            /**< ioctl TCSBRK */
+#define RT_DEVICE_CTRL_GPGRP            0xE8            /**< ioctl TIOCGPGRP */
+#define RT_DEVICE_CTRL_SPGRP            0xE9            /**< ioctl TIOCSPGRP */
+#define RT_DEVICE_CTRL_GSID             0xEA            /**< ioctl TIOCGSID */
+#define RT_DEVICE_CTRL_SSID             0xEB            /**< ioctl TIOCSSID */
 #define RT_DEVICE_CTRL_BLK_GETGEOME     0x10            /**< get geometry information   */
 #define RT_DEVICE_CTRL_BLK_SYNC         0x11            /**< flush data to block device */
 #define RT_DEVICE_CTRL_BLK_ERASE        0x12            /**< erase block on block device */

@@ -81,8 +81,8 @@
 #define PIN_PZ2		PINID_SSP0_DATA5
 #endif
 
-#define CONSOLE_DEVICE "dbgu"
-#define FINSH_DEVICE_NAME "dbgu"
+#define CONSOLE_DEVICE "tty0"
+#define FINSH_DEVICE_NAME "tty0"
 
 void rt_hw_board_init(void);
 void rt_hw_interrupt_init(void);
@@ -110,6 +110,7 @@ EXTVAL extern volatile int wtdog_count;
 EXTVAL extern volatile int sys_stauts;
 EXTVAL extern volatile int uptime_count;
 EXTVAL extern volatile int fs_system_init;
+EXTVAL extern volatile int tty_rx_inxpz;
 EXTVAL extern unsigned char PZ[4];
 void inittmppath(void);
 void cleartmppath(void);

@@ -409,7 +409,7 @@ void abort(void)
 #else
 #define PRESS_DEBUG_NOSYS(...)
 #endif
-#if 1
+#if 0
 #define PRESS_DEBUG_IOCTL rt_kprintf
 #else
 #define PRESS_DEBUG_IOCTL(...)
@@ -418,9 +418,6 @@ void abort(void)
 #include <rthw.h>
 #include "linux-syscall.h"
 #include "linux-usedef.h"
-
-#include <shell.h>
-extern struct finsh_shell *shell;
 
 extern void *rt_process_conv_ptr(rt_process_t module, rt_uint32_t ptr, rt_int32_t size);
 extern rt_uint32_t rt_process_brk(rt_process_t module, rt_uint32_t addr);
@@ -439,7 +436,8 @@ static inline int ret_err(int ret)
         int err = errno;
         if (err == 0)
             err = rt_get_errno();
-        return (err>0)?(-err):(err);
+        if (err != 0)
+            return (err>0)?(-err):(err);
     }
     return ret;
 }
@@ -747,6 +745,14 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
            if (retno < 0)
                close(fileno);
        }
+       //如果是打开0文件句柄，设置控制终端的相关参数
+       if (retno == 0)
+       {
+            pid_t sid = pidinfo[module->tpid-1][2];
+            ioctl(fileno,RT_DEVICE_CTRL_SPGRP,&sid);
+            sid = pidinfo[module->tpid-1][3];
+            ioctl(fileno,RT_DEVICE_CTRL_SSID,&sid);
+       }
        PRESS_DEBUG_FILE("syscall pid:%d/%d open  file %3d/%3d lnk %s\n",module->pid,module->tpid,retno,fileno,path);
        return retno;
     }
@@ -890,8 +896,80 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_poll:
     {
-        rt_err_t ret = rt_sem_take(&shell->rx_sem, parm3);
-        return (ret==RT_EOK)?1:0;
+        errno = 0;
+        //纯粹睡眠
+        if (parm1 == 0 || parm2 == 0)
+        {
+            if ((int)parm3 > 0)
+                rt_thread_delay(parm3);
+            return 0;
+        }
+        //找到最大的fd,标记set
+        int i,maxfd = -1,pz = 0;
+        int subsize = ((DFS_FD_MAX+31)/32);
+        rt_uint32_t *pollset = rt_malloc(3*subsize*sizeof(rt_uint32_t));
+        if (pollset == RT_NULL)
+            return -ENOMEM;
+        rt_memset(pollset, 0, 3*subsize*sizeof(rt_uint32_t));
+        struct pollfd *ufds = (struct pollfd *)rt_process_conv_ptr(module,parm1,parm2*sizeof(struct pollfd));
+        for (i=0; i<parm2; i++)
+        {
+            int fileno = rt_process_convfile(module,ufds[i].fd);
+            if (fileno < 0)
+                continue;
+            if (maxfd < fileno)
+                maxfd = fileno;
+            if (ufds[i].events & (POLLIN|POLLPRI))
+            {
+                pz |= 0x01;
+                pollset[fileno/32] |= (1<<(fileno%32));
+                pollset[2*subsize+fileno/32] |= (1<<(fileno%32));
+            }
+            if (ufds[i].events & POLLOUT)
+            {
+                pz |= 0x02;
+                pollset[subsize+fileno/32] |= (1<<(fileno%32));
+                pollset[2*subsize+fileno/32] |= (1<<(fileno%32));
+            }
+        }
+        if (pz == 0)
+        {
+            if ((int)parm3 > 0)
+                rt_thread_delay(parm3);
+            rt_free(pollset);
+            return 0;
+        }
+        int ret = dfs_file_select(maxfd+1,
+                ((pz&0x01)?&pollset[0]:RT_NULL),
+                ((pz&0x02)?&pollset[subsize]:RT_NULL),
+                &pollset[2*subsize],
+                parm3);
+        if (ret <= 0)
+        {
+            rt_free(pollset);
+            return ret;
+        }
+        //设置相关set
+        for (i=0; i<parm2; i++)
+        {
+            int fileno = rt_process_convfile(module,ufds[i].fd);
+            if (fileno < 0)
+                continue;
+            if (ufds[i].events & (POLLIN|POLLPRI))
+            {
+                if (pollset[fileno/32] & (1<<(fileno%32)))
+                    ufds[i].revents |= (POLLIN|POLLPRI);
+            }
+            if (ufds[i].events & POLLOUT)
+            {
+                if (pollset[subsize+fileno/32] & (1<<(fileno%32)))
+                    ufds[i].revents |= POLLOUT;
+            }
+            if (pollset[2*subsize+fileno/32] & (1<<(fileno%32)))
+                ufds[i].revents |= (POLLERR|POLLNVAL);
+        }
+        rt_free(pollset);
+        return ret;
     }
     case SYS_gettimeofday:
     {
@@ -939,40 +1017,26 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         }
         case TCFLSH:
         {
-            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_FLSH,0));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_FLSH,(void *)parm3));
         }
         case TIOCGSID:
         {
-            int fileno = rt_process_convfile(module,parm1);
-            if (fileno < 0)
-                return -EBADF;
             pid_t *tsid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
-            *tsid = pidinfo[module->tpid-1][3];
-            return 0;
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_GSID,tsid));
         }
         case TIOCGPGRP:
         {
-            int fileno = rt_process_convfile(module,parm1);
-            if (fileno < 0)
-                return -EBADF;
-            pid_t *tgid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
-            *tgid = pidinfo[module->tpid-1][2];
-            return 0;
+            pid_t *tsid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_GPGRP,tsid));
         }
         case TIOCSPGRP:
         {
-            int fileno = rt_process_convfile(module,parm1);
-            if (fileno < 0)
-                return -EBADF;
-            pid_t *tgid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
-            temp = rt_hw_interrupt_disable();
-            pidinfo[module->tpid-1][2] = *tgid;
-            rt_hw_interrupt_enable(temp);
-            return 0;
+            pid_t *tsid = (pid_t *)rt_process_conv_ptr(module,parm3,sizeof(pid_t));
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_SPGRP,tsid));
         }
         case TCSBRK:
         {
-            return 0;
+            return ret_err(ioctl(fileno,RT_DEVICE_CTRL_BRK,(void *)parm3));
         }
         }
         PRESS_DEBUG_IOCTL("syscall pid:%d/%d ioctl file:%d/%d cmd:0x%x data:0x%x\n",module->pid,module->tpid,parm1,fileno,parm2,parm3);
@@ -1043,6 +1107,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_BASE+1001:
     {
+        errno = 0;
         int fileno = rt_process_convfile(module,parm1);
         if (fileno < 0)
             return -EBADF;
@@ -1050,11 +1115,18 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         struct dfs_fd *d = fd_get(fileno);
         //必须是devfs
         if (d == RT_NULL || d->fs == RT_NULL || rt_strcmp(d->fs->path,"/dev") != 0)
-    	{
-    		if (d)
-    			fd_put(d);
-    		return -ENOTTY;
-    	}
+        {
+        	if (d)
+        		fd_put(d);
+        	return -ENOTTY;
+        }
+        //必须是字符类设备
+        rt_device_t device = (rt_device_t)d->data;;
+        if (device == RT_NULL || device->type != RT_Device_Class_Char)
+        {
+        	fd_put(d);
+        	return -ENOTTY;
+        }
         //复制设备名称/dev
         rt_snprintf(name,parm3,"/dev%s",d->path);
         fd_put(d);
