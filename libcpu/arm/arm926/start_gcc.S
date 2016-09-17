@@ -258,6 +258,7 @@ SWI_Handler:
     STR     R6, [R4, #8]            @; Save CPSR
     LDR     R0, [LR, #-4]
     MOV     R1, SP
+    MSR     CPSR_c, #MODE_SVC       @; Switch to SVC mode and interrupt
     BL      rt_hw_trap_swi
     LDR     R0, [R4, #4]            @; Pop Save SPSR
     MSR     SPSR_cxsf, R0

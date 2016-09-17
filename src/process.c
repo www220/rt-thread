@@ -1732,17 +1732,12 @@ int rt_process_clearfile(rt_process_t module, int fileno)
 
 void rt_process_wait(int delay)
 {
-    if (tty_rx_inxpz == 0)
-    {
-        if (rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,delay,0) != RT_EOK)
-            return;
-        free_tpid(1);
-        tty_rx_inxpz = 1;
-        rt_kprintf(FINSH_PROMPT);
-    }
-    else
-    {
-        rt_thread_delay(delay);
-    }
+    if (rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,delay,0) != RT_EOK)
+        return;
+    if (tty_rx_inxpz)
+        return;
+    free_tpid(1);
+    tty_rx_inxpz = 1;
+    rt_kprintf(FINSH_PROMPT);
 }
 #endif

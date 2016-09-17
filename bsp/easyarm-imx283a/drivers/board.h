@@ -81,8 +81,8 @@
 #define PIN_PZ2		PINID_SSP0_DATA5
 #endif
 
-#define CONSOLE_DEVICE "tty0"
-#define FINSH_DEVICE_NAME "tty0"
+#define CONSOLE_DEVICE "ttyD"
+#define FINSH_DEVICE_NAME "ttyD"
 
 void rt_hw_board_init(void);
 void rt_hw_interrupt_init(void);

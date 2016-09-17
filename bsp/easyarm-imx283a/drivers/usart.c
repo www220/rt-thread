@@ -516,7 +516,7 @@ void rt_hw_usart_init(void)
 
     /* register vcom device */
     rt_hw_serial_register(&serial_dbgu, "dbgu", RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &dbgu);
-    rt_tty_init(&serial_dbgu.parent, &tty_dbgu, "tty0");
+    rt_tty_init(&serial_dbgu.parent, &tty_dbgu, CONSOLE_DEVICE);
 #endif
 
 #if defined(RT_USING_UART1)
@@ -751,6 +751,7 @@ static rt_size_t tty_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t
 		//msh使用的是异步读取
 		if (device->parent.rx_indicate && tty_rx_inxpz)
 			return ret;
+		//异步机制
 		//等待事件信号
 		rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
 		ret = rt_device_read(device->device, pos, buffer, size);
