@@ -230,7 +230,7 @@ void rt_object_init(struct rt_object         *object,
     object->flag = 0;
 
 #ifdef RT_USING_MODULE
-    object->module_id = (void *)rt_module_self();
+    object->module_id = 0;
 #endif
 #ifdef RT_USING_PROCESS
     object->process_id = 0;

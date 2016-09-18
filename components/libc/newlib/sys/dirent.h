@@ -14,7 +14,6 @@
 #define FT_DIRECTORY	2	/* directory    */
 #define FT_USER			3	/* user defined */
 
-#define O_NDELAY        0x001000
 #define O_BINARY        0x010000
 #define O_TEXT          0x020000
 #define O_CLOEXEC       0x040000
