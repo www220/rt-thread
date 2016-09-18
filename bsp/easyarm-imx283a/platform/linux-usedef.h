@@ -314,7 +314,7 @@ struct termios
 /* Disable reboot using Ctrl-Alt-Delete keystroke.  */
 #define RB_DISABLE_CAD	0
 
-#define MAX_PID_SIZE	4096
+#define MAX_PID_SIZE	1024
 extern volatile int pid_buf[MAX_PID_SIZE];
 extern volatile unsigned short pidinfo[MAX_PID_SIZE][4];
 

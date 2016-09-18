@@ -1028,6 +1028,11 @@ int chdir(const char *path)
     closedir(d);
 
     /* copy full path to working directory */
+#ifdef RT_USING_PROCESS
+    if (rt_process_self() != RT_NULL)
+        rt_strncpy(rt_process_self()->workd, fullpath, DFS_PATH_MAX);
+    else
+#endif
     strncpy(working_directory, fullpath, DFS_PATH_MAX);
     /* release normalize directory path name */
     rt_free(fullpath);
@@ -1056,6 +1061,11 @@ char *getcwd(char *buf, size_t size)
 {
 #ifdef DFS_USING_WORKDIR
     rt_enter_critical();
+#ifdef RT_USING_PROCESS
+    if (rt_process_self() != RT_NULL)
+        rt_strncpy(buf, rt_process_self()->workd, size);
+    else
+#endif
     rt_strncpy(buf, working_directory, size);
     rt_exit_critical();
 #else

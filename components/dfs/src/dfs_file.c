@@ -763,6 +763,11 @@ void ls(const char *pathname)
     {
 #ifdef DFS_USING_WORKDIR
         /* open current working directory */
+#ifdef RT_USING_PROCESS
+        if (rt_process_self() != RT_NULL)
+            path = rt_strdup(rt_process_self()->workd);
+        else
+#endif
         path = rt_strdup(working_directory);
 #else
         path = rt_strdup("/");

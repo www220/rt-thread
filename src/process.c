@@ -45,6 +45,7 @@
 #ifdef RT_USING_PROCESS
 #include "module.h"
 #include "board.h"
+#include "linux-usedef.h"
 
 #define elf_module        ((Elf32_Ehdr *)module_ptr)
 #define shdr              ((Elf32_Shdr *)((rt_uint8_t *)module_ptr + elf_module->e_shoff))
@@ -97,7 +98,6 @@ extern int __rt_ffs(int value);
 extern rt_uint32_t rt_pids_from;
 extern rt_uint32_t rt_pids_to;
 
-#define MAX_PID_SIZE	4096
 //status
 volatile int pidbuf[MAX_PID_SIZE];
 //pz:[0],ppid:[1],pgid[2],sid[3]
@@ -212,6 +212,11 @@ static int find_tpid(unsigned short tpid, unsigned short tme)
 			return 1;
 	}
 	return 0;
+}
+
+static void rt_process_timeout(void *parameter)
+{
+    struct rt_process *process = (struct rt_process *)parameter;
 }
 
 //以下函数实现系统对象的复制
@@ -413,7 +418,7 @@ static struct rt_process *_load_exec_object(rt_process_t process,
     }
 
     module_size = vend_addr - vstart_addr;
-    module_size = RT_ALIGN(module_size,64*RT_MM_PAGE_SIZE);
+    module_size = RT_ALIGN(module_size,32*RT_MM_PAGE_SIZE);
 
     RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("process size: %d, vstart_addr: 0x%p\n",
                                    module_size, vstart_addr));
@@ -437,6 +442,7 @@ static struct rt_process *_load_exec_object(rt_process_t process,
     module->page_array = RT_NULL;
     module->page_cnt = 0;
     module->page_mutex = RT_NULL;
+    module->alarm = RT_NULL;
     module->impure_ptr = RT_NULL;
     module->jmppid = 0;
     module->jmpsp = 0;
@@ -688,6 +694,18 @@ rt_process_t rt_process_do_main(rt_process_t process,
 
     /* init process object container */
     rt_process_init_object_container(module);
+    if (process)
+        rt_memcpy(module->workd, process->workd, 256);
+    else
+        rt_strncpy(module->workd, "/", 256);
+    for (i=0; i<NSIG; i++)
+    {
+        module->sigact[i].sa_handler = SIG_DFL;
+        sigemptyset(&module->sigact[i].sa_mask);
+        module->sigact[i].sa_flags = 0;
+    }
+    sigemptyset(&module->sigset);
+    sigemptyset(&module->siginfo);
 
     if (*argv && (*argv)[0])
     {
@@ -790,8 +808,9 @@ rt_process_t rt_process_do_main(rt_process_t process,
 
     /* initialize heap semaphore */
     module->page_mutex = rt_mutex_create(name, RT_IPC_FLAG_FIFO);
+    module->alarm = rt_timer_create(name, rt_process_timeout, module, 0, RT_TIMER_FLAG_ONE_SHOT);
 
-    if (!module->page_array || !module->page_mutex)
+    if (!module->page_array || !module->page_mutex|| !module->alarm)
     {
         /* release process space memory */
         rt_page_free(module->module_space,module->module_size/RT_MM_PAGE_SIZE);
@@ -803,6 +822,8 @@ rt_process_t rt_process_do_main(rt_process_t process,
             rt_free(module->page_array);
         if (module->page_mutex != RT_NULL)
             rt_mutex_delete(module->page_mutex);
+        if (module->alarm != RT_NULL)
+            rt_timer_delete(module->alarm);
 
         {register rt_ubase_t temp = rt_hw_interrupt_disable();
         free_pid(module->pid);
@@ -835,6 +856,8 @@ rt_process_t rt_process_do_main(rt_process_t process,
             rt_free(module->page_array);
         if (module->page_mutex != RT_NULL)
             rt_mutex_delete(module->page_mutex);
+        if (module->alarm != RT_NULL)
+            rt_timer_delete(module->alarm);
 
         {register rt_ubase_t temp = rt_hw_interrupt_disable();
         free_pid(module->pid);
@@ -1059,6 +1082,8 @@ rt_err_t rt_process_destroy(rt_process_t module)
         rt_free(module->page_array);
     if (module->page_mutex != RT_NULL)
         rt_mutex_delete(module->page_mutex);
+    if (module->alarm != RT_NULL)
+        rt_timer_delete(module->alarm);
 #endif
 
     //关闭打开的文件
@@ -1408,8 +1433,10 @@ int rt_process_fork(rt_process_t module)
     forkmod->page_cnt = 0;
     /* initialize heap semaphore */
     forkmod->page_mutex = rt_mutex_create(module->page_mutex->parent.parent.name, RT_IPC_FLAG_FIFO);
+    forkmod->alarm = rt_timer_create(module->alarm->parent.name,
+                                            rt_process_timeout, forkmod, 0, RT_TIMER_FLAG_ONE_SHOT);
 
-    if (!forkmod->page_array || !forkmod->page_mutex)
+    if (!forkmod->page_array || !forkmod->page_mutex || !forkmod->alarm)
     {
         /* release process space memory */
         rt_page_free(forkmod->module_space,forkmod->module_size/RT_MM_PAGE_SIZE);
@@ -1421,6 +1448,8 @@ int rt_process_fork(rt_process_t module)
             rt_free(forkmod->page_array);
         if (forkmod->page_mutex != RT_NULL)
             rt_mutex_delete(forkmod->page_mutex);
+        if (forkmod->alarm != RT_NULL)
+            rt_timer_delete(forkmod->alarm);
 
         {register rt_ubase_t temp = rt_hw_interrupt_disable();
         free_pid(forkmod->pid);
@@ -1447,6 +1476,8 @@ int rt_process_fork(rt_process_t module)
             rt_free(forkmod->page_array);
         if (forkmod->page_mutex != RT_NULL)
             rt_mutex_delete(forkmod->page_mutex);
+        if (forkmod->alarm != RT_NULL)
+            rt_timer_delete(forkmod->alarm);
 
         {register rt_ubase_t temp = rt_hw_interrupt_disable();
         free_pid(forkmod->pid);
@@ -1480,6 +1511,8 @@ int rt_process_fork(rt_process_t module)
                 rt_free(forkmod->page_array);
             if (forkmod->page_mutex != RT_NULL)
                 rt_mutex_delete(forkmod->page_mutex);
+            if (forkmod->alarm != RT_NULL)
+                rt_timer_delete(forkmod->alarm);
 
             {register rt_ubase_t temp = rt_hw_interrupt_disable();
             free_pid(forkmod->pid);
@@ -1648,10 +1681,12 @@ int rt_process_waitpid(rt_process_t module, pid_t pid, int* status, int opt)
 			pidinfo[i][0] = 1;
 			if (!find_tpid(i+1,i+1))
 				free_tpid(i+1);
-			if (pidinfo[pidinfo[i][2]-1][0] < 100 && pidinfo[pidinfo[i][2]-1][0] > 0
+			if (pidinfo[i][2] != 0
+					&& pidinfo[pidinfo[i][2]-1][0] < 100 && pidinfo[pidinfo[i][2]-1][0] > 0
 					&& !find_tpid(pidinfo[i][2],i+1))
 				free_tpid(pidinfo[i][2]);
-			if (pidinfo[pidinfo[i][3]-1][0] < 100 && pidinfo[pidinfo[i][2]-1][0] > 0
+			if (pidinfo[i][3] != 0
+					&& pidinfo[pidinfo[i][3]-1][0] < 100 && pidinfo[pidinfo[i][2]-1][0] > 0
 					&& !find_tpid(pidinfo[i][3],i+1))
 				free_tpid(pidinfo[i][3]);
 			result = i+1;
@@ -1734,10 +1769,10 @@ void rt_process_wait(int delay)
 {
     if (rt_event_recv(&mod_eventp,1,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,delay,0) != RT_EOK)
         return;
-    if (tty_rx_inxpz)
-        return;
     free_tpid(1);
+#ifdef RT_USING_FINSH
     tty_rx_inxpz = 1;
     rt_kprintf(FINSH_PROMPT);
+#endif
 }
 #endif

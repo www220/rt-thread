@@ -404,12 +404,12 @@ void abort(void)
 #else
 #define PRESS_DEBUG_FILE(...)
 #endif
-#if 0
+#if 1
 #define PRESS_DEBUG_NOSYS rt_kprintf
 #else
 #define PRESS_DEBUG_NOSYS(...)
 #endif
-#if 0
+#if 1
 #define PRESS_DEBUG_IOCTL rt_kprintf
 #else
 #define PRESS_DEBUG_IOCTL(...)
@@ -452,6 +452,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
 
     RT_ASSERT(module != RT_NULL);
     RT_ASSERT((nbr&SYS_BASE) == SYS_BASE);
+    //__asm volatile("msr cpsr_c, #0x13");
     //rt_kprintf("syscall %d in\n",nbr-SYS_BASE);
 
     switch(nbr)
@@ -587,6 +588,46 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         const char **argv = (parm2)?(rt_process_conv_ptr(module,parm2,-1)):(0);
         const char **envp = (parm3)?(rt_process_conv_ptr(module,parm3,-1)):(0);
         return rt_process_execve(module,file,argv,envp);;
+    }
+    case SYS_sigaction:
+    {
+        struct sigaction *sig = (parm2)?(rt_process_conv_ptr(module,parm2,sizeof(struct sigaction))):(0);
+        struct sigaction *osig = (parm3)?(rt_process_conv_ptr(module,parm3,sizeof(struct sigaction))):(0);
+        if (parm1 >= NSIG)
+            return -EINVAL;
+        //保存上一个数据
+        if (osig != RT_NULL)
+            *osig = module->sigact[parm1];
+        //设置新值
+        if (sig != RT_NULL)
+            module->sigact[parm1] = *sig;
+        return 0;
+    }
+    case SYS_sigprocmask:
+    {
+        sigset_t *sig = (parm2)?(rt_process_conv_ptr(module,parm2,sizeof(sigset_t))):(0);
+        sigset_t *osig = (parm3)?(rt_process_conv_ptr(module,parm3,sizeof(sigset_t))):(0);
+        if (parm1 > SIG_UNBLOCK)
+            return -EINVAL;
+        //保存上一个数据
+        if (osig != RT_NULL)
+            *osig = module->sigset;
+        //设置新值
+        if (sig != RT_NULL)
+        {
+            if (parm1 == SIG_BLOCK)
+                module->sigset |= *sig;
+            else if (parm1 == SIG_UNBLOCK)
+                module->sigset &= ~(*sig);
+            else if (parm1 == SIG_SETMASK)
+                module->sigset = *sig;
+        }
+        return 0;
+    }
+    case SYS_kill:
+    {
+        rt_kprintf("kill %d,%d\n",parm1,parm2);
+        return 0;
     }
     case SYS_wait4:
     {
@@ -894,6 +935,11 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             return -EBADF;
         return ret_err(fsync(fileno));
     }
+    case SYS_sync:
+    {
+        rt_kprintf("sync\n");
+        return 0;
+    }
     case SYS_poll:
     {
         errno = 0;
@@ -906,7 +952,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         }
         //找到最大的fd,标记set
         int i,maxfd = -1,pz = 0;
-        int subsize = ((DFS_FD_MAX+31)/32);
+        int subsize = (DFS_FD_MAX+31)/32;
         rt_uint32_t *pollset = rt_malloc(3*subsize*sizeof(rt_uint32_t));
         if (pollset == RT_NULL)
             return -ENOMEM;
@@ -970,6 +1016,26 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         }
         rt_free(pollset);
         return ret;
+    }
+    case SYS_alarm:
+    {
+        int ret = 0;
+        if (module->alarm->parent.flag & RT_TIMER_FLAG_ACTIVATED)
+            ret = (module->alarm->timeout_tick - rt_tick_get()) + 1;
+        if (parm1 != 0)
+        {
+            //定时器不能超过10天的时间
+            if (parm1 > 10*24*3600)
+                parm1 = 10*24*3600;
+            parm1 *= 1000;
+            rt_timer_control(module->alarm, RT_TIMER_CTRL_SET_TIME, &parm1);
+            rt_timer_start(module->alarm);
+        }
+        else if (ret != 0)
+        {
+            rt_timer_stop(module->alarm);
+        }
+        return ret/1000l;
     }
     case SYS_gettimeofday:
     {

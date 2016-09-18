@@ -1071,11 +1071,12 @@ struct rt_process
     void                        *page_array;            /**< process's using pages */
     rt_uint32_t                  page_cnt;              /**< process's using pages count */
     rt_mutex_t                   page_mutex;            /**< process's mutex */
+    rt_timer_t                   alarm;                 /**< process's alarm */
 #endif
 
     rt_list_t                    thread_list;           /**< process's thread list */
     int                          file_list[DFS_FD_MAX]; /**< process's file list */
-
+    char                         workd[256];            /**< process's pwd */
     rt_uint16_t                  pid;                   /**< mmu pid */
     rt_uint16_t                  tpid;                  /**< process pid */
     struct _reent               *impure_ptr;            /**< newlibc reent */
@@ -1085,6 +1086,9 @@ struct rt_process
     void                        *jmpsp;                 /**< vfork jmpsp */
     rt_uint8_t                   jmpspbuf[256];         /**< vfork spbuf */
     int                          exitcode;              /**< exit code */
+    struct sigaction             sigact[NSIG];          /**< sigact */
+    sigset_t                     sigset;                /**< sigset */
+    sigset_t                     siginfo;               /**< siginfo */
 };
 typedef struct rt_process *rt_process_t;
 

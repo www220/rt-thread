@@ -324,7 +324,14 @@ char *dfs_normalize_path(const char *directory, const char *filename)
 
 #ifdef DFS_USING_WORKDIR
     if (directory == RT_NULL) /* shall use working directory */
+    {
+#ifdef RT_USING_PROCESS
+        if (rt_process_self() != RT_NULL)
+            directory = &rt_process_self()->workd[0];
+        else
+#endif
         directory = &working_directory[0];
+    }
 #else
     if ((directory == RT_NULL) && (filename[0] != '/'))
     {
@@ -481,7 +488,7 @@ int dfs_file_select(int maxfdp,
 	result = 0;
 	count[0] = count[1] = count[2] = 0;
 	//先读取一次别浪费了
-	{rt_uint32_t recvset[3][DFS_FD_MAX+31/32] = {{0}};
+	{rt_uint32_t recvset[3][(DFS_FD_MAX+31)/32] = {{0}};
 	int status = RT_EOK;
 	struct dfs_fd *d = RT_NULL;
 	for (i=0; i<maxfdp; i++)

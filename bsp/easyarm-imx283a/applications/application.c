@@ -294,6 +294,7 @@ static void rt_thread_entry_main(void* parameter)
 #define RTT_PASSWD      "/etc/passwd"
 #define RTT_GROUP       "/etc/group"
 #define RTT_SHADOW      "/etc/shadow"
+#define RTT_INITAB      "/etc/inittab"
 #if defined(RT_USING_DFS)
     inittmppath();
     if (PZ[0] && stat(RTT_DEF_CONF, &st) == 0)
@@ -333,7 +334,7 @@ static void rt_thread_entry_main(void* parameter)
 
     if (stat(RTT_PASSWD, &st) != 0 || st.st_size < 29)
     {
-    	FILE *fp = fopen("/etc/passwd", "w+");
+    	FILE *fp = fopen(RTT_PASSWD, "w+");
     	if (fp)
     	{
     		fprintf(fp,"root:x:0:0:root:/root:/bin/sh\n");
@@ -342,7 +343,7 @@ static void rt_thread_entry_main(void* parameter)
     }
     if (stat(RTT_GROUP, &st) != 0 || st.st_size < 12)
     {
-    	FILE *fp = fopen("/etc/group", "w+");
+    	FILE *fp = fopen(RTT_GROUP, "w+");
     	if (fp)
     	{
     		fprintf(fp,"root::0:root\n");
@@ -351,10 +352,19 @@ static void rt_thread_entry_main(void* parameter)
     }
     if (stat(RTT_SHADOW, &st) != 0 || st.st_size < 10)
     {
-    	FILE *fp = fopen("/etc/shadow", "w+");
+    	FILE *fp = fopen(RTT_SHADOW, "w+");
     	if (fp)
     	{
     		fprintf(fp,"root:fAwTdQCthcZf2:0:0:99999:7:::\n");
+    		fclose(fp);
+    	}
+    }
+    if (stat(RTT_INITAB, &st) != 0 || st.st_size < 12)
+    {
+    	FILE *fp = fopen(RTT_INITAB, "w+");
+    	if (fp)
+    	{
+    		fprintf(fp,"/dev/" FINSH_DEVICE_NAME "::respawn:-/bin/sh\n");
     		fclose(fp);
     	}
     }
@@ -377,12 +387,18 @@ static void rt_thread_entry_main(void* parameter)
 #ifdef RT_USING_FINSH
     finsh_system_init();
     finsh_set_device(FINSH_DEVICE_NAME);
-   	rt_thread_delay(100);
+    rt_thread_delay(100);
 #endif
-#if 0
+#if 1
 #define bupath "/bin/busybox"
 #define buargc "init"
-   	rt_process_exec_cmd(bupath, bupath " " buargc, -1);
+#ifdef RT_USING_FINSH
+    rt_kprintf("%s\n", bupath " " buargc);
+#else
+    rt_device_t dev = rt_device_find(FINSH_DEVICE_NAME);
+    rt_device_open(dev, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
+#endif
+    rt_process_exec_cmd(bupath, bupath " " buargc, -1);
 #endif
 
     while (1)

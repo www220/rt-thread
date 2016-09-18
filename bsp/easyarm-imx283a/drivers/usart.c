@@ -389,6 +389,13 @@ static rt_err_t at91_usart_control(struct rt_serial_device *serial,
     case RT_DEVICE_CTRL_CHAR_GETWRITE:
         *((int *)arg) = 0;
         break;
+    case RT_DEVICE_CTRL_FLSH: {
+        rt_base_t level = rt_hw_interrupt_disable();
+        struct rt_serial_rx_fifo* rx_fifo = (struct rt_serial_rx_fifo*) serial->serial_rx;
+        if (rx_fifo)
+            rx_fifo->get_index = rx_fifo->put_index;
+        rt_hw_interrupt_enable(level);
+        break; }
     }
 
     return RT_EOK;
@@ -618,7 +625,7 @@ rt_size_t rt_device_write_485(rt_device_t dev,
 RTM_EXPORT(rt_device_write_485);
 
 #ifdef DFS_USING_SELECT
-#if 1
+#if 0
 #define PRESS_DEBUG_DEVFILE rt_kprintf
 #else
 #define PRESS_DEBUG_DEVFILE(...)
@@ -821,12 +828,15 @@ static rt_size_t tty_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t
 			if (device->ios.c_cc[VTIME] == 0 || ret == 0)
 			{
 				rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
-				ret += rt_device_read(device->device, 0, buffer+ret, size-ret);
+				int read = rt_device_read(device->device, 0, buffer+ret, size-ret); if (read < 0) read = 0;
+				ret += read;
 			}
 			else
 			{
 				rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,device->ios.c_cc[VTIME]*100,0);
-				ret += rt_device_read(device->device, 0, buffer+ret, size-ret);
+				int read = rt_device_read(device->device, 0, buffer+ret, size-ret); if (read < 0) read = 0;
+				ret += read;
+				break;
 			}
 		}
 	}
@@ -895,12 +905,22 @@ static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 		return RT_EOK;
 	case RT_DEVICE_CTRL_GPGRP:
 		rt_memcpy(args,&device->tpid[0],sizeof(pid_t));
+		if (device->tpid[0] == 0)
+		{
+			errno = ENOTTY;
+			return -RT_ENOSYS;
+		}
 		return RT_EOK;
 	case RT_DEVICE_CTRL_SPGRP:
 		rt_memcpy(&device->tpid[0],args,sizeof(pid_t));
 		return RT_EOK;
 	case RT_DEVICE_CTRL_GSID:
 		rt_memcpy(args,&device->tpid[1],sizeof(pid_t));
+		if (device->tpid[1] == 0)
+		{
+			errno = ENOTTY;
+			return -RT_ENOSYS;
+		}
 		return RT_EOK;
 	case RT_DEVICE_CTRL_SSID:
 		rt_memcpy(&device->tpid[1],args,sizeof(pid_t));
@@ -908,17 +928,19 @@ static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 	case RT_DEVICE_CTRL_CHAR_SETFILE:
 	{
 		int i;
+		PRESS_DEBUG_DEVFILE("devsetfile ");
 		register rt_base_t temp = rt_hw_interrupt_disable();
 		for (i=0; i<TTY_FILE_SIZE; i++)
 		{
 			if (device->file[i] == 0)
 			{
 				device->file[i] = *((int *)args);
-				PRESS_DEBUG_DEVFILE("devsetfile %2d/%2d\n",i,device->file[i]);
+				PRESS_DEBUG_DEVFILE("%2d/%2d ",i,device->file[i]);
 				break;
 			}
-			PRESS_DEBUG_DEVFILE("devsetfile %2d/%2d\n",i,device->file[i]);
+			PRESS_DEBUG_DEVFILE("%2d/%2d ",i,device->file[i]);
 		}
+		PRESS_DEBUG_DEVFILE("\n");
 		RT_ASSERT(i != TTY_FILE_SIZE);
 		rt_hw_interrupt_enable(temp);
 		return RT_EOK;
@@ -960,6 +982,7 @@ static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 	case RT_DEVICE_CTRL_CHAR_CLRFILE:
 	{
 		int i,j;
+		PRESS_DEBUG_DEVFILE("devclrfile ");
 		register rt_base_t temp = rt_hw_interrupt_disable();
 		for (i=0; i<TTY_FILE_SIZE; i++)
 		{
@@ -967,7 +990,7 @@ static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 				break;
 			if (device->file[i] == *((int *)args))
 			{
-				PRESS_DEBUG_DEVFILE("devclr old %2d/%2d\n",i,device->file[i]);
+				PRESS_DEBUG_DEVFILE("(%2d/%2d) ",i,device->file[i]);
 				device->file[i] = 0;
 				//保证数据的紧凑，不用遍历到最后节约时间
 				for (j=TTY_FILE_SIZE-1; j>i; j--)
@@ -980,8 +1003,11 @@ static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 					}
 				}
 			}
-			PRESS_DEBUG_DEVFILE("devclrfile %2d/%2d\n",i,device->file[i]);
+			if (device->file[i] == 0)
+				break;
+			PRESS_DEBUG_DEVFILE("%2d/%2d ",i,device->file[i]);
 		}
+		PRESS_DEBUG_DEVFILE("\n");
 		rt_hw_interrupt_enable(temp);
 		return RT_EOK;
 	}
