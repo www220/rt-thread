@@ -26,6 +26,7 @@
 #include <dfs_fs.h>
 
 #include "devfs.h"
+extern struct dfs_fd fd_table[];
 
 struct device_dirent
 {
@@ -70,7 +71,8 @@ int dfs_device_fs_read(struct dfs_fd *file, void *buf, rt_size_t count)
     RT_ASSERT(dev_id != RT_NULL);
 
     /* read device data */
-    result = rt_device_read(dev_id, file->pos, buf, count);
+    int fileno = (file-fd_table)+1;
+    result = rt_device_read(dev_id, fileno, buf, count);
     file->pos += result;
 
     return result;
@@ -88,7 +90,8 @@ int dfs_device_fs_write(struct dfs_fd *file, const void *buf, rt_size_t count)
     RT_ASSERT(dev_id != RT_NULL);
 
     /* read device data */
-    result = rt_device_write(dev_id, file->pos, buf, count);
+    int fileno = (file-fd_table)+1;
+    result = rt_device_write(dev_id, fileno, buf, count);
     file->pos += result;
 
     return result;
@@ -118,8 +121,7 @@ int dfs_device_fs_close(struct dfs_fd *file)
     RT_ASSERT(dev_id != RT_NULL);
 
     // clr device fileno
-    extern struct dfs_fd fd_table[];
-    int fileno = file-fd_table;
+    int fileno = (file-fd_table)+1;
     rt_device_control(dev_id, RT_DEVICE_CTRL_CHAR_CLRFILE, &fileno);
     //
 
@@ -204,8 +206,7 @@ int dfs_device_fs_open(struct dfs_fd *file)
     if (result == RT_EOK || result == -RT_ENOSYS)
     {
         // set device fileno
-        extern struct dfs_fd fd_table[];
-        int fileno = file-fd_table;
+        int fileno = (file-fd_table)+1;
         rt_device_control(device, RT_DEVICE_CTRL_CHAR_SETFILE, &fileno);
         //
         file->data = device;

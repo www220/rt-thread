@@ -64,7 +64,7 @@ static rt_size_t console_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_si
 
 	if (device->device_type == 3)
 	{
-		errno = EBADF;
+		errno = EACCES;
 		return -1;
 	}
 	else if (device->device_type == 4)
@@ -116,7 +116,7 @@ static rt_size_t console_write(rt_device_t dev, rt_off_t pos, const void* buffer
 	}
 	else if (device->device_type == 4)
 	{
-		errno = EBADF;
+		errno = EACCES;
 		return -1;
 	}
 #ifdef RT_USING_PROCESS

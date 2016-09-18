@@ -28,15 +28,21 @@
 #include <rtdevice.h>
 #include <stdint.h>
 #include "board.h"
+#ifdef DFS_USING_SELECT
 #include "linux-syscall.h"
 #include "linux-usedef.h"
 #include <errno.h>
 #include <dfs_def.h>
 #include <dfs.h>
+#ifndef RT_USING_DFS_DEVFS
+#error "defined RT_USING_DFS_DEVFS"
+#endif
+#endif
 
 #define CONFIG_UART_CLK		24000000
 #define CONFIG_INT_MASK		BM_UARTAPP_INTR_RXIEN|BM_UARTAPP_INTR_RTIEN
 
+#define TTY_FILE_SIZE 32
 struct tty_device
 {
 	struct rt_device parent;
@@ -44,7 +50,7 @@ struct tty_device
 	rt_device_t device; /* the actual device */
 	struct winsize win;
 	struct termios ios;
-	int file[32];
+	int file[TTY_FILE_SIZE];
 	pid_t tpid[2];
 };
 static struct rt_event rx_sem;
@@ -611,6 +617,13 @@ rt_size_t rt_device_write_485(rt_device_t dev,
 }
 RTM_EXPORT(rt_device_write_485);
 
+#ifdef DFS_USING_SELECT
+#if 1
+#define PRESS_DEBUG_DEVFILE rt_kprintf
+#else
+#define PRESS_DEBUG_DEVFILE(...)
+#endif
+
 volatile int tty_rx_inxpz = 1;
 static rt_err_t tty_rx_ind(rt_device_t dev, rt_size_t size)
 {
@@ -623,10 +636,13 @@ static rt_err_t tty_rx_ind(rt_device_t dev, rt_size_t size)
     RT_ASSERT(device != RT_NULL);
 
     /* release semaphore to let finsh thread rx data */
-    if (device->parent.rx_indicate && tty_rx_inxpz)
+    if (device->parent.rx_indicate)
     {
-        device->parent.rx_indicate(&device->parent, size);
-        return RT_EOK;
+        if (uart->irq != IRQ_DUART || tty_rx_inxpz)
+        {
+            device->parent.rx_indicate(&device->parent, size);
+            return RT_EOK;
+        }
     }
 
     //发出事件信号
@@ -634,6 +650,9 @@ static rt_err_t tty_rx_ind(rt_device_t dev, rt_size_t size)
         rt_event_send(&rx_sem, 0x01);
     else
         rt_event_send(&rx_sem, (1<<(uart->irq-IRQ_AUART0+1)));
+    //其他串口不支持select，防止频繁中断影响效率
+    if (uart->irq != IRQ_DUART)
+        return RT_EOK;
 
     /* lock interrupt */
     {register rt_base_t temp = rt_hw_interrupt_disable();
@@ -645,16 +664,16 @@ static rt_err_t tty_rx_ind(rt_device_t dev, rt_size_t size)
     	int i,pz = 0;
     	sinfo = rt_list_entry(n, struct dfs_select_info, list);
     	//遍历找到是否关注该句柄
-    	for (i=0; i<32; i++)
+    	for (i=0; i<TTY_FILE_SIZE; i++)
     	{
     		if (device->file[i] == 0)
-    			continue;
+    			break;
     		if (device->file[i] > sinfo->maxfdp)
     			continue;
     		int fileno = device->file[i]-1;
-    		if (sinfo->reqset[0] && (sinfo->reqset[0][fileno/32] & (1<<(fileno%32))))
+    		if (sinfo->reqset[0] && (sinfo->reqset[0][fileno/TTY_FILE_SIZE] & (1<<(fileno%TTY_FILE_SIZE))))
     		{
-    			sinfo->recvset[0][fileno/32] |= (1<<(fileno%32));
+    			sinfo->recvset[0][fileno/TTY_FILE_SIZE] |= (1<<(fileno%TTY_FILE_SIZE));
     			pz = 1;
     		}
     	}
@@ -739,24 +758,79 @@ static rt_size_t tty_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t
 	uart = (struct at91_uart *)device->device->user_data;
 	RT_ASSERT(uart != RT_NULL);
 
+	//缓存数量不足最小字符
+	if (device->ios.c_cc[VMIN] && size<device->ios.c_cc[VMIN])
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
 	if (uart->irq == IRQ_DUART)
 		set = 0x01;
 	else
 		set = (1<<(uart->irq-IRQ_AUART0+1));
 	//接受前清理事件信号
 	rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0,0);
-	ret = rt_device_read(device->device, pos, buffer, size);
-	if (ret <= 0)
+	ret = rt_device_read(device->device, 0, buffer, size); if (ret < 0) ret = 0;
+	if (ret == 0)
 	{
 		//msh使用的是异步读取
-		if (device->parent.rx_indicate && tty_rx_inxpz)
+		if (uart->irq == IRQ_DUART && tty_rx_inxpz)
 			return ret;
-		//异步机制
+		//获取读取文件
+		int i,fileno = -1;
+		for (i=0; i<TTY_FILE_SIZE; i++)
+		{
+			if (device->file[i] == 0)
+				break;
+			if (device->file[i] == pos)
+			{
+				fileno = pos-1;
+				break;
+			}
+		}
+		//判断读取文件的打开类型
+		if (fileno > 0)
+		{
+			struct dfs_fd * fd = fd_get(fileno);
+			if (fd != RT_NULL)
+			{
+				fd_put(fd);
+				if (fd->flags & O_NONBLOCK)
+				{
+					//读取不到等待下一次继续
+					errno = EAGAIN;
+					return 0;
+				}
+			}
+		}
 		//等待事件信号
-		rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
-		ret = rt_device_read(device->device, pos, buffer, size);
+		if (device->ios.c_cc[VMIN] == 0)
+		{
+			if (device->ios.c_cc[VTIME] == 0)
+				return 0;
+			rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,device->ios.c_cc[VTIME]*100,0);
+			ret = rt_device_read(device->device, 0, buffer, size);
+		}
 	}
-	if (ret>0 && device->ios.c_lflag & ECHO && tty_rx_inxpz==0)
+	if (device->ios.c_cc[VMIN])
+	{
+		//需要继续等待
+		while (ret < device->ios.c_cc[VMIN])
+		{
+			if (device->ios.c_cc[VTIME] == 0 || ret == 0)
+			{
+				rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,RT_WAITING_FOREVER,0);
+				ret += rt_device_read(device->device, 0, buffer+ret, size-ret);
+			}
+			else
+			{
+				rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,device->ios.c_cc[VTIME]*100,0);
+				ret += rt_device_read(device->device, 0, buffer+ret, size-ret);
+			}
+		}
+	}
+	if (ret>0 && (device->ios.c_lflag & ECHO) && (uart->irq == IRQ_DUART && !tty_rx_inxpz))
 	{
 		//回车换行的转换
 		if (device->ios.c_iflag & (ICRNL|INLCR))
@@ -774,7 +848,7 @@ static rt_size_t tty_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t
 					((char *)buffer)[size] = write;
 			}
 		}
-		rt_device_write(device->device, pos, buffer, ret);
+		rt_device_write(device->device, 0, buffer, ret);
 	}
 	return ret;
 }
@@ -792,7 +866,7 @@ static rt_size_t tty_write(rt_device_t dev, rt_off_t pos, const void* buffer, rt
 	else
 		device->device->open_flag &= ~RT_DEVICE_FLAG_STREAM;
 
-	return rt_device_write(device->device, pos, buffer, size);
+	return rt_device_write(device->device, 0, buffer, size);
 }
 
 static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
@@ -835,59 +909,78 @@ static rt_err_t tty_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 	{
 		int i;
 		register rt_base_t temp = rt_hw_interrupt_disable();
-		for (i=0; i<32; i++)
+		for (i=0; i<TTY_FILE_SIZE; i++)
 		{
 			if (device->file[i] == 0)
 			{
-				device->file[i] = *((int *)args)+1;
+				device->file[i] = *((int *)args);
+				PRESS_DEBUG_DEVFILE("devsetfile %2d/%2d\n",i,device->file[i]);
 				break;
 			}
+			PRESS_DEBUG_DEVFILE("devsetfile %2d/%2d\n",i,device->file[i]);
 		}
-		RT_ASSERT(i != 32);
+		RT_ASSERT(i != TTY_FILE_SIZE);
 		rt_hw_interrupt_enable(temp);
 		return RT_EOK;
 	}
 	case RT_DEVICE_CTRL_CHAR_GETFILE:
 	{
-		int i;
+		int i,find = 0;
 		register rt_base_t temp = rt_hw_interrupt_disable();
-		for (i=0; i<32; i++)
+		for (i=TTY_FILE_SIZE-1; i>=0; i--)
 		{
 			if (device->file[i] != 0)
 			{
-				*((int *)args) = device->file[i]-1;
+				*((int *)args) = device->file[i];
+				find = 1;
 				break;
 			}
 		}
 		rt_hw_interrupt_enable(temp);
-		return (i==32)?RT_ERROR:RT_EOK;
+		return (find==0)?RT_ERROR:RT_EOK;
 	}
 	case RT_DEVICE_CTRL_CHAR_CHKFILE:
 	{
-		int i;
+		int i,find = 0;
 		register rt_base_t temp = rt_hw_interrupt_disable();
-		for (i=0; i<32; i++)
+		for (i=0; i<TTY_FILE_SIZE; i++)
 		{
+			if (device->file[i] == 0)
+				break;
 			if (device->file[i] == *((int *)args))
 			{
 				*((int *)args) = device->file[i]-1;
+				find = 1;
 				break;
 			}
 		}
 		rt_hw_interrupt_enable(temp);
-		return (i==32)?RT_ERROR:RT_EOK;
+		return (find==0)?RT_ERROR:RT_EOK;
 	}
 	case RT_DEVICE_CTRL_CHAR_CLRFILE:
 	{
-		int i;
+		int i,j;
 		register rt_base_t temp = rt_hw_interrupt_disable();
-		for (i=0; i<32; i++)
+		for (i=0; i<TTY_FILE_SIZE; i++)
 		{
-			if (device->file[i] == *((int *)args)+1)
-			{
-				device->file[i] = 0;
+			if (device->file[i] == 0)
 				break;
+			if (device->file[i] == *((int *)args))
+			{
+				PRESS_DEBUG_DEVFILE("devclr old %2d/%2d\n",i,device->file[i]);
+				device->file[i] = 0;
+				//保证数据的紧凑，不用遍历到最后节约时间
+				for (j=TTY_FILE_SIZE-1; j>i; j--)
+				{
+					if (device->file[j] != 0)
+					{
+						device->file[i] = device->file[j];
+						device->file[j] = 0;
+						break;
+					}
+				}
 			}
+			PRESS_DEBUG_DEVFILE("devclrfile %2d/%2d\n",i,device->file[i]);
 		}
 		rt_hw_interrupt_enable(temp);
 		return RT_EOK;
@@ -914,3 +1007,4 @@ static void rt_tty_init(rt_device_t device, struct tty_device* tty, const char* 
 	tty->device = device;
 	rt_device_register(&tty->parent, att_name, RT_DEVICE_FLAG_RDWR);
 }
+#endif
