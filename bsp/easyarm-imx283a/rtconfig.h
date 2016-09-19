@@ -89,11 +89,11 @@
 #define RT_CONSOLEBUF_SIZE	4096
 
 /* SECTION: finsh, a C-Express shell */
-//#define RT_USING_FINSH
-//#define FINSH_USING_MSH
-//#define FINSH_USING_MSH_DEFAULT
+#define RT_USING_FINSH
+#define FINSH_USING_MSH
+#define FINSH_USING_MSH_DEFAULT
 //#define FINSH_USING_MSH_ONLY
-//#define RT_USING_RYM
+#define RT_USING_RYM
 
 /* Using symbol table */
 #define FINSH_USING_SYMTAB

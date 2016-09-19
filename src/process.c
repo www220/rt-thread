@@ -1117,7 +1117,12 @@ rt_err_t rt_process_destroy(rt_process_t module)
     free_pid(module->pid);
     release_tpid(module->tpid,module->exitcode);
     rt_hw_interrupt_enable(temp);}
-    rt_process_kill(module,module->tpid,SIGCHLD);
+    /* send sigchld to parent */
+    if (module->tpid != 0)
+    {
+        rt_process_kill(module,module->tpid,SIGCHLD);
+        module->tpid = 0;
+    }
 
     RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("rt_process_destroy: %8.*s finished\n",
                                    RT_NAME_MAX, module->parent.name));
@@ -1799,9 +1804,9 @@ int rt_process_kill(rt_process_t module, int pid, int sig)
          node = node->next)
     {
         struct rt_process *object = (struct rt_process *)rt_list_entry(node, struct rt_object, list);
-        if (pid >0 &&
-        		((sig != SIGCHLD && object->tpid == pid)
-        				|| (sig ==SIGCHLD && object->tpid == pidinfo[pid-1][1])))
+        if (pid > 0 &&
+        		((sig!=SIGCHLD && object->tpid==pid)
+        				|| (sig==SIGCHLD && object->tpid==pidinfo[pid-1][1])))
         {
             //找到子进程或者子进程的父进程
             find = object;
@@ -1812,7 +1817,6 @@ int rt_process_kill(rt_process_t module, int pid, int sig)
     /* leave critical */
     rt_exit_critical();
 
-    rt_kprintf("kill %d %d\n",pid,sig);
     if (find == RT_NULL)
         return -ESRCH;
 
@@ -1835,9 +1839,14 @@ int rt_process_kill(rt_process_t module, int pid, int sig)
     		return 0;
     	}
     }
+
     //信号被忽略，不用进行处理
 	if ((find->sigact[sig].sa_handler == SIG_IGN)
 			|| (find->sigact[sig].sa_handler == SIG_ERR))
+		return 0;
+	//默认不必处理的消息
+	if ((sig==SIGCHLD || sig==SIGWINCH || sig==SIGURG)
+			&& (find->sigact[sig].sa_handler == SIG_DFL))
 		return 0;
 
 	int dosched = 0;

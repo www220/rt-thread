@@ -389,7 +389,7 @@ static void rt_thread_entry_main(void* parameter)
     finsh_set_device(FINSH_DEVICE_NAME);
     rt_thread_delay(100);
 #endif
-#if 1
+#if 0
 #define bupath "/bin/busybox"
 #define buargc "init"
 #ifdef RT_USING_FINSH

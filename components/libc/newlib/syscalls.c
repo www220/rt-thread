@@ -1251,6 +1251,10 @@ rt_uint32_t sys_call_signal(rt_uint32_t ret)
 	rt_process_t module = rt_process_self();
 	int i,deal = 0;
 
+	//没有信号产生或者全部信号屏蔽
+	if (module->siginfo == 0 || module->sigset == 0xffffffff)
+		return ret;
+
 	temp = rt_hw_interrupt_disable();
 	for (i=1; i<NSIG; i++)
 	{
@@ -1281,7 +1285,7 @@ rt_uint32_t sys_call_signal(rt_uint32_t ret)
 		}
 		//调用处理函数，回调相关代码
 		sigset_t oldset = module->sigset;
-		module->sigset |= module->sigact[i].sa_mask;
+		module->sigset |= (module->sigact[i].sa_mask|(1<<i));
 		rt_hw_interrupt_enable(temp);
 		module->sigact[i].sa_handler(i);
 		temp = rt_hw_interrupt_disable();

@@ -583,7 +583,10 @@ int cmd_ym(int argc, char **argv)
     rt_thread_delay(500);
     dev->open_flag = oflag;
     if (ret != 0)
+    {
         rt_kprintf("\nleaving RYM mode with code %d\n", ret);
+        return 1;
+    }
     rt_kprintf("file %s has been created.\n", ym.fpath);
     return 0;
 }
