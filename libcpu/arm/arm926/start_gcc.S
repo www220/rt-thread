@@ -241,7 +241,11 @@ Undef_Handler:
     STR     R6, [R8, #8]            @; Save CPSR
     MOV     R0, SP
     BL      rt_hw_trap_udef
-    
+    ADD     SP, SP, #S_FRAME_SIZE
+    MSR     CPSR_c, #MODE_SVC|NOINT @; Switch to SVC mode and no interrupt
+    LDR     SP, =SVC_STACK_START
+    BL      rt_hw_trap_assert
+
     .align  5
 SWI_Handler:
     LDR     SP, =SVC_STACK_START

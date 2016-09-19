@@ -90,11 +90,15 @@ void rt_hw_trap_udef(struct rt_hw_register *regs)
 {
     rt_hw_show_register(regs);
 
-    rt_kprintf("\nundefined instruction\n");
-    rt_kprintf("thread - %.*s - stack:\n", RT_NAME_MAX, rt_current_thread->name);
+    rt_kprintf("\nthread - %.*s - ", RT_NAME_MAX, rt_current_thread->name);
+    rt_kprintf("undefined instruction abort sp:%x call:%x \n",regs->sp,regs->lr);
 
 #ifdef RT_USING_FINSH
     list_thread();
+#endif
+#ifdef RT_USING_PROCESS
+    if (rt_process_self() != RT_NULL)
+        return;
 #endif
     rt_hw_cpu_shutdown();
 }
@@ -114,10 +118,12 @@ inline void rt_hw_trap_swi(rt_uint32_t call, struct rt_hw_register *regs)
             rt_uint32_t parm2, rt_uint32_t parm3,
             rt_uint32_t parm4, rt_uint32_t parm5,
             rt_uint32_t parm6);
-    regs->r0 = sys_call_switch(call&0xffffff,regs->r0,
+    int ret = sys_call_switch(call&0xffffff,regs->r0,
             regs->r1,regs->r2,
             regs->r3,regs->r4,
             regs->r5);
+    extern rt_uint32_t sys_call_signal(rt_uint32_t ret);
+    regs->r0 = sys_call_signal(ret);
 }
 
 /**

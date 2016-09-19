@@ -455,6 +455,25 @@ int sigaction (int sig, const struct sigaction *act, struct sigaction *oact)
 	return _set_errno(rc);
 }
 
+int raise (int sig)
+{
+	pid_t pid = _getpid();
+	if (pid < 0)
+		return pid;
+	return kill(pid, sig);
+}
+
+_sig_func_ptr signal (int sig, _sig_func_ptr func)
+{
+	struct sigaction act,old;
+	act.sa_handler = func;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	if (sigaction (sig, &act, &old) < 0)
+		return NULL;
+	return old.sa_handler;
+}
+
 int sigsuspend (const sigset_t *mask)
 {
 	int rc = sys_call1(__NR_sigsuspend, (uintptr_t)mask);

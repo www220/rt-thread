@@ -266,6 +266,7 @@ typedef int (*init_fn_t)(void);
 #define RT_ENOSYS                       6               /**< No system */
 #define RT_EBUSY                        7               /**< Busy */
 #define RT_EIO                          8               /**< IO error */
+#define RT_EINTR                        9               /**< Interrupted by a signal */
 
 /*@}*/
 

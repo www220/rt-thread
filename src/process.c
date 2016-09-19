@@ -110,6 +110,8 @@ static int current_pid = 0;
 //wait
 static rt_uint32_t mod_waitp;
 static struct rt_event mod_eventp;
+//kill
+int rt_process_kill(rt_process_t module, int pid, int sig);
 
 static unsigned short getempty_pid()
 {
@@ -217,6 +219,9 @@ static int find_tpid(unsigned short tpid, unsigned short tme)
 static void rt_process_timeout(void *parameter)
 {
     struct rt_process *process = (struct rt_process *)parameter;
+
+    RT_ASSERT(process != RT_NULL);
+    rt_process_kill(process, process->tpid, SIGALRM);
 }
 
 //以下函数实现系统对象的复制
@@ -243,14 +248,6 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 	information = &rt_object_container[type];
 	rt_enter_critical();
 	rt_memcpy(desc,src,information->object_size);
-	/* remove thread from run list */
-	if (type == RT_Object_Class_Thread)
-	{
-		rt_thread_t src_thread = (rt_thread_t)src;
-		rt_thread_t desc_thread = (rt_thread_t)desc;
-		rt_list_init(&(desc_thread->tlist));
-	}
-	rt_exit_critical();
 
 	/* dump object */
 	switch(type)
@@ -259,14 +256,12 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 	{
 		rt_timer_t src_timer = (rt_timer_t)src;
 		rt_timer_t desc_timer = (rt_timer_t)desc;
-		temp = rt_hw_interrupt_disable();
 		for (i = 0; i < RT_TIMER_SKIP_LIST_LEVEL; i++)
 		{
 			rt_list_init(&(desc_timer->row[i]));
 			if (!rt_list_isempty(&(src_timer->row[i])))
 				rt_list_insert_after(&(src_timer->row[i]), &(desc_timer->row[i]));
 		}
-		rt_hw_interrupt_enable(temp);
 		//fix parameter
 		break;
 	}
@@ -274,6 +269,8 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 	{
 		rt_thread_t src_thread = (rt_thread_t)src;
 		rt_thread_t desc_thread = (rt_thread_t)desc;
+		/* remove thread from run list */
+		rt_list_init(&(desc_thread->tlist));
 		//timer
 		rt_process_copy_object(&desc_thread->thread_timer.parent, &src_thread->thread_timer.parent);
 		desc_thread->thread_timer.parameter = desc_thread;
@@ -281,6 +278,8 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 		break;
 	}
 	}
+
+	rt_exit_critical();
 	return desc;
 }
 
@@ -1118,6 +1117,7 @@ rt_err_t rt_process_destroy(rt_process_t module)
     free_pid(module->pid);
     release_tpid(module->tpid,module->exitcode);
     rt_hw_interrupt_enable(temp);}
+    rt_process_kill(module,module->tpid,SIGCHLD);
 
     RT_DEBUG_LOG(RT_DEBUG_PROCESS, ("rt_process_destroy: %8.*s finished\n",
                                    RT_NAME_MAX, module->parent.name));
@@ -1174,6 +1174,13 @@ rt_err_t rt_process_unload(rt_process_t module, int exitcode)
             /* delete dynamic object */
             rt_thread_delete((rt_thread_t)object);
         }
+    }
+
+    /* delete the alarm timer */
+    if (module->alarm)
+    {
+        rt_timer_delete(module->alarm);
+        module->alarm = RT_NULL;
     }
 
     /* delete the main thread of process */
@@ -1433,8 +1440,7 @@ int rt_process_fork(rt_process_t module)
     forkmod->page_cnt = 0;
     /* initialize heap semaphore */
     forkmod->page_mutex = rt_mutex_create(module->page_mutex->parent.parent.name, RT_IPC_FLAG_FIFO);
-    forkmod->alarm = rt_timer_create(module->alarm->parent.name,
-                                            rt_process_timeout, forkmod, 0, RT_TIMER_FLAG_ONE_SHOT);
+    forkmod->alarm = (rt_timer_t)rt_process_copy_object(RT_NULL,(rt_object_t)module->alarm);
 
     if (!forkmod->page_array || !forkmod->page_mutex || !forkmod->alarm)
     {
@@ -1618,7 +1624,7 @@ int rt_process_execve(rt_process_t module, const char*file, const char **argv, c
 	{
 		if (!module->jmppid && !module->jmpsp && !module->jmpsplen)
 			module->tpid = 0;
-		rt_process_unload(module,SIGQUIT);
+		rt_process_unload(module,SIGSTOP);
 		rt_schedule();
 	}
     return -1;
@@ -1774,5 +1780,91 @@ void rt_process_wait(int delay)
     tty_rx_inxpz = 1;
     rt_kprintf(FINSH_PROMPT);
 #endif
+}
+
+int rt_process_kill(rt_process_t module, int pid, int sig)
+{
+    struct rt_object_information *information;
+    struct rt_process *find = RT_NULL;
+    struct rt_list_node *node;
+
+    /* enter critical */
+    rt_enter_critical();
+
+    /* try to find device object */
+    extern struct rt_object_information rt_object_container[];
+    information = &rt_object_container[RT_Object_Class_Process];
+    for (node = information->object_list.next;
+         node != &(information->object_list);
+         node = node->next)
+    {
+        struct rt_process *object = (struct rt_process *)rt_list_entry(node, struct rt_object, list);
+        if (pid >0 &&
+        		((sig != SIGCHLD && object->tpid == pid)
+        				|| (sig ==SIGCHLD && object->tpid == pidinfo[pid-1][1])))
+        {
+            //找到子进程或者子进程的父进程
+            find = object;
+            break;
+        }
+    }
+
+    /* leave critical */
+    rt_exit_critical();
+
+    rt_kprintf("kill %d %d\n",pid,sig);
+    if (find == RT_NULL)
+        return -ESRCH;
+
+    //处理退出进程
+    if (sig == SIGKILL)
+    {
+		rt_process_unload(find,SIGKILL);
+		rt_schedule();
+		return 0;
+    }
+    //特殊处理子进程退出事件
+    if (sig == SIGCHLD)
+    {
+    	if ((find->sigact[sig].sa_handler == SIG_IGN)
+    			|| (find->sigact[sig].sa_handler == SIG_ERR)
+    			|| (find->sigact[sig].sa_flags & SA_NOCLDSTOP))
+    	{
+    		//忽略信号，不产生僵尸进程
+    		rt_process_waitpid(module,pid,0,WNOHANG);
+    		return 0;
+    	}
+    }
+    //信号被忽略，不用进行处理
+	if ((find->sigact[sig].sa_handler == SIG_IGN)
+			|| (find->sigact[sig].sa_handler == SIG_ERR))
+		return 0;
+
+	int dosched = 0;
+	register rt_ubase_t temp = rt_hw_interrupt_disable();
+	find->siginfo |= (1<<sig);
+
+	do
+	{
+		//信号被阻止不用立刻处理
+		if (find->sigset & (1<<sig))
+			break;
+		//程序正在运行不用唤醒
+		if (find->module_thread->stat != RT_THREAD_SUSPEND)
+			break;
+		//不带超时时间的休眠，不能唤醒，因为无法恢复到原来的状态
+		if (!(find->module_thread->thread_timer.parent.flag & RT_TIMER_FLAG_ACTIVATED))
+			break;
+		//唤醒并设置错误
+		find->module_thread->error = -RT_EINTR;
+		rt_thread_resume(find->module_thread);
+		dosched = 1;
+	} while (0);
+	rt_hw_interrupt_enable(temp);
+
+	//强制调度一下
+	if (dosched)
+		rt_schedule();
+	return 0;
 }
 #endif

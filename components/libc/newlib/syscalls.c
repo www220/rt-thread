@@ -429,6 +429,7 @@ extern int rt_process_savefile(rt_process_t module, int fileno);
 extern int rt_process_convfile(rt_process_t module, int fileno);
 extern int rt_process_setfile(rt_process_t module, int fileno, int newfileno);
 extern int rt_process_clearfile(rt_process_t module, int fileno);
+extern int rt_process_kill(rt_process_t module, int pid, int sig);
 static inline int ret_err(int ret)
 {
     if (ret < 0)
@@ -452,8 +453,8 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
 
     RT_ASSERT(module != RT_NULL);
     RT_ASSERT((nbr&SYS_BASE) == SYS_BASE);
-    //__asm volatile("msr cpsr_c, #0x13");
     //rt_kprintf("syscall %d in\n",nbr-SYS_BASE);
+    __asm volatile("msr cpsr_c, #0x13");
 
     switch(nbr)
     {
@@ -487,7 +488,21 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         extern void __udelay(unsigned long usecs);
         while (tim1->tv_sec > 10*24*3600)
         {
+            rt_tick_t tnow = rt_tick_get();
             rt_thread_delay(10*24*3600*1000);
+            //处理中断醒来的情况
+            if (rt_thread_self()->error == -RT_EINTR)
+            {
+                tnow = rt_tick_get()-tnow;
+                tim1->tv_sec -= (tnow+500)/1000;
+                if (tim1->tv_sec < 0) tim1->tv_sec = 0;
+                if (tim2)
+                {
+                    tim2->tv_sec = tim1->tv_sec;
+                    tim2->tv_nsec = tim1->tv_nsec;
+                }
+                return -EINTR;
+            }
             tim1->tv_sec -= 10*24*3600;
         }
         //休息剩下的时间
@@ -495,7 +510,25 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         if (ms <= 0)
             __udelay(tim1->tv_nsec/1000l+1);
         else
+        {
+            rt_tick_t tnow = rt_tick_get();
             rt_thread_delay(ms);
+            //处理中断醒来的情况
+            if (rt_thread_self()->error == -RT_EINTR)
+            {
+                tnow = rt_tick_get()-tnow;
+                tim1->tv_sec -= tnow/1000;
+                if (tim1->tv_sec < 0) tim1->tv_sec = 0;
+                tim1->tv_nsec = (tnow-tim1->tv_sec*1000)*1000000l;
+                if (tim1->tv_nsec < 0) tim1->tv_nsec = 0;
+                if (tim2)
+                {
+                    tim2->tv_sec = tim1->tv_sec;
+                    tim2->tv_nsec = tim1->tv_nsec;
+                }
+                return -EINTR;
+            }
+        }
         if (tim2)
         {
             tim2->tv_sec = 0;
@@ -509,10 +542,14 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     case SYS_getppid:
     {
+        if (pidinfo[module->tpid-1][0] < 100)
+            return -ESRCH;
         return pidinfo[module->tpid-1][1];
     }
     case SYS_getpgrp:
     {
+        if (pidinfo[module->tpid-1][0] < 100 || pidinfo[module->tpid-1][2] == 0)
+            return -ESRCH;
         return pidinfo[module->tpid-1][2];
     }
     case SYS_getpgid:
@@ -521,7 +558,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     		parm1 = module->tpid;
     	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
     		return -EINVAL;
-    	if (pidinfo[parm1-1][0] < 100)
+    	if (pidinfo[parm1-1][0] < 100 || pidinfo[parm1-1][2] == 0)
     		return -ESRCH;
     	return pidinfo[parm1-1][2];
     }
@@ -531,7 +568,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     		parm1 = module->tpid;
     	if (parm1 < 0 && parm1 > MAX_PID_SIZE)
     		return -EINVAL;
-    	if (pidinfo[parm1-1][0] < 100)
+    	if (pidinfo[parm1-1][0] < 100 || pidinfo[parm1-1][3] == 0)
     		return -ESRCH;
     	return pidinfo[parm1-1][3];
     }
@@ -596,11 +633,13 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         if (parm1 >= NSIG)
             return -EINVAL;
         //保存上一个数据
+        temp = rt_hw_interrupt_disable();
         if (osig != RT_NULL)
             *osig = module->sigact[parm1];
         //设置新值
         if (sig != RT_NULL)
             module->sigact[parm1] = *sig;
+        rt_hw_interrupt_enable(temp);
         return 0;
     }
     case SYS_sigprocmask:
@@ -610,6 +649,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         if (parm1 > SIG_UNBLOCK)
             return -EINVAL;
         //保存上一个数据
+        temp = rt_hw_interrupt_disable();
         if (osig != RT_NULL)
             *osig = module->sigset;
         //设置新值
@@ -622,12 +662,14 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
             else if (parm1 == SIG_SETMASK)
                 module->sigset = *sig;
         }
+        rt_hw_interrupt_enable(temp);
         return 0;
     }
     case SYS_kill:
     {
-        rt_kprintf("kill %d,%d\n",parm1,parm2);
-        return 0;
+        if (parm2 >= NSIG)
+            return -EINVAL;
+        return rt_process_kill(module,parm1,parm2);
     }
     case SYS_wait4:
     {
@@ -1201,5 +1243,53 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     }
     PRESS_DEBUG_NOSYS("syscall %d not supported\n",nbr-SYS_BASE);
     return -ENOTSUP;
+}
+
+rt_uint32_t sys_call_signal(rt_uint32_t ret)
+{
+	register rt_base_t temp;
+	rt_process_t module = rt_process_self();
+	int i,deal = 0;
+
+	temp = rt_hw_interrupt_disable();
+	for (i=1; i<NSIG; i++)
+	{
+		//没有信号需要处理
+		if (!(module->siginfo & (1<<i)))
+			continue;
+		//忽略的信号不用处理
+		if (module->sigact[i].sa_handler == SIG_IGN
+					|| module->sigact[i].sa_handler == SIG_ERR)
+			continue;
+		//信号被阻止，不能进行处理
+		if (module->sigset & (1<<i))
+			continue;
+
+		deal = 1;
+		//默认消息一般是退出处理
+		if (module->sigact[i].sa_handler == SIG_DFL)
+		{
+			//这消息默认是不处理
+			if (i==SIGCHLD || i==SIGWINCH || i==SIGURG)
+			{
+				module->siginfo &= ~(1<<i);
+				continue;
+			}
+			rt_hw_interrupt_enable(temp);
+			rt_process_unload(module,i);
+			rt_schedule();
+		}
+		//调用处理函数，回调相关代码
+		sigset_t oldset = module->sigset;
+		module->sigset |= module->sigact[i].sa_mask;
+		rt_hw_interrupt_enable(temp);
+		module->sigact[i].sa_handler(i);
+		temp = rt_hw_interrupt_disable();
+		module->sigset = oldset;
+		module->siginfo &= ~(1<<i);
+	}
+	rt_hw_interrupt_enable(temp);
+
+	return (deal && ret<0)?(-EINTR):(ret);
 }
 #endif
