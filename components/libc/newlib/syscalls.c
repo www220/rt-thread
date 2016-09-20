@@ -488,21 +488,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         extern void __udelay(unsigned long usecs);
         while (tim1->tv_sec > 10*24*3600)
         {
-            rt_tick_t tnow = rt_tick_get();
             rt_thread_delay(10*24*3600*1000);
-            //处理中断醒来的情况
-            if (rt_thread_self()->error == -RT_EINTR)
-            {
-                tnow = rt_tick_get()-tnow;
-                tim1->tv_sec -= (tnow+500)/1000;
-                if (tim1->tv_sec < 0) tim1->tv_sec = 0;
-                if (tim2)
-                {
-                    tim2->tv_sec = tim1->tv_sec;
-                    tim2->tv_nsec = tim1->tv_nsec;
-                }
-                return -EINTR;
-            }
             tim1->tv_sec -= 10*24*3600;
         }
         //休息剩下的时间
@@ -510,25 +496,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         if (ms <= 0)
             __udelay(tim1->tv_nsec/1000l+1);
         else
-        {
-            rt_tick_t tnow = rt_tick_get();
             rt_thread_delay(ms);
-            //处理中断醒来的情况
-            if (rt_thread_self()->error == -RT_EINTR)
-            {
-                tnow = rt_tick_get()-tnow;
-                tim1->tv_sec -= tnow/1000;
-                if (tim1->tv_sec < 0) tim1->tv_sec = 0;
-                tim1->tv_nsec = (tnow-tim1->tv_sec*1000)*1000000l;
-                if (tim1->tv_nsec < 0) tim1->tv_nsec = 0;
-                if (tim2)
-                {
-                    tim2->tv_sec = tim1->tv_sec;
-                    tim2->tv_nsec = tim1->tv_nsec;
-                }
-                return -EINTR;
-            }
-        }
         if (tim2)
         {
             tim2->tv_sec = 0;
@@ -1247,9 +1215,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
 
 rt_uint32_t sys_call_signal(rt_uint32_t ret)
 {
+	int i,deal = 0;
 	register rt_base_t temp;
 	rt_process_t module = rt_process_self();
-	int i,deal = 0;
+
+    RT_ASSERT(module != RT_NULL);
+    //rt_kprintf("signale ret:%d in\n",ret);
 
 	//没有信号产生或者全部信号屏蔽
 	if (module->siginfo == 0 || module->sigset == 0xffffffff)
@@ -1287,13 +1258,20 @@ rt_uint32_t sys_call_signal(rt_uint32_t ret)
 		sigset_t oldset = module->sigset;
 		module->sigset |= (module->sigact[i].sa_mask|(1<<i));
 		rt_hw_interrupt_enable(temp);
-		module->sigact[i].sa_handler(i);
+		extern void rt_hw_context_signal(rt_uint32_t sig, rt_uint32_t to);
+		rt_hw_context_signal(i,(rt_uint32_t)module->sigact[i].sa_handler);
 		temp = rt_hw_interrupt_disable();
 		module->sigset = oldset;
+		//清除标志，会丢失信号但是避免了递归的问题
 		module->siginfo &= ~(1<<i);
 	}
 	rt_hw_interrupt_enable(temp);
 
 	return (deal && ret<0)?(-EINTR):(ret);
+}
+
+void rt_hw_printinfo(rt_int32_t r0, rt_int32_t r1, rt_int32_t r2)
+{
+	rt_kprintf("\nhw_print R0:%08x,R1:%08x,R2:%08x\n",r0,r1,r2);
 }
 #endif

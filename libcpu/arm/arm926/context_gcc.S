@@ -43,13 +43,14 @@ rt_hw_interrupt_enable:
     BX      LR
 
 /*
- * void rt_hw_context_switch(rt_uint32 from, rt_uint32 to);
+ * void rt_hw_context_switch(rt_uint32_t from, rt_uint32_t to);
  * r0 --> from
  * r1 --> to
  */
     .globl rt_pids_from
     .globl rt_pids_to
     .globl mmu_switchtlb
+    .globl rt_hw_printinfo
     .globl rt_hw_context_switch
 rt_hw_context_switch:
     STMFD   SP!, {LR}           @; push pc (lr should be pushed in place of pc)
@@ -83,7 +84,7 @@ rt_hw_context_switch_usr:
     LDMFD   SP!, {PC}^
 
 /*
- * void rt_hw_context_save(rt_uint32 ret, rt_uint32 to);
+ * void rt_hw_context_save(rt_uint32_t ret, rt_uint32_t to);
  * r0 --> ret
  * r1 --> to
  */
@@ -98,7 +99,20 @@ rt_hw_context_save:
     MOV     PC, LR
 
 /*
- * void rt_hw_context_switch_to(rt_uint32 to);
+ * void rt_hw_context_signal(rt_uint32_t sig, rt_uint32_t to);
+ * r0 --> sig
+ * r1 --> to
+ */
+    .globl rt_hw_context_signal
+rt_hw_context_signal:
+    STMFD   SP!, {SP}
+    LDMFD   SP!, {SP}^
+    MSR     CPSR_c, #0x10
+    BLX     R1
+    MSR     CPSR_c, #0x13
+
+/*
+ * void rt_hw_context_switch_to(rt_uint32_t to);
  * r0 --> to
  */
     .globl rt_hw_context_switch_to
@@ -118,7 +132,7 @@ rt_hw_context_switch_to_usr:
     LDMFD   SP!, {PC}^
 
 /*
- * void rt_hw_context_switch_interrupt(rt_uint32 from, rt_uint32 to);
+ * void rt_hw_context_switch_interrupt(rt_uint32_t from, rt_uint32_t to);
  */
     .globl rt_thread_switch_interrupt_flag
     .globl rt_interrupt_from_thread

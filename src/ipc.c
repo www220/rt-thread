@@ -57,6 +57,29 @@ extern void (*rt_object_take_hook)(struct rt_object *object);
 extern void (*rt_object_put_hook)(struct rt_object *object);
 #endif
 
+#ifdef RT_USING_PROCESS
+extern rt_uint32_t sys_call_signal(rt_uint32_t ret);
+#define SIGNAL_RESTART signalrestart:
+#define GOTO_SIGNAL_RE if (thread->error == -RT_EINTR) \
+{ rt_process_t process = rt_process_self(); \
+  if (process != RT_NULL) \
+  { \
+    rt_tick_t now = rt_tick_get(),elsp = 0; \
+    if (thread->thread_timer.parent.flag & RT_TIMER_FLAG_ACTIVATED) \
+      elsp = (thread->thread_timer.timeout_tick - now); \
+    sys_call_signal(-RT_EINTR); \
+    if (elsp > rt_tick_get()-now) \
+    { \
+      timeout = elsp-(rt_tick_get()-now); \
+      goto signalrestart; \
+    } \
+  } \
+}
+#else
+#define SIGNAL_RESTART
+#define GOTO_SIGNAL_RE
+#endif
+
 /**
  * @addtogroup IPC
  */
@@ -325,7 +348,7 @@ RTM_EXPORT(rt_sem_delete);
  *
  * @return the error code
  */
-rt_err_t rt_sem_take(rt_sem_t sem, rt_int32_t time)
+rt_err_t rt_sem_take(rt_sem_t sem, rt_int32_t timeout)
 {
     register rt_base_t temp;
     struct rt_thread *thread;
@@ -333,6 +356,7 @@ rt_err_t rt_sem_take(rt_sem_t sem, rt_int32_t time)
     RT_ASSERT(sem != RT_NULL);
 
     RT_OBJECT_HOOK_CALL(rt_object_trytake_hook, (&(sem->parent.parent)));
+    SIGNAL_RESTART
 
     /* disable interrupt */
     temp = rt_hw_interrupt_disable();
@@ -353,7 +377,7 @@ rt_err_t rt_sem_take(rt_sem_t sem, rt_int32_t time)
     else
     {
         /* no waiting, return with timeout */
-        if (time == 0)
+        if (timeout == 0)
         {
             rt_hw_interrupt_enable(temp);
 
@@ -380,7 +404,7 @@ rt_err_t rt_sem_take(rt_sem_t sem, rt_int32_t time)
                                 sem->parent.parent.flag);
 
             /* has waiting time, start thread timer */
-            if (time > 0)
+            if (timeout > 0)
             {
                 RT_DEBUG_LOG(RT_DEBUG_IPC, ("set thread:%s to timer list\n",
                                             thread->name));
@@ -388,7 +412,7 @@ rt_err_t rt_sem_take(rt_sem_t sem, rt_int32_t time)
                 /* reset the timeout of thread timer and start it */
                 rt_timer_control(&(thread->thread_timer),
                                  RT_TIMER_CTRL_SET_TIME,
-                                 &time);
+                                 &timeout);
                 rt_timer_start(&(thread->thread_timer));
             }
 
@@ -400,6 +424,7 @@ rt_err_t rt_sem_take(rt_sem_t sem, rt_int32_t time)
 
             if (thread->error != RT_EOK)
             {
+                GOTO_SIGNAL_RE
                 return thread->error;
             }
         }
@@ -639,7 +664,7 @@ RTM_EXPORT(rt_mutex_delete);
  *
  * @return the error code
  */
-rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time)
+rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t timeout)
 {
     register rt_base_t temp;
     struct rt_thread *thread;
@@ -648,6 +673,7 @@ rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time)
     RT_DEBUG_IN_THREAD_CONTEXT;
 
     RT_ASSERT(mutex != RT_NULL);
+    SIGNAL_RESTART
 
     /* disable interrupt */
     temp = rt_hw_interrupt_disable();
@@ -687,7 +713,7 @@ rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time)
         else
         {
             /* no waiting, return with timeout */
-            if (time == 0)
+            if (timeout == 0)
             {
                 /* set error as timeout */
                 thread->error = -RT_ETIMEOUT;
@@ -718,7 +744,7 @@ rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time)
                                     mutex->parent.parent.flag);
 
                 /* has waiting time, start thread timer */
-                if (time > 0)
+                if (timeout > 0)
                 {
                     RT_DEBUG_LOG(RT_DEBUG_IPC,
                                  ("mutex_take: start the timer of thread:%s\n",
@@ -727,7 +753,7 @@ rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time)
                     /* reset the timeout of thread timer and start it */
                     rt_timer_control(&(thread->thread_timer),
                                      RT_TIMER_CTRL_SET_TIME,
-                                     &time);
+                                     &timeout);
                     rt_timer_start(&(thread->thread_timer));
                 }
 
@@ -739,6 +765,7 @@ rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time)
 
                 if (thread->error != RT_EOK)
                 {
+                    GOTO_SIGNAL_RE
                     /* return error */
                     return thread->error;
                 }
@@ -1106,6 +1133,7 @@ rt_err_t rt_event_recv(rt_event_t   event,
     RT_ASSERT(event != RT_NULL);
     if (set == 0)
         return -RT_ERROR;
+    SIGNAL_RESTART
 
     /* init status */
     status = -RT_ERROR;
@@ -1180,6 +1208,7 @@ rt_err_t rt_event_recv(rt_event_t   event,
 
         if (thread->error != RT_EOK)
         {
+            GOTO_SIGNAL_RE
             /* return error */
             return thread->error;
         }
@@ -1413,6 +1442,7 @@ rt_err_t rt_mb_send_wait(rt_mailbox_t mb,
 
     /* parameter check */
     RT_ASSERT(mb != RT_NULL);
+    SIGNAL_RESTART
 
     /* initialize delta tick */
     tick_delta = 0;
@@ -1478,6 +1508,7 @@ rt_err_t rt_mb_send_wait(rt_mailbox_t mb,
         /* resume from suspend state */
         if (thread->error != RT_EOK)
         {
+            GOTO_SIGNAL_RE
             /* return error */
             return thread->error;
         }
@@ -1558,6 +1589,7 @@ rt_err_t rt_mb_recv(rt_mailbox_t mb, rt_uint32_t *value, rt_int32_t timeout)
 
     /* parameter check */
     RT_ASSERT(mb != RT_NULL);
+    SIGNAL_RESTART
 
     /* initialize delta tick */
     tick_delta = 0;
@@ -1625,6 +1657,7 @@ rt_err_t rt_mb_recv(rt_mailbox_t mb, rt_uint32_t *value, rt_int32_t timeout)
         /* resume from suspend state */
         if (thread->error != RT_EOK)
         {
+            GOTO_SIGNAL_RE
             /* return error */
             return thread->error;
         }
@@ -2107,6 +2140,7 @@ rt_err_t rt_mq_recv(rt_mq_t    mq,
     RT_ASSERT(mq != RT_NULL);
     RT_ASSERT(buffer != RT_NULL);
     RT_ASSERT(size != 0);
+    SIGNAL_RESTART
 
     /* initialize delta tick */
     tick_delta = 0;
@@ -2174,6 +2208,7 @@ rt_err_t rt_mq_recv(rt_mq_t    mq,
         /* recv message */
         if (thread->error != RT_EOK)
         {
+            GOTO_SIGNAL_RE
             /* return error */
             return thread->error;
         }

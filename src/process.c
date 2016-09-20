@@ -1823,6 +1823,9 @@ int rt_process_kill(rt_process_t module, int pid, int sig)
     //处理退出进程
     if (sig == SIGKILL)
     {
+		//不能轻易干掉init进程
+		if (find->tpid == 1 && pid != 1)
+			return -EACCES;
 		rt_process_unload(find,SIGKILL);
 		rt_schedule();
 		return 0;
@@ -1860,9 +1863,6 @@ int rt_process_kill(rt_process_t module, int pid, int sig)
 			break;
 		//程序正在运行不用唤醒
 		if (find->module_thread->stat != RT_THREAD_SUSPEND)
-			break;
-		//不带超时时间的休眠，不能唤醒，因为无法恢复到原来的状态
-		if (!(find->module_thread->thread_timer.parent.flag & RT_TIMER_FLAG_ACTIVATED))
 			break;
 		//唤醒并设置错误
 		find->module_thread->error = -RT_EINTR;

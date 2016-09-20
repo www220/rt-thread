@@ -70,6 +70,29 @@ void rt_mp_free_sethook(void (*hook)(struct rt_mempool *mp, void *block))
 /*@}*/
 #endif
 
+#ifdef RT_USING_PROCESS
+extern rt_uint32_t sys_call_signal(rt_uint32_t ret);
+#define SIGNAL_RESTART signalrestart:
+#define GOTO_SIGNAL_RE if (thread->error == -RT_EINTR) \
+{ rt_process_t process = rt_process_self(); \
+  if (process != RT_NULL) \
+  { \
+    rt_tick_t now = rt_tick_get(),elsp = 0; \
+    if (thread->thread_timer.parent.flag & RT_TIMER_FLAG_ACTIVATED) \
+      elsp = (thread->thread_timer.timeout_tick - now); \
+    sys_call_signal(-RT_EINTR); \
+    if (elsp > rt_tick_get()-now) \
+    { \
+      time = elsp-(rt_tick_get()-now); \
+      goto signalrestart; \
+    } \
+  } \
+}
+#else
+#define SIGNAL_RESTART
+#define GOTO_SIGNAL_RE
+#endif
+
 /**
  * @addtogroup MM
  */
@@ -327,6 +350,7 @@ void *rt_mp_alloc(rt_mp_t mp, rt_int32_t time)
 
     /* get current thread */
     thread = rt_thread_self();
+    SIGNAL_RESTART
 
     /* disable interrupt */
     level = rt_hw_interrupt_disable();
@@ -372,7 +396,10 @@ void *rt_mp_alloc(rt_mp_t mp, rt_int32_t time)
         rt_schedule();
 
         if (thread->error != RT_EOK)
+        {
+            GOTO_SIGNAL_RE
             return RT_NULL;
+        }
 
         if (time > 0)
         {

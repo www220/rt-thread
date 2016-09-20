@@ -364,7 +364,8 @@ static void rt_thread_entry_main(void* parameter)
     	FILE *fp = fopen(RTT_INITAB, "w+");
     	if (fp)
     	{
-    		fprintf(fp,"/dev/" FINSH_DEVICE_NAME "::respawn:-/bin/sh\n");
+    		//fprintf(fp,"/dev/" FINSH_DEVICE_NAME "::respawn:-/bin/sh\n");
+    		fprintf(fp,"::respawn:/sbin/getty /dev/" FINSH_DEVICE_NAME " 115200\n");
     		fclose(fp);
     	}
     }
@@ -384,22 +385,51 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
     /* init finsh */
+    int waitmsh = 1;
 #ifdef RT_USING_FINSH
+    //等待输入跳过msh
+    int i,j;
+    char buf[100];
+    rt_device_t dev = rt_device_find(FINSH_DEVICE_NAME);
+    while (rt_device_read(dev, 0, buf, sizeof(buf)) > 0);
+    for (i=0; i<3; i++)
+    {
+        rt_kprintf("wait fo msh input %d.",3-i);
+        for (j=0; j<5; j++)
+        {
+            rt_thread_delay(200);
+            if (rt_device_read(dev, 0, buf, sizeof(buf)) > 0)
+            {
+                waitmsh = 0;
+                break;
+            }
+        }
+        if (waitmsh == 0)
+            break;
+        rt_kprintf("\r");
+        //等待结束没有收到跳转命令
+        if (i+1 == 3)
+            rt_kprintf("wait fo msh input 0.");
+    }
+    rt_kprintf("\n");
+    while (rt_device_read(dev, 0, buf, sizeof(buf)) > 0);
+    //初始化msh
     finsh_system_init();
     finsh_set_device(FINSH_DEVICE_NAME);
     rt_thread_delay(100);
 #endif
-#if 0
+    if (waitmsh)
+    {
 #define bupath "/bin/busybox"
 #define buargc "init"
 #ifdef RT_USING_FINSH
-    rt_kprintf("%s\n", bupath " " buargc);
+        rt_kprintf("%s\n", bupath " " buargc);
 #else
-    rt_device_t dev = rt_device_find(FINSH_DEVICE_NAME);
-    rt_device_open(dev, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
+        rt_device_t dev = rt_device_find(FINSH_DEVICE_NAME);
+        rt_device_open(dev, RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_INT_RX|RT_DEVICE_FLAG_STREAM);
 #endif
-    rt_process_exec_cmd(bupath, bupath " " buargc, -1);
-#endif
+        rt_process_exec_cmd(bupath, bupath " " buargc, -1);
+    }
 
     while (1)
     {

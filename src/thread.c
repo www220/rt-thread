@@ -75,6 +75,30 @@ void rt_thread_resume_sethook(void (*hook)(rt_thread_t thread))
 }
 #endif
 
+#ifdef RT_USING_PROCESS
+extern rt_uint32_t sys_call_signal(rt_uint32_t ret);
+#define SIGNAL_RESTART signalrestart:
+#define GOTO_SIGNAL_RE if (thread->error == -RT_EINTR) \
+{ rt_process_t process = rt_process_self(); \
+  if (process != RT_NULL) \
+  { \
+    rt_tick_t now = rt_tick_get(),elsp = 0; \
+    if (thread->thread_timer.parent.flag & RT_TIMER_FLAG_ACTIVATED) \
+      elsp = (thread->thread_timer.timeout_tick - now); \
+    sys_call_signal(-RT_EINTR); \
+    if (elsp > rt_tick_get()-now) \
+    { \
+      tick = elsp-(rt_tick_get()-now); \
+      goto signalrestart; \
+    } \
+  } \
+  thread->error = RT_EOK; \
+}
+#else
+#define SIGNAL_RESTART
+#define GOTO_SIGNAL_RE
+#endif
+
 void rt_thread_exit(void)
 {
     struct rt_thread *thread;
@@ -496,6 +520,7 @@ rt_err_t rt_thread_sleep(rt_tick_t tick)
 {
     register rt_base_t temp;
     struct rt_thread *thread;
+    SIGNAL_RESTART
 
     /* disable interrupt */
     temp = rt_hw_interrupt_disable();
@@ -518,6 +543,7 @@ rt_err_t rt_thread_sleep(rt_tick_t tick)
     /* clear error number of this thread to RT_EOK */
     if (thread->error == -RT_ETIMEOUT)
         thread->error = RT_EOK;
+    GOTO_SIGNAL_RE
 
     return RT_EOK;
 }

@@ -392,8 +392,7 @@ static rt_err_t at91_usart_control(struct rt_serial_device *serial,
     case RT_DEVICE_CTRL_FLSH: {
         rt_base_t level = rt_hw_interrupt_disable();
         struct rt_serial_rx_fifo* rx_fifo = (struct rt_serial_rx_fifo*) serial->serial_rx;
-        if (rx_fifo)
-            rx_fifo->get_index = rx_fifo->put_index;
+        if (rx_fifo) rx_fifo->get_index = rx_fifo->put_index;
         rt_hw_interrupt_enable(level);
         break; }
     }
@@ -776,6 +775,7 @@ static rt_size_t tty_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t
 		set = 0x01;
 	else
 		set = (1<<(uart->irq-IRQ_AUART0+1));
+
 	//接受前清理事件信号
 	rt_event_recv(&rx_sem,set,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0,0);
 	ret = rt_device_read(device->device, 0, buffer, size); if (ret < 0) ret = 0;
@@ -840,7 +840,12 @@ static rt_size_t tty_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t
 			}
 		}
 	}
-	if (ret>0 && (device->ios.c_lflag & ECHO) && (uart->irq == IRQ_DUART && !tty_rx_inxpz))
+
+	//其他串口不支持回显模式
+	if (uart->irq != IRQ_DUART)
+		return ret;
+
+	if (ret>0 && (device->ios.c_lflag & ECHO) && !tty_rx_inxpz)
 	{
 		//回车换行的转换
 		if (device->ios.c_iflag & (ICRNL|INLCR))
