@@ -37,6 +37,7 @@
 #ifndef RT_USING_DFS_DEVFS
 #error "defined RT_USING_DFS_DEVFS"
 #endif
+extern int rt_process_kill(rt_process_t module, int pid, int sig);
 #endif
 
 #define CONFIG_UART_CLK		24000000
@@ -441,6 +442,18 @@ static int at91_usart_getc(struct rt_serial_device *serial)
     	/* Read data byte */
     	if ((REG_RD(REGS_UARTDBG_BASE, HW_UARTDBGFR) & BM_UARTDBGFR_RXFE) == 0)
     		result = REG_RD(REGS_UARTDBG_BASE, HW_UARTDBGDR) & 0xff;
+#ifdef DFS_USING_SELECT
+    	//¿ØÖÆ×Ö·û´®¼ìË÷µ½ÒÔºó·¢ËÍ¿ØÖÆÃüÁî
+    	if (result != -1 && uart->tty->tpid[0] != 0)
+    	{
+    		if (result == uart->tty->ios.c_cc[VINTR])
+    			rt_process_kill(RT_NULL, -uart->tty->tpid[0], SIGINT);
+    		else if (result == uart->tty->ios.c_cc[VQUIT])
+    			rt_process_kill(RT_NULL, -uart->tty->tpid[0], SIGQUIT);
+    		else if (result == uart->tty->ios.c_cc[VKILL])
+    			rt_process_kill(RT_NULL, -uart->tty->tpid[0], SIGTERM);
+    	}
+#endif
     }
     else
 #endif

@@ -99,17 +99,20 @@ rt_hw_context_save:
     MOV     PC, LR
 
 /*
- * void rt_hw_context_signal(rt_uint32_t sig, rt_uint32_t to);
+ * void rt_hw_context_signal(rt_uint32_t sig, rt_uint32_t to, rt_uint32_t jmp);
  * r0 --> sig
  * r1 --> to
+ * r2 --> jmp
  */
     .globl rt_hw_context_signal
 rt_hw_context_signal:
+    STMFD   SP!, {R2}
     STMFD   SP!, {SP}
     LDMFD   SP!, {SP}^
     MSR     CPSR_c, #0x10
     BLX     R1
-    MSR     CPSR_c, #0x13
+    LDMFD   SP!, {R0}
+    SWI     #0x9007D1
 
 /*
  * void rt_hw_context_switch_to(rt_uint32_t to);

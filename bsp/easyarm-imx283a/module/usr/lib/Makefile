@@ -43,15 +43,15 @@ rtt_syscall:$(OBJS)
 	@$(AR) -rc rtt_syscall.a $(OBJS)
 
 rtt_do:$(OBJS)
-	@echo LD rtt_do_un.mo
-	@$(CC) -o rtt_do_un.mo $(CFLAGS) $(LIBS) $(OBJS)
-	@echo STRIP rtt_do.mo
-	@$(STRIP) -s -K _impure_ptr rtt_do_un.mo -o rtt_do.mo
+	@echo LD rtt_do_un
+	@$(CC) -o rtt_do_un $(CFLAGS) $(LIBS) $(OBJS)
+	@echo STRIP rtt_do
+	@$(STRIP) -s -K _impure_ptr rtt_do_un -o rtt_do
 
 clean:
 	rm -f *.o
 	rm -f posix/*.o
 	rm -f linux/*.o
 	rm -f libbb/*.o
-	rm -f rtt_syscall.a rtt_do_un.mo rtt_do.mo
+	rm -f rtt_syscall.a rtt_do_un rtt_do
 

@@ -592,7 +592,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         const char *file = (const char *)rt_process_conv_ptr(module,parm1,0);
         const char **argv = (parm2)?(rt_process_conv_ptr(module,parm2,-1)):(0);
         const char **envp = (parm3)?(rt_process_conv_ptr(module,parm3,-1)):(0);
-        return rt_process_execve(module,file,argv,envp);;
+        return rt_process_execve(module,file,argv,envp);
     }
     case SYS_sigaction:
     {
@@ -1197,7 +1197,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         	return -ENOTTY;
         }
         //必须是字符类设备
-        rt_device_t device = (rt_device_t)d->data;;
+        rt_device_t device = (rt_device_t)d->data;
         if (device == RT_NULL || device->type != RT_Device_Class_Char)
         {
         	fd_put(d);
@@ -1206,6 +1206,12 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
         //复制设备名称/dev
         rt_snprintf(name,parm3,"/dev%s",d->path);
         fd_put(d);
+        return 0;
+    }
+    case SYS_BASE+2001:
+    {
+        jmp_buf *sigjmp = rt_process_conv_ptr(module,parm1,sizeof(jmp_buf));
+        longjmp(*sigjmp, 2001);
         return 0;
     }
     }
@@ -1256,10 +1262,15 @@ rt_uint32_t sys_call_signal(rt_uint32_t ret)
 		}
 		//调用处理函数，回调相关代码
 		sigset_t oldset = module->sigset;
+		module->siginfo &= ~(1<<i);
 		module->sigset |= (module->sigact[i].sa_mask|(1<<i));
 		rt_hw_interrupt_enable(temp);
-		extern void rt_hw_context_signal(rt_uint32_t sig, rt_uint32_t to);
-		rt_hw_context_signal(i,(rt_uint32_t)module->sigact[i].sa_handler);
+		{jmp_buf sigjmp;
+		if (setjmp(sigjmp) == 0)
+		{
+			extern void rt_hw_context_signal(rt_uint32_t sig, rt_uint32_t to, rt_uint32_t jmp);
+			rt_hw_context_signal(i,(rt_uint32_t)module->sigact[i].sa_handler,(rt_uint32_t)&sigjmp);
+		}}
 		temp = rt_hw_interrupt_disable();
 		module->sigset = oldset;
 		//清除标志，会丢失信号但是避免了递归的问题

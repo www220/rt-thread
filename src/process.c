@@ -234,13 +234,13 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 	if (desc == RT_NULL)
 	{
 		desc = rt_object_allocate(type,"");
-	}
-	else
-	{
-		temp = rt_hw_interrupt_disable();
-		/* insert object into information object list */
-		rt_list_insert_after(&(src->list), &(desc->list));
-		rt_hw_interrupt_enable(temp);
+		if (desc != RT_NULL)
+		{
+			temp = rt_hw_interrupt_disable();
+			/* remove object from information object list */
+			rt_list_remove(&(desc->list));
+			rt_hw_interrupt_enable(temp);
+		}
 	}
 	if (desc == RT_NULL)
 		return desc;
@@ -248,6 +248,10 @@ rt_object_t rt_process_copy_object(rt_object_t desc, rt_object_t src)
 	information = &rt_object_container[type];
 	rt_enter_critical();
 	rt_memcpy(desc,src,information->object_size);
+	temp = rt_hw_interrupt_disable();
+	/* insert object into information object list */
+	rt_list_insert_after(&(src->list), &(desc->list));
+	rt_hw_interrupt_enable(temp);
 
 	/* dump object */
 	switch(type)
@@ -1804,9 +1808,13 @@ int rt_process_kill(rt_process_t module, int pid, int sig)
          node = node->next)
     {
         struct rt_process *object = (struct rt_process *)rt_list_entry(node, struct rt_object, list);
-        if (pid > 0 &&
-        		((sig!=SIGCHLD && object->tpid==pid)
-        				|| (sig==SIGCHLD && object->tpid==pidinfo[pid-1][1])))
+        //僵尸进程不能参与查找和消息发送
+        if (object->tpid == 0 || pidinfo[object->tpid-1][0] < 100)
+            continue;
+        if ((sig!=SIGCHLD && (object->tpid==pid
+        				|| (pidinfo[object->tpid-1][2]==-pid)
+        				|| (pid==0 && pidinfo[object->tpid-1][2]==pidinfo[module->tpid-1][2])))
+        		|| (sig==SIGCHLD && object->tpid==pidinfo[pid-1][1]))
         {
             //找到子进程或者子进程的父进程
             find = object;

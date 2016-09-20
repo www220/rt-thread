@@ -88,8 +88,6 @@ void rt_hw_show_register (struct rt_hw_register *regs)
  */
 void rt_hw_trap_udef(struct rt_hw_register *regs)
 {
-    rt_hw_show_register(regs);
-
     rt_kprintf("\nthread - %.*s - ", RT_NAME_MAX, rt_current_thread->name);
     rt_kprintf("undefined instruction abort sp:%x call:%x \n",regs->sp,regs->lr);
 
