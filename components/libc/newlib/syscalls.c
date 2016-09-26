@@ -1219,7 +1219,7 @@ rt_uint32_t sys_call_switch(rt_uint32_t nbr, rt_uint32_t parm1,
     return -ENOTSUP;
 }
 
-rt_uint32_t sys_call_signal(rt_uint32_t ret)
+rt_uint32_t sys_call_signal(rt_int32_t ret)
 {
 	int i,deal = 0;
 	register rt_base_t temp;

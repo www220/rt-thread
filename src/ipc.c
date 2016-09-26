@@ -68,9 +68,13 @@ extern rt_uint32_t sys_call_signal(rt_uint32_t ret);
     if (thread->thread_timer.parent.flag & RT_TIMER_FLAG_ACTIVATED) \
       elsp = (thread->thread_timer.timeout_tick - now); \
     sys_call_signal(-RT_EINTR); \
-    if (elsp > rt_tick_get()-now) \
+    if ((timeout > 0) && (elsp > rt_tick_get()-now)) \
     { \
       timeout = elsp-(rt_tick_get()-now); \
+      goto signalrestart; \
+    } \
+    else if (timeout < 0) \
+    { \
       goto signalrestart; \
     } \
   } \
