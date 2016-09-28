@@ -40,6 +40,12 @@ int dfs_file_flush(struct dfs_fd *fd);
 int dfs_file_lseek(struct dfs_fd *fd, rt_off_t offset);
 int dfs_file_stat(const char *path, struct stat *buf);
 int dfs_file_rename(const char *oldpath, const char *newpath);
+int dfs_file_lstat(const char *path, struct stat *buf);
+int dfs_file_fstat(struct dfs_fd *fd, struct stat *buf);
+int dfs_file_link(const char * oldpath, const char * newpath);
+int dfs_file_symlink(const char * oldpath, const char * newpath);
+int dfs_file_readlink(const char *path, char *buf, rt_size_t bufsiz);
+int dfs_file_truncate(struct dfs_fd *fd, rt_off_t length);
 
 #endif
 

@@ -217,7 +217,7 @@ int fd_is_open(const char *pathname)
     fullpath = dfs_normalize_path(RT_NULL, pathname);
     if (fullpath != RT_NULL)
     {
-        char *mountpath;
+        const char *mountpath;
         fs = dfs_filesystem_lookup(fullpath);
         if (fs == RT_NULL)
         {
@@ -229,9 +229,16 @@ int fd_is_open(const char *pathname)
 
         /* get file path name under mounted file system */
         if (fs->path[0] == '/' && fs->path[1] == '\0')
+        {
             mountpath = fullpath;
+        }
         else
-            mountpath = fullpath + strlen(fs->path);
+        {
+            if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+                mountpath = fullpath;
+            else
+                mountpath = dfs_subdir(fs->path, fullpath);
+        }
 
         dfs_lock();
 #ifdef DFS_USING_STDIO
@@ -305,7 +312,14 @@ char *dfs_normalize_path(const char *directory, const char *filename)
 
 #ifdef DFS_USING_WORKDIR
     if (directory == RT_NULL) /* shall use working directory */
+    {
+#ifdef RT_USING_PROCESS
+        if (rt_process_self() != RT_NULL)
+            directory = &rt_process_self()->workd[0];
+        else
+#endif
         directory = &working_directory[0];
+    }
 #else
     if ((directory == RT_NULL) && (filename[0] != '/'))
     {
@@ -414,4 +428,3 @@ up_one:
 RTM_EXPORT(dfs_normalize_path);
 
 /*@}*/
-

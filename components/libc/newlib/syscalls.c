@@ -201,147 +201,69 @@ _wait_r(struct _reent *ptr, int *status)
 	return -1;
 }
 
-#ifdef RT_USING_DEVICE
 _ssize_t
 _write_r(struct _reent *ptr, int fd, const void *buf, size_t nbytes)
 {
-	if (fd < 3)
-	{
-#ifdef RT_USING_CONSOLE
-		rt_device_t console_device;
-		extern rt_device_t rt_console_get_device(void);
-
-		console_device = rt_console_get_device();
-		if (console_device != 0) rt_device_write(console_device, 0, buf, nbytes);
-		return nbytes;
+#ifndef RT_USING_DFS
+	return 0;
 #else
-        return 0;
+	_ssize_t rc;
+
+	rc = write(fd, buf, nbytes);
+	return rc;
 #endif
+}
+
+int
+gettimeofday(struct timeval *__tp, void *__tzp)
+{
+#ifndef RT_USING_RTC
+	/* return "not supported" */
+	return -1;
+#else
+	static time_t sysnow = 0;
+	static uint16_t sysms = 0;
+	time_t nownow = time(NULL);
+	uint16_t nowms = rt_tick_get() % 1000;
+	if (sysnow == 0 && sysms == 0)
+	{
+		sysnow = nownow;
+		sysms = nowms;
 	}
 	else
 	{
-#ifdef RT_USING_DFS
-	    _ssize_t rc;
-
-	    rc = write(fd, buf, nbytes);
-	    return rc;
-#else
-        return 0;
-#endif
+		//如果毫秒走的比较快，在秒上面增加
+		if ((sysnow == nownow)
+				&& (nowms<sysnow))
+			sysnow = nownow+1;
+		else
+			sysnow = nownow;
+		sysms = nowms;
 	}
-}
-#endif
-
-#ifndef RT_USING_PTHREADS
-
-#ifndef MILLISECOND_PER_SECOND
-#define MILLISECOND_PER_SECOND	1000UL
-#endif
-
-#ifndef MICROSECOND_PER_SECOND
-#define MICROSECOND_PER_SECOND	1000000UL
-#endif
-
-#ifndef NANOSECOND_PER_SECOND
-#define NANOSECOND_PER_SECOND	1000000000UL
-#endif
-
-#define MILLISECOND_PER_TICK	(MILLISECOND_PER_SECOND / RT_TICK_PER_SECOND)
-#define MICROSECOND_PER_TICK	(MICROSECOND_PER_SECOND / RT_TICK_PER_SECOND)
-#define NANOSECOND_PER_TICK		(NANOSECOND_PER_SECOND  / RT_TICK_PER_SECOND)
-
-
-struct timeval _timevalue = {0};
-#ifdef RT_USING_DEVICE
-static void libc_system_time_init(void)
-{
-	time_t time;
-	rt_tick_t tick;
-	rt_device_t device;
-
-	time = 0;
-	device = rt_device_find("rtc");
-	if (device != RT_NULL)
-	{
-		/* get realtime seconds */
-		rt_device_control(device, RT_DEVICE_CTRL_RTC_GET_TIME, &time);
-	}
-
-	/* get tick */
-	tick = rt_tick_get();
-
-	_timevalue.tv_usec = MICROSECOND_PER_SECOND - (tick%RT_TICK_PER_SECOND) * MICROSECOND_PER_TICK;
-	_timevalue.tv_sec = time - tick/RT_TICK_PER_SECOND - 1;
-}
-#endif
-
-int libc_get_time(struct timespec *time)
-{
-	rt_tick_t tick;
-	static rt_bool_t inited = 0;
-
-	RT_ASSERT(time != RT_NULL);
-
-	/* initialize system time */
-	if (inited == 0)
-	{
-		libc_system_time_init();
-		inited = 1;
-	}
-
-	/* get tick */
-	tick = rt_tick_get();
-
-	time->tv_sec = _timevalue.tv_sec + tick / RT_TICK_PER_SECOND;
-	time->tv_nsec = (_timevalue.tv_usec + (tick % RT_TICK_PER_SECOND) * MICROSECOND_PER_TICK) * 1000;
-
+	__tp->tv_sec = sysnow;
+	__tp->tv_usec = sysms * 1000l;
 	return 0;
-}
-
-int
-_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
-{
-	struct timespec tp;
-
-	if (libc_get_time(&tp) == 0)
-	{
-		if (__tp != RT_NULL)
-		{
-			__tp->tv_sec  = tp.tv_sec;
-			__tp->tv_usec = tp.tv_nsec / 1000UL;
-		}
-
-		return tp.tv_sec;
-	}
-
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
-}
-#else
-/* POSIX thread provides clock_gettime function */
-#include <time.h>
-int
-_gettimeofday_r(struct _reent *ptr, struct timeval *__tp, void *__tzp)
-{
-	struct timespec tp;
-
-	if (clock_gettime(CLOCK_REALTIME, &tp) == 0)
-	{
-		if (__tp != RT_NULL)
-		{
-			__tp->tv_sec  = tp.tv_sec;
-			__tp->tv_usec = tp.tv_nsec / 1000UL;
-		}
-
-		return tp.tv_sec;
-	}
-
-	/* return "not supported" */
-	ptr->_errno = ENOTSUP;
-	return -1;
-}
 #endif
+}
+RTM_EXPORT(gettimeofday);
+
+int
+settimeofday(const struct timeval *__tp, const struct timezone *__tzp)
+{
+#ifndef RT_USING_RTC
+	/* return "not supported" */
+	return -1;
+#else
+	rt_device_t device;
+	device = rt_device_find("rtc");
+    if (device == RT_NULL)
+        return -1;
+    /* update to RTC device. */
+    rt_device_control(device, RT_DEVICE_CTRL_RTC_SET_TIME, (void *)&__tp->tv_sec);
+	return 0;
+#endif
+}
+RTM_EXPORT(settimeofday);
 
 /* Memory routine */
 void *
@@ -424,6 +346,19 @@ _exit (int status)
 		/* delete main thread */
 		rt_thread_delete(module->module_thread);
 		rt_exit_critical();
+
+		/* re-schedule */
+		rt_schedule();
+	}
+#endif
+#ifdef RT_USING_PROCESS
+	rt_process_t process;
+
+	process = rt_process_self();
+	if (process != RT_NULL)
+	{
+		/* unload assertion module */
+		rt_process_unload(process, (status&0xff)<<8);
 
 		/* re-schedule */
 		rt_schedule();

@@ -114,12 +114,8 @@ int dfs_file_open(struct dfs_fd *fd, const char *path, int flags)
         return result;
     }
 
-    fd->flags |= DFS_F_OPEN;
     if (flags & DFS_O_DIRECTORY)
-    {
         fd->type = FT_DIRECTORY;
-        fd->flags |= DFS_F_DIRECTORY;
-    }
 
     dfs_log(DFS_DEBUG_INFO, ("open successful"));
     return 0;
@@ -194,10 +190,7 @@ int dfs_file_read(struct dfs_fd *fd, void *buf, rt_size_t len)
     if (fs->ops->read == RT_NULL)
         return -DFS_STATUS_ENOSYS;
 
-    if ((result = fs->ops->read(fd, buf, len)) < 0)
-        fd->flags |= DFS_F_EOF;
-
-    return result;
+    return fs->ops->read(fd, buf, len);
 }
 
 /**
@@ -413,12 +406,280 @@ int dfs_file_stat(const char *path, struct stat *buf)
         if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
             result = fs->ops->stat(fs, fullpath, buf);
         else
-            result = fs->ops->stat(fs, dfs_subdir(fs->path, fullpath), buf);
+        {
+            if (dfs_subdir(fs->path, fullpath) == RT_NULL)
+                result = fs->ops->stat(fs, "/", buf);
+            else
+                result = fs->ops->stat(fs, dfs_subdir(fs->path, fullpath), buf);
+        }
     }
 
     rt_free(fullpath);
 
     return result;
+}
+
+int dfs_file_lstat(const char *path, struct stat *buf)
+{
+    int result;
+    char *fullpath;
+    struct dfs_filesystem *fs;
+
+    fullpath = dfs_normalize_path(RT_NULL, path);
+    if (fullpath == RT_NULL)
+    {
+        return -1;
+    }
+
+    if ((fs = dfs_filesystem_lookup(fullpath)) == RT_NULL)
+    {
+        dfs_log(DFS_DEBUG_ERROR,
+                ("can't find mounted filesystem on this path:%s", fullpath));
+        rt_free(fullpath);
+
+        return -DFS_STATUS_ENOENT;
+    }
+
+    if (fs->ops->lstat == RT_NULL && fs->ops->stat == RT_NULL)
+    {
+        rt_free(fullpath);
+        dfs_log(DFS_DEBUG_ERROR,
+                ("the filesystem didn't implement this function"));
+
+        return -DFS_STATUS_ENOSYS;
+    }
+
+    /* get the real file path and get file stat */
+    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+    {
+        if (fs->ops->lstat)
+            result = fs->ops->lstat(fs, fullpath, buf);
+        else
+            result = fs->ops->stat(fs, fullpath, buf);
+    }
+    else
+    {
+        if (fs->ops->lstat)
+        {
+            if (dfs_subdir(fs->path, fullpath) == RT_NULL)
+                result = fs->ops->lstat(fs, "/", buf);
+            else
+                result = fs->ops->lstat(fs, dfs_subdir(fs->path, fullpath), buf);
+        }
+        else
+        {
+            if (dfs_subdir(fs->path, fullpath) == RT_NULL)
+                result = fs->ops->stat(fs, "/", buf);
+            else
+                result = fs->ops->stat(fs, dfs_subdir(fs->path, fullpath), buf);
+        }
+    }
+
+    rt_free(fullpath);
+
+    return result;
+}
+
+int dfs_file_fstat(struct dfs_fd *fd, struct stat *buf)
+{
+    int result;
+    struct dfs_filesystem *fs;
+
+    if (fd == RT_NULL)
+        return -DFS_STATUS_EINVAL;
+
+    fs = (struct dfs_filesystem *)fd->fs;
+    if (fs->ops->lstat == RT_NULL && fs->ops->fstat == RT_NULL && fs->ops->stat == RT_NULL)
+    {
+        dfs_log(DFS_DEBUG_ERROR,
+                ("the filesystem didn't implement this function"));
+
+        return -DFS_STATUS_ENOSYS;
+    }
+
+    /* get the real file path and get file stat */
+    if (fs->ops->fstat)
+        result = fs->ops->fstat(fd, buf);
+    else
+    {
+        /* flush file info */
+        if (fs->ops->flush)
+            fs->ops->flush(fd);
+        if (fs->ops->lstat)
+            result = fs->ops->lstat(fs, fd->path, buf);
+        else
+            result = fs->ops->stat(fs, fd->path, buf);
+    }
+
+    return result;
+}
+
+int dfs_file_link(const char * oldpath, const char * newpath)
+{
+    int result;
+    char *fullpath,*fullpath2;
+    struct dfs_filesystem *fs;
+
+    fullpath = dfs_normalize_path(RT_NULL, oldpath);
+    if (fullpath == RT_NULL)
+    {
+        return -1;
+    }
+    fullpath2 = dfs_normalize_path(RT_NULL, newpath);
+    if (fullpath2 == RT_NULL)
+    {
+        rt_free(fullpath);
+        return -1;
+    }
+
+    if ((fs = dfs_filesystem_lookup(fullpath)) == RT_NULL)
+    {
+        dfs_log(DFS_DEBUG_ERROR,
+                ("can't find mounted filesystem on this path:%s", fullpath));
+        rt_free(fullpath);
+        rt_free(fullpath2);
+
+        return -DFS_STATUS_ENOENT;
+    }
+
+    if (fs->ops->link == RT_NULL)
+    {
+        rt_free(fullpath);
+        rt_free(fullpath2);
+        dfs_log(DFS_DEBUG_ERROR,
+                ("the filesystem didn't implement this function"));
+
+        return -DFS_STATUS_ENOSYS;
+    }
+
+    /* get the real file path and get file link */
+    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+        result = fs->ops->link(fs, fullpath, fullpath2);
+    else
+        result = fs->ops->link(fs, dfs_subdir(fs->path, fullpath), fullpath2);
+
+    rt_free(fullpath);
+    rt_free(fullpath2);
+
+    return result;
+}
+
+int dfs_file_symlink(const char * oldpath, const char * newpath)
+{
+    int result;
+    char *fullpath,*fullpath2;
+    struct dfs_filesystem *fs;
+
+    fullpath = dfs_normalize_path(RT_NULL, oldpath);
+    if (fullpath == RT_NULL)
+    {
+        return -1;
+    }
+    fullpath2 = dfs_normalize_path(RT_NULL, newpath);
+    if (fullpath2 == RT_NULL)
+    {
+        rt_free(fullpath);
+        return -1;
+    }
+
+    if ((fs = dfs_filesystem_lookup(fullpath2)) == RT_NULL)
+    {
+        dfs_log(DFS_DEBUG_ERROR,
+                ("can't find mounted filesystem on this path:%s", fullpath));
+        rt_free(fullpath);
+        rt_free(fullpath2);
+
+        return -DFS_STATUS_ENOENT;
+    }
+
+    if (fs->ops->symlink == RT_NULL)
+    {
+        rt_free(fullpath);
+        rt_free(fullpath2);
+        dfs_log(DFS_DEBUG_ERROR,
+                ("the filesystem didn't implement this function"));
+
+        return -DFS_STATUS_ENOSYS;
+    }
+
+    /* get the real file path and get file symlink */
+    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+        result = fs->ops->symlink(fs, fullpath, fullpath2);
+    else
+        result = fs->ops->symlink(fs, fullpath, dfs_subdir(fs->path, fullpath2));
+
+    rt_free(fullpath);
+    rt_free(fullpath2);
+
+    return result;
+}
+
+int dfs_file_readlink(const char *path, char *buf, rt_size_t bufsiz)
+{
+    int result;
+    char *fullpath;
+    struct dfs_filesystem *fs;
+
+    fullpath = dfs_normalize_path(RT_NULL, path);
+    if (fullpath == RT_NULL)
+    {
+        return -1;
+    }
+
+    if ((fs = dfs_filesystem_lookup(fullpath)) == RT_NULL)
+    {
+        dfs_log(DFS_DEBUG_ERROR,
+                ("can't find mounted filesystem on this path:%s", fullpath));
+        rt_free(fullpath);
+
+        return -DFS_STATUS_ENOENT;
+    }
+
+    if (fs->ops->readlink == RT_NULL)
+    {
+        rt_free(fullpath);
+        dfs_log(DFS_DEBUG_ERROR,
+                ("the filesystem didn't implement this function"));
+
+        return -DFS_STATUS_ENOSYS;
+    }
+
+    /* get the real file path and get file readlink */
+    if (fs->ops->flags & DFS_FS_FLAG_FULLPATH)
+        result = fs->ops->readlink(fs, fullpath, buf, bufsiz);
+    else
+        result = fs->ops->readlink(fs, dfs_subdir(fs->path, fullpath), buf, bufsiz);
+
+    /* calc real file path length */
+    if (result == 0)
+    {
+        char *find = buf;
+        while (bufsiz--)
+        {
+            if (*find == '\0')
+                break;
+            find++;
+            result++;
+        }
+    }
+
+    rt_free(fullpath);
+
+    return result;
+}
+
+int dfs_file_truncate(struct dfs_fd *fd, rt_off_t length)
+{
+    struct dfs_filesystem *fs;
+
+    if (fd == RT_NULL)
+        return -DFS_STATUS_EINVAL;
+
+    fs = fd->fs;
+    if (fs->ops->truncate == RT_NULL)
+        return -DFS_STATUS_ENOSYS;
+
+    return fs->ops->truncate(fd, length);
 }
 
 /**
@@ -502,6 +763,11 @@ void ls(const char *pathname)
     {
 #ifdef DFS_USING_WORKDIR
         /* open current working directory */
+#ifdef RT_USING_PROCESS
+        if (rt_process_self() != RT_NULL)
+            path = rt_strdup(rt_process_self()->workd);
+        else
+#endif
         path = rt_strdup(working_directory);
 #else
         path = rt_strdup("/");

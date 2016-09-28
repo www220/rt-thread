@@ -25,6 +25,7 @@
 #ifndef __DFS_H__
 #define __DFS_H__
 
+#include <dfs_def.h>
 #include <string.h>
 
 #ifdef __cplusplus

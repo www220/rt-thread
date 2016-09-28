@@ -151,6 +151,34 @@ long list_thread(void)
 FINSH_FUNCTION_EXPORT(list_thread, list thread);
 MSH_CMD_EXPORT(list_thread, list thread);
 
+#ifdef RT_USING_DFS
+#include <dfs_def.h>
+#include <dfs_fs.h>
+#include <dfs.h>
+long list_file(void)
+{
+	int i;
+	struct dfs_fd *fd;
+
+    rt_kprintf("fileno  ref  status      link\n");
+    rt_kprintf("------  ---  ----------  -----------------\n");
+    for (i=0; i<DFS_FD_MAX; i++)
+    {
+        fd = fd_get(i);
+        if (fd == RT_NULL)
+            continue;
+        rt_kprintf("%-6d  %-3d  0x%08x  %s%s\n",
+                   i,fd->ref_count-1,fd->flags,
+                   fd->fs->path,fd->path);
+        fd_put(fd);
+    }
+
+    return 0;
+}
+FINSH_FUNCTION_EXPORT(list_file, list file);
+MSH_CMD_EXPORT(list_file, list file);
+#endif
+
 static void show_wait_queue(struct rt_list_node *list)
 {
     struct rt_thread *thread;

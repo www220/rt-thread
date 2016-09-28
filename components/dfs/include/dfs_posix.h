@@ -108,6 +108,7 @@ long telldir(DIR *d);
 void seekdir(DIR *d, off_t offset);
 void rewinddir(DIR *d);
 int closedir(DIR* d);
+int getdents(int file, struct dirent *dirp, rt_size_t nbytes);
 
 #else
 /* use newlib header file */
@@ -117,7 +118,7 @@ int closedir(DIR* d);
 struct stat;
 
 /* file api*/
-int open(const char *file, int flags, int mode);
+int open(const char *file, int flags, ...);
 int close(int d);
 #ifdef RT_USING_NEWLIB
 _READ_WRITE_RETURN_TYPE _EXFUN(read, (int __fd, void *__buf, size_t __nbyte));
@@ -133,6 +134,13 @@ int stat(const char *file, struct stat *buf);
 int fstat(int fildes, struct stat *buf);
 int fsync(int fildes);
 int ioctl(int fildes, unsigned long cmd, void *data);
+int lstat(const char *file, struct stat *buf);
+int link(const char * oldpath, const char * newpath);
+int symlink(const char * oldpath, const char * newpath);
+int readlink(const char *path, char *buf, size_t bufsiz);
+int truncate(const char *path, rt_off_t length);
+int ftruncate(int fildes, rt_off_t length);
+int sendfile(int out_fd, int in_fd, rt_off_t *offset, rt_size_t count);
 
 /* directory api*/
 int rmdir(const char *path);
@@ -141,6 +149,7 @@ char *getcwd(char *buf, size_t size);
 
 /* file system api */
 int statfs(const char *path, struct statfs *buf);
+int fstatfs(int fildes, struct statfs *buf);
 
 #ifdef __cplusplus
 }

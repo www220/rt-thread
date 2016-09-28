@@ -38,12 +38,6 @@
 #define DEVICE_FORMAT            2
 #define DEVICE_CLEAN_SECTOR      3
 
-/* File flags */
-#define DFS_F_OPEN               0x01000000
-#define DFS_F_DIRECTORY          0x02000000
-#define DFS_F_EOF                0x04000000
-#define DFS_F_ERR                0x08000000
-
 #ifndef DFS_PATH_MAX
 #define DFS_PATH_MAX             256
 #endif
@@ -195,12 +189,6 @@
 #define DFS_O_APPEND             0x0002000
 #define DFS_O_BINARY             0x0008000
 #define DFS_O_DIRECTORY          0x0200000
-
-/* File flags */
-#define DFS_F_OPEN               0x01000000
-#define DFS_F_DIRECTORY          0x02000000
-#define DFS_F_EOF                0x04000000
-#define DFS_F_ERR                0x08000000
 
 /* Seek flags */
 #ifdef __CC_ARM

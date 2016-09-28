@@ -41,7 +41,7 @@
  *
  * @return the non-negative integer on successful open, others for failed.
  */
-int open(const char *file, int flags, int mode)
+int open(const char *file, int flags, ...)
 {
     int fd, result;
     struct dfs_fd *d;
@@ -331,6 +331,7 @@ int stat(const char *file, struct stat *buf)
 {
     int result;
 
+    rt_memset(buf, 0, sizeof(struct stat));
     result = dfs_file_stat(file, buf);
     if (result < 0)
     {
@@ -343,6 +344,23 @@ int stat(const char *file, struct stat *buf)
 }
 RTM_EXPORT(stat);
 
+int lstat(const char *file, struct stat *buf)
+{
+    int result;
+
+    rt_memset(buf, 0, sizeof(struct stat));
+    result = dfs_file_lstat(file, buf);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(lstat);
+
 /**
  * this function is a POSIX compliant version, which will get file status.
  *
@@ -353,8 +371,10 @@ RTM_EXPORT(stat);
  */
 int fstat(int fildes, struct stat *buf)
 {
+    int result;
     struct dfs_fd *d;
 
+    rt_memset(buf, 0, sizeof(struct stat));
     /* get the fd */
     d = fd_get(fildes);
     if (d == RT_NULL)
@@ -364,23 +384,17 @@ int fstat(int fildes, struct stat *buf)
         return -1;
     }
 
-    /* it's the root directory */
-    buf->st_dev = 0;
-
-    buf->st_mode = DFS_S_IFREG | DFS_S_IRUSR | DFS_S_IRGRP | DFS_S_IROTH |
-                   DFS_S_IWUSR | DFS_S_IWGRP | DFS_S_IWOTH;
-    if (d->type == FT_DIRECTORY)
+    result = dfs_file_fstat(d, buf);
+    if (result < 0)
     {
-        buf->st_mode &= ~DFS_S_IFREG;
-        buf->st_mode |= DFS_S_IFDIR | DFS_S_IXUSR | DFS_S_IXGRP | DFS_S_IXOTH;
+        fd_put(d);
+        rt_set_errno(result);
+
+        return -1;
     }
 
-    buf->st_size    = d->size;
-    buf->st_mtime   = 0;
-
     fd_put(d);
-
-    return DFS_STATUS_OK;
+    return result;
 }
 RTM_EXPORT(fstat);
 #endif
@@ -409,6 +423,11 @@ int fsync(int fildes)
     }
 
     ret = dfs_file_flush(d);
+    if (ret != DFS_STATUS_OK)
+    {
+        rt_set_errno(ret);
+        ret = -1;
+    }
 
     fd_put(d);
     return ret;
@@ -452,6 +471,135 @@ int ioctl(int fildes, unsigned long cmd, void *data)
 }
 RTM_EXPORT(ioctl);
 
+int link(const char * oldpath, const char * newpath)
+{
+    int result;
+
+    result = dfs_file_link(oldpath, newpath);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(link);
+
+int symlink(const char * oldpath, const char * newpath)
+{
+    int result;
+
+    result = dfs_file_symlink(oldpath, newpath);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(symlink);
+
+int readlink(const char *path, char *buf, size_t bufsiz)
+{
+    int result;
+
+    rt_memset(buf, 0, bufsiz);
+    result = dfs_file_readlink(path, buf, bufsiz);
+    if (result < 0)
+    {
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    return result;
+}
+RTM_EXPORT(readlink);
+
+int ftruncate(int fildes, off_t length)
+{
+    int result;
+    struct dfs_fd *d;
+
+    /* get the fd */
+    d = fd_get(fildes);
+    if (d == RT_NULL)
+    {
+        rt_set_errno(-DFS_STATUS_EBADF);
+
+        return -1;
+    }
+
+    result = dfs_file_truncate(d, length);
+    if (result < 0)
+    {
+        fd_put(d);
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    fd_put(d);
+    return result;
+}
+RTM_EXPORT(ftruncate);
+
+int truncate(const char *path, off_t length)
+{
+    int result;
+	int fd = open(path, O_RDWR);
+	if (fd < 0)
+	{
+		rt_set_errno(-DFS_STATUS_ENOENT);
+
+		return -1;
+	}
+
+	result = ftruncate(fd, length);
+	close(fd);
+	return result;
+}
+RTM_EXPORT(truncate);
+
+int sendfile(int out_fd, int in_fd, rt_off_t *offset, rt_size_t count)
+{
+    char buf[4096];
+    int result;
+    int readlen;
+
+    if (offset)
+    {
+        result = lseek(in_fd,*offset,0);
+        if (result < 0)
+            return -1;
+    }
+
+    readlen = 0;
+    while (count)
+    {
+        errno = 0;
+        int len = (count>sizeof(buf))?(sizeof(buf)):(count);
+        result = read(in_fd,buf,len);
+        if (result < 0)
+            return -1;
+        result = write(out_fd,buf,result);
+        if (result < 0)
+            return -1;
+        readlen += result;
+        if (result < len)
+            break;
+        count -= result;
+    }
+    if (offset)
+        *offset += readlen;
+    return readlen;
+}
+RTM_EXPORT(sendfile);
+
 /**
  * this function is a POSIX compliant version, which will return the
  * information about a mounted file system.
@@ -465,6 +613,7 @@ int statfs(const char *path, struct statfs *buf)
 {
     int result;
 
+    rt_memset(buf, 0, sizeof(struct statfs));
     result = dfs_statfs(path, buf);
     if (result < 0)
     {
@@ -476,6 +625,35 @@ int statfs(const char *path, struct statfs *buf)
     return result;
 }
 RTM_EXPORT(statfs);
+
+int fstatfs(int fildes, struct statfs *buf)
+{
+    int result;
+    struct dfs_fd *d;
+
+    rt_memset(buf, 0, sizeof(struct statfs));
+    /* get the fd */
+    d = fd_get(fildes);
+    if (d == RT_NULL)
+    {
+        rt_set_errno(-DFS_STATUS_EBADF);
+
+        return -1;
+    }
+
+    result = dfs_fstatfs(d, buf);
+    if (result < 0)
+    {
+        fd_put(d);
+        rt_set_errno(result);
+
+        return -1;
+    }
+
+    fd_put(d);
+    return result;
+}
+RTM_EXPORT(fstatfs);
 
 /**
  * this function is a POSIX compliant version, which will make a directory
@@ -654,6 +832,32 @@ struct dirent *readdir(DIR *d)
 }
 RTM_EXPORT(readdir);
 
+int getdents(int file, struct dirent *dirp, rt_size_t nbytes)
+{
+    int result;
+    struct dfs_fd *fd;
+
+    fd = fd_get(file);
+    if (fd == RT_NULL)
+    {
+        rt_set_errno(-DFS_STATUS_EBADF);
+        return -1;
+    }
+
+	/* get a new entry */
+	result = dfs_file_getdents(fd,dirp,nbytes);
+	if (result <= 0)
+	{
+		fd_put(fd);
+		rt_set_errno(result);
+
+		return -1;
+	}
+	fd_put(fd);
+	return result;
+}
+RTM_EXPORT(getdents);
+
 /**
  * this function is a POSIX compliant version, which will return current
  * location in directory stream.
@@ -824,6 +1028,11 @@ int chdir(const char *path)
     closedir(d);
 
     /* copy full path to working directory */
+#ifdef RT_USING_PROCESS
+    if (rt_process_self() != RT_NULL)
+        rt_strncpy(rt_process_self()->workd, fullpath, DFS_PATH_MAX);
+    else
+#endif
     strncpy(working_directory, fullpath, DFS_PATH_MAX);
     /* release normalize directory path name */
     rt_free(fullpath);
@@ -852,6 +1061,11 @@ char *getcwd(char *buf, size_t size)
 {
 #ifdef DFS_USING_WORKDIR
     rt_enter_critical();
+#ifdef RT_USING_PROCESS
+    if (rt_process_self() != RT_NULL)
+        rt_strncpy(buf, rt_process_self()->workd, size);
+    else
+#endif
     rt_strncpy(buf, working_directory, size);
     rt_exit_critical();
 #else

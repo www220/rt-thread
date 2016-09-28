@@ -489,6 +489,14 @@ int dfs_statfs(const char *path, struct statfs *buffer)
     return -1;
 }
 
+int dfs_fstatfs(struct dfs_fd *fd, struct statfs *buffer)
+{
+    if (fd->fs->ops->statfs != RT_NULL)
+        return fd->fs->ops->statfs(fd->fs, buffer);
+
+    return -1;
+}
+
 #ifdef RT_USING_DFS_MNTTABLE
 int dfs_mount_table(void)
 {
