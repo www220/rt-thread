@@ -1,0 +1,27 @@
+Import('RTT_ROOT')
+Import('rtconfig')
+from building import *
+
+cwd = GetCurrentDir()
+
+src = Split("""
+readspeed.c
+writespeed.c
+""")
+
+ethdev_src = Split("""
+netio.c
+ping.c
+tcpecho.c
+udpecho.c
+ntp.c
+""")
+
+if GetDepend(['RT_USING_LWIP']):
+    src += ethdev_src
+
+CPPPATH = [cwd]
+
+group = DefineGroup('Tools', src, depend = [''], CPPPATH = CPPPATH)
+
+Return('group')
