@@ -16,17 +16,8 @@
 #include <asm/imx-common/mxc_i2c.h>
 #include <asm/io.h>
 #include <common.h>
-#include <fsl_esdhc.h>
-#include <i2c.h>
 #include <linux/sizes.h>
 #include <linux/fb.h>
-#include <miiphy.h>
-#include <mmc.h>
-#include <mxsfb.h>
-#include <netdev.h>
-#include <usb.h>
-#include <usb/ehci-fsl.h>
-#include <splash.h>
 
 #ifdef CONFIG_FASTBOOT
 #include <fastboot.h>
@@ -809,13 +800,6 @@ int board_late_init(void)
 u32 get_board_rev(void)
 {
 	return get_cpu_rev();
-}
-
-int checkboard(void)
-{
-	puts("Board: SINLINX-IMX6UL\n");
-
-	return 0;
 }
 
 #ifdef CONFIG_FASTBOOT

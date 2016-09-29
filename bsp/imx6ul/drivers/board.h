@@ -26,13 +26,13 @@
 
 void rt_hw_board_init(void);
 void rt_hw_interrupt_init(void);
-void rt_hw_usart_init(void);
-void rt_hw_timer_init(void);
-void rt_hw_spi_init(void);
-void rt_hw_rtc_init(void);
-void rt_hw_mtd_nand_init(void);
-void rt_hw_ssp_init(void);
-void rt_hw_usbh_init(void);
+int rt_hw_uart_init(void);
+int rt_hw_timer_init(void);
+int rt_hw_spi_init(void);
+int rt_hw_rtc_init(void);
+int rt_hw_mtd_nand_init(void);
+int rt_hw_ssp_init(void);
+int rt_hw_usbh_init(void);
 
 #ifdef _MSC_VER
 #ifdef _DLL
@@ -44,8 +44,6 @@ void rt_hw_usbh_init(void);
 #define EXTVAL
 #endif
 
-EXTVAL extern volatile int eth_wtdog;
-EXTVAL extern volatile int eth_linkstatus;
 EXTVAL extern volatile int wtdog_count;
 EXTVAL extern volatile int sys_stauts;
 EXTVAL extern volatile int uptime_count;

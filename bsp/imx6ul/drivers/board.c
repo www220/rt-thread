@@ -30,7 +30,7 @@ static void rt_hw_timer_isr(int vector, void *param)
     epit_get_compare_event(HW_EPIT1);
 }
 
-void rt_hw_timer_init(void)
+int rt_hw_timer_init(void)
 {
     uint32_t freq;
 
@@ -59,6 +59,8 @@ void rt_hw_timer_init(void)
 
     rt_hw_interrupt_install(IMX_INT_EPIT1, rt_hw_timer_isr, RT_NULL, "tick");
     rt_hw_interrupt_umask(IMX_INT_EPIT1);
+
+    return 0;
 }
 INIT_BOARD_EXPORT(rt_hw_timer_init);
 
@@ -70,6 +72,7 @@ void rt_hw_board_init(void)
     enable_neon_fpu();
     disable_strict_align_check();
 
+    rt_hw_uart_init();
     rt_console_set_device(CONSOLE_DEVICE);
 }
 
