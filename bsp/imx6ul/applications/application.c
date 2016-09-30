@@ -201,7 +201,6 @@ static char thread_main_stack[4096];
 struct rt_thread thread_main;
 static void rt_thread_entry_main(void* parameter)
 {
-    struct stat st;
     /* initialize rtc */
 #ifdef RT_USING_RTC
     rt_hw_rtc_init();
@@ -294,6 +293,7 @@ static void rt_thread_entry_main(void* parameter)
 #define RTT_SHADOW      "/etc/shadow"
 #define RTT_INITAB      "/etc/inittab"
 #if defined(RT_USING_DFS)
+    struct stat st;
     inittmppath();
     if (PZ[0] && stat(RTT_DEF_CONF, &st) == 0)
     {

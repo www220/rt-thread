@@ -5,6 +5,10 @@ from building import *
 cwd = GetCurrentDir()
 
 src = Split("""
+cpuusage.c
+""")
+
+file_src = Split("""
 readspeed.c
 writespeed.c
 """)
@@ -16,6 +20,9 @@ tcpecho.c
 udpecho.c
 ntp.c
 """)
+
+if GetDepend(['RT_USING_DFS']):
+    src += file_src
 
 if GetDepend(['RT_USING_LWIP']):
     src += ethdev_src

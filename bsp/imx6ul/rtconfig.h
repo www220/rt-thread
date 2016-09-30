@@ -75,11 +75,11 @@
 #define RT_USING_DEVICE_IPC
 #define RT_USING_SERIAL
 //#define RT_USING_SPI
-#define RT_USING_RTC
+//#define RT_USING_RTC
 //#define RT_MTD_NAND_DEBUG
-#define RT_USING_MTD_NAND
+//#define RT_USING_MTD_NAND
 //#define RT_MMCSD_DBG
-#define RT_USING_SDIO
+//#define RT_USING_SDIO
 #define RT_MMCSD_STACK_SIZE 4096
 //#define RT_USING_USB_HOSTU
 
@@ -101,9 +101,9 @@
 #define FINSH_THREAD_STACK_SIZE	8192
 
 /* SECTION: device filesystem */
-#define RT_USING_DFS
+//#define RT_USING_DFS
 #define DFS_USING_WORKDIR
-#define DFS_USING_SELECT
+//#define DFS_USING_SELECT
 
 #define RT_USING_DFS_ELMFAT
 #define RT_DFS_ELM_DRIVES			2
