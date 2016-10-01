@@ -30,14 +30,13 @@
 #include <rthw.h>
 #include <registers/regsuart.h>
 #include <imx_uart.h>
-
+#include <board.h>
 #include <rtdevice.h>
-
-#include "serial.h"
 
 struct hw_uart_device
 {
     uint32_t instance;
+    char *name;
     int irqno;
 };
 
@@ -50,12 +49,9 @@ static void rt_hw_uart_isr(int irqno, void *param)
 
 static rt_err_t uart_configure(struct rt_serial_device *serial, struct serial_configure *cfg)
 {
-    struct hw_uart_device *uart;
+    struct hw_uart_device *uart = (struct hw_uart_device *)serial->parent.user_data;
     uint32_t baudrate;
     uint8_t parity, stopbits, datasize, flowcontrol;
-
-    RT_ASSERT(serial != RT_NULL);
-    uart = (struct hw_uart_device *)serial->parent.user_data;
 
     baudrate = cfg->baud_rate;
     switch (cfg->data_bits)
@@ -66,31 +62,38 @@ static rt_err_t uart_configure(struct rt_serial_device *serial, struct serial_co
     case DATA_BITS_7:
         datasize = SEVENBITS;
         break;
+    default:
+        datasize = EIGHTBITS;
+        break;
     }
-    if (cfg->stop_bits == STOP_BITS_1) stopbits = STOPBITS_ONE;
-    else if (cfg->stop_bits == STOP_BITS_2) stopbits = STOPBITS_TWO;
-
+    switch (cfg->stop_bits)
+    {
+    case STOP_BITS_1:
+        stopbits = STOPBITS_ONE;
+        break;
+    case STOP_BITS_2:
+        stopbits = STOPBITS_TWO;
+        break;
+    default:
+        stopbits = STOPBITS_ONE;
+        break;
+    }
     parity = PARITY_NONE;
     flowcontrol = FLOWCTRL_OFF;
 
     /* Initialize UART */
     uart_init(uart->instance, baudrate, parity, stopbits, datasize, flowcontrol);
-
-    rt_hw_interrupt_install(uart->irqno, rt_hw_uart_isr, serial, "uart");
+    rt_hw_interrupt_install(uart->irqno, rt_hw_uart_isr, serial, uart->name);
     rt_hw_interrupt_mask(uart->irqno);
 
     /* Set the IRQ mode for the Rx FIFO */
     uart_set_FIFO_mode(uart->instance, RX_FIFO, 1, IRQ_MODE);
-
     return RT_EOK;
 }
 
 static rt_err_t uart_control(struct rt_serial_device *serial, int cmd, void *arg)
 {
-    struct hw_uart_device *uart;
-
-    RT_ASSERT(serial != RT_NULL);
-    uart = (struct hw_uart_device *)serial->parent.user_data;
+    struct hw_uart_device *uart = (struct hw_uart_device *)serial->parent.user_data;
 
     switch (cmd)
     {
@@ -110,25 +113,17 @@ static rt_err_t uart_control(struct rt_serial_device *serial, int cmd, void *arg
 
 static int uart_putc(struct rt_serial_device *serial, char c)
 {
-    struct hw_uart_device *uart;
-
-    RT_ASSERT(serial != RT_NULL);
-    uart = (struct hw_uart_device *)serial->parent.user_data;
+    struct hw_uart_device *uart = (struct hw_uart_device *)serial->parent.user_data;
 
     uart_putchar(uart->instance, (uint8_t*)&c);
-
     return 1;
 }
 
 static int uart_getc(struct rt_serial_device *serial)
 {
-    int ch;
-    struct hw_uart_device *uart;
+    struct hw_uart_device *uart = (struct hw_uart_device *)serial->parent.user_data;
 
-    RT_ASSERT(serial != RT_NULL);
-    uart = (struct hw_uart_device *)serial->parent.user_data;
-
-    ch = uart_getchar(uart->instance);
+    int ch = uart_getchar(uart->instance);
     if (ch == NONE_CHAR) ch = -1;
 
     return ch;
@@ -142,26 +137,28 @@ static const struct rt_uart_ops _uart_ops =
     uart_getc,
 };
 
-#ifdef RT_USING_UART0
-/* UART device driver structure */
-static struct hw_uart_device _uart0_device =
-{
-    HW_UART0,
-    IMX_INT_UART0
-};
-static struct rt_serial_device _serial0;
-#endif
-
 #ifdef RT_USING_UART1
 /* UART1 device driver structure */
 static struct hw_uart_device _uart1_device =
 {
     HW_UART1,
+    "uart1",
     IMX_INT_UART1
 };
 static struct rt_serial_device _serial1;
 #endif
+#ifdef RT_USING_UART2
+/* UART2 device driver structure */
+static struct hw_uart_device _uart2_device =
+{
+    HW_UART2,
+    "uart2",
+    IMX_INT_UART2
+};
+static struct rt_serial_device _serial2;
+#endif
 
+void uart_iomux_config(int instance) {}
 int rt_hw_uart_init(void)
 {
     struct hw_uart_device *uart;
@@ -175,25 +172,30 @@ int rt_hw_uart_init(void)
     config.invert    = NRZ_NORMAL;
     config.bufsz     = RT_SERIAL_RB_BUFSZ;
 
-#ifdef RT_USING_UART0
-    uart = &_uart0_device;
-
-    _serial0.ops    = &_uart_ops;
-    _serial0.config = config;
-
-    /* register UART1 device */
-    rt_hw_serial_register(&_serial0, "uart0",
-                          RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX,
-                          uart);
-#endif
-
 #ifdef RT_USING_UART1
     uart = &_uart1_device;
     _serial1.ops = &_uart_ops;
     _serial1.config = config;
 
+    MX6UL_PAD_UART1_TX_DATA__UART1_TX(PAD_UART_OUTPUT);
+    MX6UL_PAD_UART1_RX_DATA__UART1_RX(PAD_UART_INPUT);
+    rt_hw_interrupt_mask(uart->irqno);
+
     /* register UART1 device */
     rt_hw_serial_register(&_serial1, "uart1",
+                          RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, uart);
+#endif
+#ifdef RT_USING_UART2
+    uart = &_uart2_device;
+    _serial2.ops = &_uart_ops;
+    _serial2.config = config;
+
+    MX6UL_PAD_UART2_TX_DATA__UART2_TX(PAD_UART_OUTPUT);
+    MX6UL_PAD_UART2_RX_DATA__UART2_RX(PAD_UART_INPUT);
+    rt_hw_interrupt_mask(uart->irqno);
+
+    /* register UART1 device */
+    rt_hw_serial_register(&_serial2, "uart2",
                           RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, uart);
 #endif
 

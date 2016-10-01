@@ -1,9 +1,106 @@
+Import('RTT_ROOT')
+Import('rtconfig')
 from building import *
 
 cwd = GetCurrentDir()
-src	= Glob('*.c') + Glob('iomux/*.c')
 
-CPPPATH = [cwd, cwd + '/iomux']
+src = Split("""
+romfs.c
+""")
+
+basedev_src = Split("""
+board.c
+serial.c
+""")
+
+basesim_src = Split("""
+simbase.c
+simusart.c
+getopt/getopt.c
+""")
+
+ethdev_src = Split("""
+fec.c
+""")
+
+ethsim_src = Split("""
+simeth.c
+win32/pktdrv.c
+""")
+
+rtcdev_src = Split("""
+rtc.c
+""")
+
+rtcsim_src = Split("""
+simrtc.c
+""")
+
+nanddev_src = Split("""
+nand.c
+apbh_dma.c
+""")
+
+nandsim_src = Split("""
+simnand.c
+""")
+
+tfdev_src = Split("""
+tf.c
+""")
+
+tfsim_src = Split("""
+simtf.c
+""")
+
+usbhdev_src = Split("""
+usb_host.c
+usb_storage.c
+usb/part_dev.c
+usb/usb.c
+usb/ehci-hcd.c
+""")
+
+lcddev_src = Split("""
+lcdif.c
+mxsfb.c
+mxsts.c
+""")
+
+if rtconfig.PLATFORM != 'cl':
+    src += basedev_src
+else:
+    src += basesim_src
+
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_LWIP']):
+        src += ethdev_src
+else:
+    if GetDepend(['RT_USING_LWIP']):
+        src += ethsim_src
+    
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_RTC']):
+        src += rtcdev_src
+else:
+    if GetDepend(['RT_USING_RTC']):
+        src += rtcsim_src
+
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_MTD_NAND']):
+        src += nanddev_src
+else:
+    if GetDepend(['RT_USING_MTD_NAND']):
+        src += nandsim_src
+        
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_SDIO']):
+        src += tfdev_src
+else:
+    if GetDepend(['RT_USING_SDIO']):
+        src += tfsim_src
+
+CPPPATH = [cwd]
 
 group = DefineGroup('Drivers', src, depend = [''], CPPPATH = CPPPATH)
 

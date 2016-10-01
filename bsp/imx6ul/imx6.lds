@@ -3,9 +3,9 @@ OUTPUT_ARCH(arm)
 
 SECTIONS
 {
-    . = 0x86800000;
+    . = 0x80100000;
 
-    __text_start = .;
+    . = ALIGN(4);
     .text :
     {
         *(.vectors)
@@ -21,25 +21,22 @@ SECTIONS
         __vsymtab_start = .;
         KEEP(*(VSymTab))
         __vsymtab_end = .;
-        . = ALIGN(4);
+
+        /* section information for init */
+       . = ALIGN(4);
+        __rt_init_start = .;
+        KEEP(*(SORT(.rti_fn*)))
+        __rt_init_end = .;
 
         /* section information for modules */
         . = ALIGN(4);
         __rtmsymtab_start = .;
         KEEP(*(RTMSymTab))
         __rtmsymtab_end = .;
+    }
 
-        /* section information for initialization */
-        . = ALIGN(4);
-        __rt_init_start = .;
-        KEEP(*(SORT(.rti_fn*)))
-        __rt_init_end = .;
-    } =0
-    __text_end = .;
-
-    __rodata_start = .;
+    . = ALIGN(4);
     .rodata   : { *(.rodata) *(.rodata.*) }
-    __rodata_end = .;
 
     . = ALIGN(4);
     .ctors :
@@ -58,32 +55,19 @@ SECTIONS
         PROVIDE(__dtors_end__ = .);
     }
 
-    . = ALIGN(16 * 1024);
-    .l1_page_table :
-    {
-        __l1_page_table_start = .;
-        . += 16K;
-    }
-
-    __data_start = .;
     . = ALIGN(4);
     .data :
     {
         *(.data)
         *(.data.*)
     }
-    __data_end = .;
 
     . = ALIGN(4);
-    __bss_start = __data_end;
-    .bss       :
-    {
-    *(.bss)
-    *(.bss.*)
-    *(COMMON)
+    .nobss : { *(.nobss) }
+
     . = ALIGN(4);
-    }
-    . = ALIGN(4);
+    __bss_start = .;
+    .bss : { *(.bss) *(.bss.*) *(COMMON) }
     __bss_end = .;
 
     /* Stabs debugging sections.  */

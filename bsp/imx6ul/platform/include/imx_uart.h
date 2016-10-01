@@ -87,9 +87,9 @@ enum _uart_bits
 #define	DMA_MODE  2	  //!< Config the service mode for dma request.
 #define	IRQ_MODE  1      //!< Config the service mode for interrupt.
 
-#define UART_MODULE_CLK(x) ((x) == HW_UART1 ? UART1_MODULE_CLK : (x) == HW_UART2 ? UART2_MODULE_CLK : (x) == HW_UART3 ? UART3_MODULE_CLK : (x) == HW_UART4 ? UART4_MODULE_CLK : -1)
+#define UART_MODULE_CLK(x) ((x) == HW_UART1 ? UART1_MODULE_CLK : (x) == HW_UART2 ? UART2_MODULE_CLK : (x) == HW_UART3 ? UART3_MODULE_CLK : (x) == HW_UART4 ? UART4_MODULE_CLK : (x) == HW_UART5 ? UART5_MODULE_CLK : (x) == HW_UART6 ? UART6_MODULE_CLK : (x) == HW_UART7 ? UART7_MODULE_CLK : (x) == HW_UART8 ? UART8_MODULE_CLK : -1)
 
-#define UART_IRQS(x) ((x) == HW_UART1 ? IMX_INT_UART1 : (x) == HW_UART2 ? IMX_INT_UART2 : (x) == HW_UART3 ? IMX_INT_UART3 : (x) == HW_UART4 ? IMX_INT_UART4 : (x) == HW_UART5 ? IMX_INT_UART5 : 0xFFFFFFFF)
+#define UART_IRQS(x) ((x) == HW_UART1 ? IMX_INT_UART1 : (x) == HW_UART2 ? IMX_INT_UART2 : (x) == HW_UART3 ? IMX_INT_UART3 : (x) == HW_UART4 ? IMX_INT_UART4 : (x) == HW_UART5 ? IMX_INT_UART5 : (x) == HW_UART6 ? IMX_INT_UART6 : (x) == HW_UART7 ? IMX_INT_UART7 : (x) == HW_UART8 ? IMX_INT_UART8 : 0xFFFFFFFF)
 
 //////////////////////////////////////////////////////////////////////////
 //API
@@ -127,7 +127,7 @@ uint8_t uart_putchar(uint32_t instance, uint8_t * ch);
  * @return  a character received from the UART port; if the RX FIFO
  *          is empty or errors are detected, it returns NONE_CHAR
  */
-uint8_t uart_getchar(uint32_t instance);
+uint16_t uart_getchar(uint32_t instance);
 
 /*!
  * @brief   Configure the RX or TX FIFO level and trigger mode

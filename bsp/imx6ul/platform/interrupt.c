@@ -18,12 +18,9 @@
 
 #include <irq_numbers.h>
 #include <interrupt.h>
+#include <board.h>
 
-#include <gic.h>
-#include "cp15.h"
-
-#define MAX_HANDLERS                IMX_INTERRUPT_COUNT
-
+#define MAX_HANDLERS IMX_INTERRUPT_COUNT
 extern volatile rt_uint8_t rt_interrupt_nest;
 
 /* exception and interrupt handler table */
@@ -58,7 +55,7 @@ void disable_interrupt(uint32_t irq_id, uint32_t cpu_id)
 
 static void rt_hw_vector_init(void)
 {
-    int sctrl;
+    int sctrl = 0;
     unsigned int *src = (unsigned int *)&system_vectors;
 
     /* C12-C0 is only active when SCTLR.V = 0 */
@@ -150,3 +147,23 @@ void rt_hw_interrupt_clear(int vector)
 {
     gic_write_end_of_irq(vector);
 }
+
+#ifdef RT_USING_FINSH
+void list_irq(void)
+{
+    int irq;
+    rt_kprintf("number\tcount\t name\n");
+    for (irq = 0; irq < MAX_HANDLERS; irq++)
+    {
+        if (isr_table[irq].name[0])
+        {
+            rt_kprintf("%3ld: %10ld  %s\n",
+                       irq, isr_table[irq].counter, isr_table[irq].name);
+        }
+    }
+}
+
+#include <finsh.h>
+FINSH_FUNCTION_EXPORT(list_irq, list system irq);
+MSH_CMD_EXPORT(list_irq, list system irq);
+#endif

@@ -54,7 +54,7 @@
 //@}
 
 //! @brief 
-#define NONE_CHAR   (0xFF)
+#define NONE_CHAR   (0xFFFF)
 
 //! @brief A parameter was out of range or otherwise invalid.
 #define INVALID_PARAMETER (-1)

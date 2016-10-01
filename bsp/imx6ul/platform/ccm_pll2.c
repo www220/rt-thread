@@ -39,8 +39,7 @@
 #include "registers/regsi2c.h"
 #include "registers/regsecspi.h"
 #include "ccm_pll.h"
-//#include "hardware.h"
-//#include "soc_memory_map.h"
+
 #define HW_ANADIG_REG_CORE		(ANATOP_IPS_BASE_ADDR + 0x140)
 #define HW_ANADIG_PLL_SYS_RW  (ANATOP_IPS_BASE_ADDR + 0x000)
 #define HW_ANADIG_REG_CORE_V_CORE_VALUE_mv(x)	((((x)-700)/25) << 0)
@@ -49,7 +48,6 @@
 #define HW_ANADIG_REG_CORE_V_SOC_MSK		(0x1F << 18)
 
 uint32_t g_arm_clk = 528000000;
-
 const uint32_t PLL2_OUTPUT[] = { 528000000, 396000000, 352000000, 198000000 };
 const uint32_t PLL3_OUTPUT[] = { 480000000, 720000000, 540000000, 508235294, 454736842 };
 const uint32_t PLL4_OUTPUT = 650000000;
@@ -76,29 +74,28 @@ void set_soc_core_voltage(unsigned int v_core_mv, unsigned int v_soc_mv)
 
 void setup_clk(void)
 {
-		uint32_t div_select;
-		uint32_t temp;	
-		uint32_t arm_clk = g_arm_clk/1000000;
-	  
-		switch(arm_clk)
-		{
-			case 400:
-				div_select = 33;
-				set_soc_core_voltage(1150, 1175);
-				return;
-			case 528:
-				div_select = 44;
-				set_soc_core_voltage(1250, 1250);
-				break;
-			case 756:
-				div_select = 63;
-    		set_soc_core_voltage(1250, 1250);
-    		printf("ARM Clock set to 756MHz\r\n");
-    		break;
-			default:
-				return;
-    }      	    			   	    			
-    	
+	uint32_t div_select;
+	uint32_t temp;
+	uint32_t arm_clk = g_arm_clk/1000000;
+
+	switch(arm_clk)
+	{
+		case 400:
+			div_select = 33;
+			set_soc_core_voltage(1150, 1175);
+			return;
+		case 528:
+			div_select = 44;
+			set_soc_core_voltage(1250, 1250);
+			break;
+		case 756:
+			div_select = 63;
+			set_soc_core_voltage(1250, 1250);
+			break;
+		default:
+			return;
+	}
+
     // first, make sure ARM_PODF is clear
     HW_CCM_CACRR_WR(0);
     // write the div_select value into HW_ANADIG_PLL_SYS_RW
@@ -113,12 +110,12 @@ void setup_clk(void)
     temp |= div_select;  // Update div 
     writel(temp, HW_ANADIG_PLL_SYS_RW);
 
-		/* Wait for PLL to lock */
-		while(!(readl(HW_ANADIG_PLL_SYS_RW) & 0x80000000));
+	/* Wait for PLL to lock */
+	while(!(readl(HW_ANADIG_PLL_SYS_RW) & 0x80000000));
 
-		/*disable BYPASS*/
+	/*disable BYPASS*/
     temp = readl(HW_ANADIG_PLL_SYS_RW);
-		temp &= ~0x10000;
+	temp &= ~0x10000;
     writel(temp, HW_ANADIG_PLL_SYS_RW);		
 }
 
@@ -200,10 +197,10 @@ uint32_t get_peri_clock(peri_clocks_t clock)
         case UART2_MODULE_CLK:
         case UART3_MODULE_CLK:
         case UART4_MODULE_CLK:
-       	case UART5_MODULE_CLK:
-     		case UART6_MODULE_CLK:
-   			case UART7_MODULE_CLK:
-   			case UART8_MODULE_CLK:   				
+        case UART5_MODULE_CLK:
+        case UART6_MODULE_CLK:
+        case UART7_MODULE_CLK:
+        case UART8_MODULE_CLK:
             // UART source clock is a fixed PLL3 / 6
             ret_val = PLL3_OUTPUT[0] / 6 / (HW_CCM_CSCDR1.B.UART_CLK_PODF + 1);
             break;
@@ -212,13 +209,13 @@ uint32_t get_peri_clock(peri_clocks_t clock)
             break;
         case RAWNAND_CLK:
             ret_val =
-                PLL3_OUTPUT[0] / (HW_CCM_CS2CDR.B.ENFC_CLK_PRED + 1) / (HW_CCM_CS2CDR.B.ENFC_CLK_PODF +
-                                                                        1);
+                PLL3_OUTPUT[0] / (HW_CCM_CS2CDR.B.ENFC_CLK_PRED + 1)
+                                            / (HW_CCM_CS2CDR.B.ENFC_CLK_PODF + 1);
             break;
         case CAN_CLK:
             // For i.mx6dq/sdl CAN source clock is a fixed PLL3 / 8
-        	ret_val = PLL3_OUTPUT[0] / 8 / (HW_CCM_CSCMR2.B.CAN_CLK_PODF + 1);
-        	break;
+            ret_val = PLL3_OUTPUT[0] / 8 / (HW_CCM_CSCMR2.B.CAN_CLK_PODF + 1);
+            break;
         default:
             break;
     }

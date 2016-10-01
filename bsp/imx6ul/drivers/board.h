@@ -15,11 +15,29 @@
 #ifndef __BOARD_H__
 #define __BOARD_H__
 
-#include <registers.h>
-#include <irq_numbers.h>
+#include <epit.h>
+#include <gic.h>
+#include <gpt.h>
+#include <imx_timer.h>
+#include <registers/regsarmglobaltimer.h>
+#include <registers/regsepit.h>
+#include <registers/regsuart.h>
 
-#define HEAP_BEGIN        0x80E00000
-#define HEAP_END          0x83E00000
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned u32;
+
+#define HEAP_BEGIN      (void*)(0x80000000 + 32 * 1024 * 1024)
+#define HEAP_END        (void*)(0x80000000 + 224 * 1024 * 1024)
+
+#define RT_USING_UART1
+#define RT_USING_UART2
+//#define RT_USING_UART3
+//#define RT_USING_UART4
+//#define RT_USING_UART5
+//#define RT_USING_UART6
+//#define RT_USING_UART7
+//#define RT_USING_UART8
 
 #define CONSOLE_DEVICE "uart1"
 #define FINSH_DEVICE_NAME "uart1"
@@ -48,27 +66,10 @@ EXTVAL extern volatile int wtdog_count;
 EXTVAL extern volatile int sys_stauts;
 EXTVAL extern volatile int uptime_count;
 EXTVAL extern volatile int fs_system_init;
-EXTVAL extern volatile int tty_rx_inxpz;
 EXTVAL extern unsigned char PZ[4];
 void inittmppath(void);
 void cleartmppath(void);
 char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *file);
 int SetPrivateStringData(const char *name, const char *buf, const char *file);
 
-#ifndef _MSC_VER
-extern void __delay(int loops);
-extern void __bad_udelay(void);
-extern void __udelay(unsigned long usecs);
-extern void __const_udelay(unsigned long);
-
-#define HZ 1000
-#define MAX_UDELAY_MS 2
-
-#define udelay(n)							\
-	(__builtin_constant_p(n) ?					\
-	  ((n) > (MAX_UDELAY_MS * 1000) ? __bad_udelay() :		\
-			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
-	  __udelay(n))
-
-#endif
 #endif

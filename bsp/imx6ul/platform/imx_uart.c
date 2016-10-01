@@ -71,7 +71,7 @@ uint8_t uart_putchar(uint32_t instance, uint8_t * ch)
     return *ch;
 }
 
-uint8_t uart_getchar(uint32_t instance)
+uint16_t uart_getchar(uint32_t instance)
 {
     uint32_t read_data;
 
@@ -85,7 +85,7 @@ uint8_t uart_getchar(uint32_t instance)
     if (read_data & 0x7C00)
         return NONE_CHAR;
 
-    return (uint8_t) read_data;
+    return read_data & 0xFF;
 }
 
 void uart_set_FIFO_mode(uint32_t instance, uint8_t fifo, uint8_t trigger_level,

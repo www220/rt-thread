@@ -1,12 +1,7 @@
 /*
- *  UART driver
- *
- * COPYRIGHT (C) 2013, Shanghai Real-Thread Technology Co., Ltd
- *
- *  This file is part of RT-Thread (http://www.rt-thread.org)
- *  Maintainer: bernard.xiong <bernard.xiong at gmail.com>
- *
- *  All rights reserved.
+ * File      : romfs.c
+ * This file is part of Device File System in RT-Thread RTOS
+ * COPYRIGHT (C) 2004-2011, RT-Thread Development Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,16 +19,23 @@
  *
  * Change Logs:
  * Date           Author       Notes
- * 2013-03-30     Bernard      the first verion
  */
 
-#ifndef __UART_H__
-#define __UART_H__
+#include <rtthread.h>
+#include <dfs_romfs.h>
 
-#include <board.h>
+const static unsigned char _dummy_dummy_txt[] =
+{
+    0x74,0x68,0x69,0x73,0x20,0x69,0x73,0x20,0x61,0x20,0x66,0x69,0x6c,0x65,0x21,0x0d,0x0a,
+};
 
-int rt_hw_uart_init(void);
+const struct romfs_dirent WEAK _root_dirent[] =
+{
+    {ROMFS_DIRENT_FILE, "info.txt", _dummy_dummy_txt, sizeof(_dummy_dummy_txt)},
+};
 
-#endif
-
+const struct romfs_dirent WEAK romfs_root =
+{
+    ROMFS_DIRENT_DIR, "/", (rt_uint8_t *)_root_dirent, sizeof(_root_dirent)/sizeof(_root_dirent[0])
+};
 

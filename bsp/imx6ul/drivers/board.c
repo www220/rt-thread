@@ -14,14 +14,7 @@
 
 #include <rthw.h>
 #include <rtthread.h>
-
 #include "board.h"
-
-#include <registers/regsarmglobaltimer.h>
-#include <registers/regsepit.h>
-
-#include <imx_uart.h>
-#include <epit.h>
 #include <cortex_a.h>
 
 static void rt_hw_timer_isr(int vector, void *param)
@@ -36,11 +29,8 @@ int rt_hw_timer_init(void)
 
     // Make sure the timer is off.
     HW_ARMGLOBALTIMER_CONTROL.B.TIMER_ENABLE = 0;
-    
     HW_ARMGLOBALTIMER_CONTROL.B.FCR0 =1;
-    
     HW_ARMGLOBALTIMER_CONTROL.B.FCR1 =0;
-    
     HW_ARMGLOBALTIMER_CONTROL.B.DBG_ENABLE =0;
     
     // Clear counter.
@@ -51,11 +41,9 @@ int rt_hw_timer_init(void)
     HW_ARMGLOBALTIMER_CONTROL.B.TIMER_ENABLE = 1;
 
     freq = get_main_clock(IPG_CLK);
-
     epit_init(HW_EPIT1, CLKSRC_IPG_CLK, freq / 1000000,
-              SET_AND_FORGET, 10000, WAIT_MODE_EN | STOP_MODE_EN);
-
-    epit_counter_enable(HW_EPIT1, 10000, IRQ_MODE);
+              SET_AND_FORGET, 999, WAIT_MODE_EN | STOP_MODE_EN);
+    epit_counter_enable(HW_EPIT1, 999, IRQ_MODE);
 
     rt_hw_interrupt_install(IMX_INT_EPIT1, rt_hw_timer_isr, RT_NULL, "tick");
     rt_hw_interrupt_umask(IMX_INT_EPIT1);
@@ -64,16 +52,40 @@ int rt_hw_timer_init(void)
 }
 INIT_BOARD_EXPORT(rt_hw_timer_init);
 
+void show_freq(void)
+{
+    rt_kprintf("CPU: %d MHz\n", get_main_clock(CPU_CLK)/1000000);
+    rt_kprintf("DDR: %d MHz\n", get_main_clock(MMDC_CH0_AXI_CLK)/1000000);
+    rt_kprintf("IPG: %d MHz\n", get_main_clock(IPG_CLK)/1000000);
+}
+
 /**
  * This function will initialize hardware board
  */
 void rt_hw_board_init(void)
 {
+    rt_hw_interrupt_init();
     enable_neon_fpu();
-    disable_strict_align_check();
 
+    /* initialize uart */
     rt_hw_uart_init();
     rt_console_set_device(CONSOLE_DEVICE);
+
+    /* initialize timer */
+    rt_hw_timer_init();
+
+#ifdef RT_USING_MTD_NAND
+    /* initialize gpmi */
+    rt_hw_mtd_nand_init();
+#endif
+
+#ifdef RT_USING_SDIO
+    /* initialize ssp */
+    rt_hw_ssp_init();
+#endif
+
+    rt_kprintf("Freescale i.MX6 Platform SDK %s\n", SDK_VERSION_STRING);
+    show_freq();
 }
 
 /*@}*/

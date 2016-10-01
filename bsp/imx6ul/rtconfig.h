@@ -93,7 +93,7 @@
 #define FINSH_USING_MSH
 #define FINSH_USING_MSH_DEFAULT
 //#define FINSH_USING_MSH_ONLY
-#define RT_USING_RYM
+//#define RT_USING_RYM
 
 /* Using symbol table */
 #define FINSH_USING_SYMTAB
@@ -101,11 +101,11 @@
 #define FINSH_THREAD_STACK_SIZE	8192
 
 /* SECTION: device filesystem */
-//#define RT_USING_DFS
+#define RT_USING_DFS
 #define DFS_USING_WORKDIR
 //#define DFS_USING_SELECT
 
-#define RT_USING_DFS_ELMFAT
+//#define RT_USING_DFS_ELMFAT
 #define RT_DFS_ELM_DRIVES			2
 #define RT_DFS_ELM_REENTRANT
 //#define RT_DFS_ELM_USE_ERASE
@@ -114,10 +114,9 @@
 #define RT_DFS_ELM_MAX_LFN			255
 #define RT_DFS_ELM_MAX_SECTOR_SIZE  512
 
-#define RT_USING_DFS_YAFFS2
+//#define RT_USING_DFS_YAFFS2
 
 #define RT_USING_DFS_ROMFS
-#define DFS_ROMFS_ROOT
 #define RT_USING_DFS_DEVFS
 
 /* the max number of mounted filesystem */

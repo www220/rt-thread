@@ -1,26 +1,30 @@
+Import('RTT_ROOT')
+Import('rtconfig')
 from building import *
 
 cwd = GetCurrentDir()
-src = Split('''
-drivers/epit.c
-drivers/gpt.c
-drivers/imx_timer.c
-drivers/imx_i2c.c
-drivers/imx_uart.c
-cpu/armv7_cache.c
-cpu/gic.c
-cpu/ccm_pll2.c
-cpu/mmu.c
-cpu/cortex_a_gcc.S
-''')
 
-CPPPATH = [ cwd + '/cpu',
+# The set of source files associated with this SConscript file.
+if rtconfig.PLATFORM == 'armcc':
+    src = Glob('*.c') + Glob('*_rvds.S')
+
+if rtconfig.PLATFORM == 'gcc':
+    src = Glob('*.c') + Glob('*_gcc.S')
+
+if rtconfig.PLATFORM == 'iar':
+    src = Glob('*.c') + Glob('*_iar.S')
+
+if rtconfig.PLATFORM == 'cl':
+    src = Glob('*.c')
+
+if rtconfig.PLATFORM == 'mingw':
+    src = Glob('*.c')
+
+CPPPATH = [cwd,
 cwd + '/include', 
 cwd + '/include/mx6ul',
-cwd + '/include/mx6ul/registers'
 ]
-CPPDEFINES = ['CHIP_MX6UL']
 
-group = DefineGroup('Platform', src, depend = [''], CPPPATH = CPPPATH, CPPDEFINES = CPPDEFINES)
+group = DefineGroup('Platform', src, depend = [''], CPPPATH = CPPPATH)
 
 Return('group')

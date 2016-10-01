@@ -36,10 +36,10 @@
  */
 
 #include <assert.h>
-
-#include "imx_timer.h"
 #include "sdk.h"
 #include "epit.h"
+
+#include "imx_timer.h"
 #include "registers/regsarmglobaltimer.h"
 #include "ccm_pll.h"
 

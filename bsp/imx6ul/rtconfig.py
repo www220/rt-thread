@@ -35,12 +35,12 @@ if PLATFORM == 'gcc':
     OBJCPY = PREFIX + 'objcopy'
 
     DEVICE = ' -march=armv7-a -mtune=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=softfp -ffunction-sections -fdata-sections -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable'
-    DEVICE += ' -Iinclude -D__KERNEL__ -D__ARM__ -D__UBOOT__ -D__HAVE_ARCH_BCOPY'
+    DEVICE += ' -DCHIP_MX6UL -DCONFIG_MX6 -DCONFIG_MX6UL'
     CFLAGS = DEVICE
     AFLAGS = '-c'+ DEVICE + ' -x assembler-with-cpp -D__ASSEMBLY__'
     AFLAGS += ' -Iplatform'
     LFLAGS = DEVICE
-    LFLAGS += ' -Wl,--gc-sections,-cref,-Map=' + MAP_FILE
+    LFLAGS += ' -Wl,--gc-sections,-cref,-u,system_vectors,-Map=' + MAP_FILE
     LFLAGS += ' -T imx6.lds'
 
     CPATH = ''
