@@ -98,9 +98,9 @@ void uart_set_FIFO_mode(uint32_t instance, uint8_t fifo, uint8_t trigger_level,
         /* Configure the TX_FIFO service mode */
         /* Default mode is polling: IRQ and DMA requests are disabled */
         HW_UART_UCR1_CLR(instance,(BM_UART_UCR1_TRDYEN | BM_UART_UCR1_TXDMAEN));
-        if (service_mode == DMA_MODE)
+        if (service_mode == UDMA_MODE)
            HW_UART_UCR1_SET(instance,BM_UART_UCR1_TXDMAEN);
-        else if (service_mode == IRQ_MODE)
+        else if (service_mode == UIRQ_MODE)
             HW_UART_UCR1_SET(instance,BM_UART_UCR1_TRDYEN); 
     } else {                    /* fifo = RX_FIFO */
         /* Configure the RX_FIFO trigger level */
@@ -109,9 +109,9 @@ void uart_set_FIFO_mode(uint32_t instance, uint8_t fifo, uint8_t trigger_level,
         /* Configure the RX_FIFO service mode */
         /* Default mode is polling: IRQ and DMA requests are disabled */
         HW_UART_UCR1_CLR(instance,(BM_UART_UCR1_RRDYEN | BM_UART_UCR1_RXDMAEN)); 
-        if (service_mode == DMA_MODE)
+        if (service_mode == UDMA_MODE)
             HW_UART_UCR1_SET(instance,BM_UART_UCR1_RXDMAEN); 
-        else if (service_mode == IRQ_MODE)
+        else if (service_mode == UIRQ_MODE)
             HW_UART_UCR1_SET(instance,BM_UART_UCR1_RRDYEN); 
     }
 }

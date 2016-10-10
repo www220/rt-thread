@@ -43,7 +43,7 @@ int rt_hw_timer_init(void)
     freq = get_main_clock(IPG_CLK);
     epit_init(HW_EPIT1, CLKSRC_IPG_CLK, freq / 1000000,
               SET_AND_FORGET, 999, WAIT_MODE_EN | STOP_MODE_EN);
-    epit_counter_enable(HW_EPIT1, 999, IRQ_MODE);
+    epit_counter_enable(HW_EPIT1, 999, UIRQ_MODE);
 
     rt_hw_interrupt_install(IMX_INT_EPIT1, rt_hw_timer_isr, RT_NULL, "tick");
     rt_hw_interrupt_umask(IMX_INT_EPIT1);

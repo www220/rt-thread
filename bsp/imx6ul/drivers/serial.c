@@ -33,6 +33,50 @@
 #include <board.h>
 #include <rtdevice.h>
 
+#undef ALIGN
+#include <asm/arch/imx-regs.h>
+#include <asm/arch/mx6-pins.h>
+#include <asm/imx-common/iomux-v3.h>
+
+#define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
+	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED |		\
+	PAD_CTL_DSE_40ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
+
+static iomux_v3_cfg_t const uart1_pads[] = {
+	MX6_PAD_UART1_TX_DATA__UART1_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_UART1_RX_DATA__UART1_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart2_pads[] = {
+	MX6_PAD_UART2_TX_DATA__UART2_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_UART2_RX_DATA__UART2_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart3_pads[] = {
+	MX6_PAD_UART3_TX_DATA__UART3_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_UART3_RX_DATA__UART3_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart4_pads[] = {
+	MX6_PAD_UART4_TX_DATA__UART4_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_UART4_RX_DATA__UART4_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart5_pads[] = {
+	MX6_PAD_UART5_TX_DATA__UART5_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_UART5_RX_DATA__UART5_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart7_pads[] = {
+	MX6_PAD_LCD_DATA16__UART7_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_LCD_DATA17__UART7_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+static iomux_v3_cfg_t const uart8_pads[] = {
+	MX6_PAD_LCD_DATA20__UART8_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_LCD_DATA21__UART8_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
 struct hw_uart_device
 {
     uint32_t instance;
@@ -87,7 +131,7 @@ static rt_err_t uart_configure(struct rt_serial_device *serial, struct serial_co
     rt_hw_interrupt_mask(uart->irqno);
 
     /* Set the IRQ mode for the Rx FIFO */
-    uart_set_FIFO_mode(uart->instance, RX_FIFO, 1, IRQ_MODE);
+    uart_set_FIFO_mode(uart->instance, RX_FIFO, 1, UIRQ_MODE);
     return RT_EOK;
 }
 
@@ -177,8 +221,7 @@ int rt_hw_uart_init(void)
     _serial1.ops = &_uart_ops;
     _serial1.config = config;
 
-    MX6UL_PAD_UART1_TX_DATA__UART1_TX(PAD_UART_OUTPUT);
-    MX6UL_PAD_UART1_RX_DATA__UART1_RX(PAD_UART_INPUT);
+	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
     rt_hw_interrupt_mask(uart->irqno);
 
     /* register UART1 device */
@@ -190,8 +233,7 @@ int rt_hw_uart_init(void)
     _serial2.ops = &_uart_ops;
     _serial2.config = config;
 
-    MX6UL_PAD_UART2_TX_DATA__UART2_TX(PAD_UART_OUTPUT);
-    MX6UL_PAD_UART2_RX_DATA__UART2_RX(PAD_UART_INPUT);
+    imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart2_pads));
     rt_hw_interrupt_mask(uart->irqno);
 
     /* register UART1 device */

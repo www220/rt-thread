@@ -41,7 +41,7 @@ typedef struct {
 typedef void (*__kernel_sighandler_t)(int);
 
 /* Type of a SYSV IPC key.  */
-typedef int __kernel_key_t;
+typedef long __kernel_key_t;
 
 #include <asm/posix_types.h>
 

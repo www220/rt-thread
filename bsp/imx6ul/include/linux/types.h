@@ -7,7 +7,6 @@
 
 #ifndef __KERNEL_STRICT_NAMES
 
-typedef __kernel_fd_set		fd_set;
 typedef __kernel_dev_t		dev_t;
 typedef __kernel_ino_t		ino_t;
 typedef __kernel_mode_t		mode_t;
@@ -19,8 +18,8 @@ typedef __kernel_key_t		key_t;
 typedef __kernel_suseconds_t	suseconds_t;
 
 #ifdef __KERNEL__
-typedef __kernel_uid32_t	uid_t;
-typedef __kernel_gid32_t	gid_t;
+typedef __kernel_uid_t	uid_t;
+typedef __kernel_gid_t	gid_t;
 typedef __kernel_uid16_t        uid16_t;
 typedef __kernel_gid16_t        gid16_t;
 

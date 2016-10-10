@@ -119,7 +119,7 @@ rt_inline int rt_list_isempty(const rt_list_t *l)
  * @head:   the head for your list.
  * @member: the name of the list_struct within the struct.
  */
-#define list_for_each_entry(pos, head, member)              \
+#define rt_list_for_each_entry(pos, head, member)              \
     for (pos = rt_list_entry((head)->next, typeof(*pos), member);  \
          &pos->member != (head);    \
          pos = rt_list_entry(pos->member.next, typeof(*pos), member))
@@ -132,7 +132,7 @@ rt_inline int rt_list_isempty(const rt_list_t *l)
  *
  * Note, that list is expected to be not empty.
  */
-#define list_first_entry(ptr, type, member) \
+#define rt_list_first_entry(ptr, type, member) \
     rt_list_entry((ptr)->next, type, member)
 /*@}*/
 

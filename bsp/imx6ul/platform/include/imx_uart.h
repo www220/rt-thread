@@ -84,8 +84,8 @@ enum _uart_bits
 };
 
 //! @brief Specify the service mode
-#define	DMA_MODE  2	  //!< Config the service mode for dma request.
-#define	IRQ_MODE  1      //!< Config the service mode for interrupt.
+#define	UDMA_MODE  2	  //!< Config the service mode for dma request.
+#define	UIRQ_MODE  1      //!< Config the service mode for interrupt.
 
 #define UART_MODULE_CLK(x) ((x) == HW_UART1 ? UART1_MODULE_CLK : (x) == HW_UART2 ? UART2_MODULE_CLK : (x) == HW_UART3 ? UART3_MODULE_CLK : (x) == HW_UART4 ? UART4_MODULE_CLK : (x) == HW_UART5 ? UART5_MODULE_CLK : (x) == HW_UART6 ? UART6_MODULE_CLK : (x) == HW_UART7 ? UART7_MODULE_CLK : (x) == HW_UART8 ? UART8_MODULE_CLK : -1)
 

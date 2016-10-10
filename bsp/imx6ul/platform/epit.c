@@ -113,7 +113,7 @@ void epit_counter_enable(uint32_t instance, uint32_t load_val, uint32_t irq_mode
     HW_EPIT_SR_SET(instance, BM_EPIT_SR_OCIF);
 
     // set the mode when the output compare event occur: IRQ or polling 
-    if (irq_mode == IRQ_MODE)
+    if (irq_mode == UIRQ_MODE)
     {
         HW_EPIT_CR_SET(instance, BM_EPIT_CR_OCIEN);
     }

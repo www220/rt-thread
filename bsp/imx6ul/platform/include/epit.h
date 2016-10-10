@@ -57,7 +57,7 @@
 #define SET_AND_FORGET  1
 
 //! @brief Pass to epit_counter_enable() to enable interrupts.
-#define IRQ_MODE 1
+#define UIRQ_MODE 1
 
 //! @brief Get the irq id of RPIT by instance number.
 //! @param x I2C instance number, from 1 through 2.

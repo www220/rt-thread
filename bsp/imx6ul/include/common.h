@@ -322,8 +322,8 @@ int	envmatch     (uchar *, int);
 #ifdef CONFIG_SANDBOX
 #define getenv uboot_getenv
 #endif
-char	*getenv	     (const char *);
-int	getenv_f     (const char *name, char *buf, unsigned len);
+//char	*getenv	     (const char *);
+//int	getenv_f     (const char *name, char *buf, unsigned len);
 ulong getenv_ulong(const char *name, int base, ulong default_val);
 
 /**
@@ -343,8 +343,8 @@ ulong getenv_hex(const char *varname, ulong default_val);
  * Return -1 if variable does not exist (default to true)
  */
 int getenv_yesno(const char *var);
-int	saveenv	     (void);
-int	setenv	     (const char *, const char *);
+//int	saveenv	     (void);
+//int	setenv	     (const char *, const char *);
 int setenv_ulong(const char *varname, ulong value);
 int setenv_hex(const char *varname, ulong value);
 /**
@@ -757,10 +757,10 @@ char *	strmhz(char *buf, unsigned long hz);
 #include <u-boot/crc.h>
 
 /* lib/rand.c */
-#define RAND_MAX -1U
-void srand(unsigned int seed);
-unsigned int rand(void);
-unsigned int rand_r(unsigned int *seedp);
+//#define RAND_MAX -1U
+//void srand(unsigned int seed);
+//unsigned int rand(void);
+//unsigned int rand_r(unsigned int *seedp);
 
 /* common/console.c */
 int	console_init_f(void);	/* Before relocation; uses the serial  stuff	*/
