@@ -6,7 +6,7 @@ static rt_uint8_t  cpu_usage_major = 0, cpu_usage_minor= 0;
 static rt_uint32_t idle_begin = 0,idle_count = 0;
 static rt_uint32_t run_begin = 0,run_count = 0;
 static rt_uint32_t update_tick = 0;
-#define jiffies ((rt_uint32_t)time_get_microseconds())
+#define jiffies get_timer_usec()
 
 void cpu_usage_idle_hook()
 {

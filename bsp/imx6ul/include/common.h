@@ -108,7 +108,7 @@ typedef volatile unsigned char	vu_char;
 #define debug_cond(cond, fmt, args...)			\
 	do {						\
 		if (cond)				\
-			printf(pr_fmt(fmt), ##args);	\
+			rt_kprintf(pr_fmt(fmt), ##args);	\
 	} while (0)
 
 #define debug(fmt, args...)			\
@@ -130,13 +130,13 @@ void __assert_fail(const char *assertion, const char *file, unsigned line,
 		__assert_fail(#x, __FILE__, __LINE__, __func__); })
 
 #define error(fmt, args...) do {					\
-		printf("ERROR: " pr_fmt(fmt) "\nat %s:%d/%s()\n",	\
+		rt_kprintf("ERROR: " pr_fmt(fmt) "\nat %s:%d/%s()\n",	\
 			##args, __FILE__, __LINE__, __func__);		\
 } while (0)
 
 #ifndef BUG
 #define BUG() do { \
-	printf("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __FUNCTION__); \
+	rt_kprintf("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __FUNCTION__); \
 	panic("BUG!"); \
 } while (0)
 #define BUG_ON(condition) do { if (unlikely((condition)!=0)) BUG(); } while(0)

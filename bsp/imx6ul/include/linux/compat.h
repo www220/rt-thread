@@ -21,11 +21,11 @@ extern struct p_current *current;
 #define dev_vdbg(dev, fmt, args...)		\
 	debug(fmt, ##args)
 #define dev_info(dev, fmt, args...)		\
-	printf(fmt, ##args)
+	rt_kprintf(fmt, ##args)
 #define dev_err(dev, fmt, args...)		\
-	printf(fmt, ##args)
-#define printk	printf
-#define printk_once	printf
+	rt_kprintf(fmt, ##args)
+#define printk	rt_kprintf
+#define printk_once	rt_kprintf
 
 #define KERN_EMERG
 #define KERN_ALERT
@@ -59,13 +59,13 @@ void *kmem_cache_alloc(struct kmem_cache *obj, int flag);
 
 #ifndef BUG
 #define BUG() do { \
-	printf("U-Boot BUG at %s:%d!\n", __FILE__, __LINE__); \
+	rt_kprintf("U-Boot BUG at %s:%d!\n", __FILE__, __LINE__); \
 } while (0)
 
 #define BUG_ON(condition) do { if (condition) BUG(); } while(0)
 #endif /* BUG */
 
-#define WARN_ON(x) if (x) {printf("WARNING in %s line %d\n" \
+#define WARN_ON(x) if (x) {rt_kprintf("WARNING in %s line %d\n" \
 				  , __FILE__, __LINE__); }
 
 #define PAGE_SIZE	4096

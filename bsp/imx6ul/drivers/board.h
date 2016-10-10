@@ -15,17 +15,15 @@
 #ifndef __BOARD_H__
 #define __BOARD_H__
 
-#include <epit.h>
 #include <gic.h>
-#include <gpt.h>
-#include <imx_timer.h>
-#include <registers/regsarmglobaltimer.h>
-#include <registers/regsepit.h>
-#include <registers/regsuart.h>
+#include <irq_numbers.h>
 
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned u32;
+int timer_init(void);
+void udelay(unsigned long usec);
+void mdelay(unsigned long msec);
+void __udelay(unsigned long usec);
+ulong get_timer_masked(void);
+int print_cpuinfo(void);
 
 #define HEAP_BEGIN      (void*)(0x80000000 + 32 * 1024 * 1024)
 #define HEAP_END        (void*)(0x80000000 + 224 * 1024 * 1024)
@@ -41,6 +39,7 @@ typedef unsigned u32;
 
 #define CONSOLE_DEVICE "uart1"
 #define FINSH_DEVICE_NAME "uart1"
+#define get_timer_usec() get_timer_masked()
 
 void rt_hw_board_init(void);
 void rt_hw_interrupt_init(void);

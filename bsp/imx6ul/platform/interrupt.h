@@ -30,7 +30,7 @@
 #ifndef __INTERRUPT_H__
 #define __INTERRUPT_H__
 
-#include "sdk_types.h"
+#include <sys/types.h>
 #include "irq_numbers.h"
 
 //! @addtogroup diag_interrupt

@@ -47,6 +47,4 @@ defined(CONFIG_MX6DL)) && !defined(CONFIG_MX6SOLO)
 #define CONFIG_MX6Q
 #endif
 
-#define CONFIG_IMX_THERMAL
-
 #endif
