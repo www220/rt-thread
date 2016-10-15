@@ -77,7 +77,7 @@
 //#define RT_USING_SPI
 //#define RT_USING_RTC
 //#define RT_MTD_NAND_DEBUG
-//#define RT_USING_MTD_NAND
+#define RT_USING_MTD_NAND
 //#define RT_MMCSD_DBG
 //#define RT_USING_SDIO
 #define RT_MMCSD_STACK_SIZE 4096
@@ -114,7 +114,7 @@
 #define RT_DFS_ELM_MAX_LFN			255
 #define RT_DFS_ELM_MAX_SECTOR_SIZE  512
 
-//#define RT_USING_DFS_YAFFS2
+#define RT_USING_DFS_YAFFS2
 
 #define RT_USING_DFS_ROMFS
 #define RT_USING_DFS_DEVFS

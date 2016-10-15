@@ -18,7 +18,11 @@
 #include <gic.h>
 #include <irq_numbers.h>
 
+void s_init(void);
+int arch_cpu_init(void);
 int timer_init(void);
+int board_postclk_init(void);
+
 void udelay(unsigned long usec);
 void mdelay(unsigned long msec);
 void __udelay(unsigned long usec);
@@ -43,13 +47,13 @@ int print_cpuinfo(void);
 
 void rt_hw_board_init(void);
 void rt_hw_interrupt_init(void);
-int rt_hw_uart_init(void);
-int rt_hw_timer_init(void);
-int rt_hw_spi_init(void);
-int rt_hw_rtc_init(void);
-int rt_hw_mtd_nand_init(void);
-int rt_hw_ssp_init(void);
-int rt_hw_usbh_init(void);
+void rt_hw_uart_init(void);
+void rt_hw_timer_init(void);
+void rt_hw_spi_init(void);
+void rt_hw_rtc_init(void);
+void rt_hw_mtd_nand_init(void);
+void rt_hw_ssp_init(void);
+void rt_hw_usbh_init(void);
 
 #ifdef _MSC_VER
 #ifdef _DLL

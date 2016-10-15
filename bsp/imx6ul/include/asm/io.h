@@ -122,15 +122,15 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
 		*buf++ = __arch_getl(addr);
 }
 
-#define __raw_writeb(v,a)	__arch_putb(v,a)
-#define __raw_writew(v,a)	__arch_putw(v,a)
-#define __raw_writel(v,a)	__arch_putl(v,a)
-#define __raw_writeq(v,a)	__arch_putq(v,a)
+#define __raw_writeb(v,a)	({ u32 aa=(u32)a;__arch_putb(v,aa); })
+#define __raw_writew(v,a)	({ u32 aa=(u32)a;__arch_putw(v,aa); })
+#define __raw_writel(v,a)	({ u32 aa=(u32)a;__arch_putl(v,aa); })
+#define __raw_writeq(v,a)	({ u32 aa=(u32)a;__arch_putq(v,aa); })
 
-#define __raw_readb(a)		__arch_getb(a)
-#define __raw_readw(a)		__arch_getw(a)
-#define __raw_readl(a)		__arch_getl(a)
-#define __raw_readq(a)		__arch_getq(a)
+#define __raw_readb(a)		({ u32 aa=(u32)a;__arch_getb(aa); })
+#define __raw_readw(a)		({ u32 aa=(u32)a;__arch_getw(aa); })
+#define __raw_readl(a)		({ u32 aa=(u32)a;__arch_getl(aa); })
+#define __raw_readq(a)		({ u32 aa=(u32)a;__arch_getq(aa); })
 
 /*
  * TODO: The kernel offers some more advanced versions of barriers, it might
@@ -141,15 +141,15 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
 #define __iormb()	dmb()
 #define __iowmb()	dmb()
 
-#define writeb(v,c)	({ u8  __v = v; __iowmb(); __arch_putb(__v,c); __v; })
-#define writew(v,c)	({ u16 __v = v; __iowmb(); __arch_putw(__v,c); __v; })
-#define writel(v,c)	({ u32 __v = v; __iowmb(); __arch_putl(__v,c); __v; })
-#define writeq(v,c)	({ u64 __v = v; __iowmb(); __arch_putq(__v,c); __v; })
+#define writeb(v,c)	({ u32 cc=(u32)c;u8  __v = v; __iowmb(); __arch_putb(__v,cc); __v; })
+#define writew(v,c)	({ u32 cc=(u32)c;u16 __v = v; __iowmb(); __arch_putw(__v,cc); __v; })
+#define writel(v,c)	({ u32 cc=(u32)c;u32 __v = v; __iowmb(); __arch_putl(__v,cc); __v; })
+#define writeq(v,c)	({ u32 cc=(u32)c;u64 __v = v; __iowmb(); __arch_putq(__v,cc); __v; })
 
-#define readb(c)	({ u8  __v = __arch_getb(c); __iormb(); __v; })
-#define readw(c)	({ u16 __v = __arch_getw(c); __iormb(); __v; })
-#define readl(c)	({ u32 __v = __arch_getl(c); __iormb(); __v; })
-#define readq(c)	({ u64 __v = __arch_getq(c); __iormb(); __v; })
+#define readb(c)	({ u32 cc=(u32)c;u8  __v = __arch_getb(cc); __iormb(); __v; })
+#define readw(c)	({ u32 cc=(u32)c;u16 __v = __arch_getw(cc); __iormb(); __v; })
+#define readl(c)	({ u32 cc=(u32)c;u32 __v = __arch_getl(cc); __iormb(); __v; })
+#define readq(c)	({ u32 cc=(u32)c;u64 __v = __arch_getq(cc); __iormb(); __v; })
 
 /*
  * The compiler seems to be incapable of optimising constants

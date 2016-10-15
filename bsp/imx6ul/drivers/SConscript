@@ -38,7 +38,6 @@ simrtc.c
 
 nanddev_src = Split("""
 nand.c
-apbh_dma.c
 """)
 
 nandsim_src = Split("""

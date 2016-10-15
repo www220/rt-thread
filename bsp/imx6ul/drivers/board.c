@@ -18,10 +18,11 @@
 #include <cortex_a.h>
 
 #undef ALIGN
+#include <common.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 
-#define CONFIG_WD_PERIOD 4000000
+#define CONFIG_WD_PERIOD 2000000
 void udelay(unsigned long usec)
 {
 	ulong kv;
@@ -46,7 +47,7 @@ static void rt_hw_timer_isr(int vector, void *param)
     __REG(EPIT_BASE+4) = 0x01;
 }
 
-int rt_hw_timer_init(void)
+void rt_hw_timer_init(void)
 {
     uint32_t clk = mxc_get_clock(MXC_IPG_CLK);
 
@@ -60,10 +61,7 @@ int rt_hw_timer_init(void)
 
     rt_hw_interrupt_install(IMX_INT_EPIT1, rt_hw_timer_isr, RT_NULL, "tick");
     rt_hw_interrupt_umask(IMX_INT_EPIT1);
-
-    return 0;
 }
-INIT_BOARD_EXPORT(rt_hw_timer_init);
 
 /**
  * This function will initialize hardware board
@@ -71,9 +69,14 @@ INIT_BOARD_EXPORT(rt_hw_timer_init);
 extern unsigned imx_ddr_size(void);
 void rt_hw_board_init(void)
 {
+    s_init();
+    arch_cpu_init();
     timer_init();
+    board_postclk_init();
+
     rt_hw_interrupt_init();
     enable_neon_fpu();
+    disable_strict_align_check();
 
     /* initialize uart */
     rt_hw_uart_init();

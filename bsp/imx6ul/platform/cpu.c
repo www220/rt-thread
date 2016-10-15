@@ -111,9 +111,8 @@ struct esd_mmdc_regs {
 unsigned imx_ddr_size(void)
 {
 	struct esd_mmdc_regs *mem = (struct esd_mmdc_regs *)MEMCTL_BASE;
-	uint32_t *ptr = &mem->ctl,*ptr2 = &mem->misc;
-	unsigned ctl = readl(ptr);
-	unsigned misc = readl(ptr2);
+	unsigned ctl = readl(&mem->ctl);
+	unsigned misc = readl(&mem->misc);
 	int bits = 11 + 0 + 0 + 1;      /* row + col + bank + width */
 
 	bits += ESD_MMDC_CTL_GET_ROW(ctl);

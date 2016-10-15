@@ -32,6 +32,7 @@
 #include <rtdevice.h>
 
 #undef ALIGN
+#include <common.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/mx6-pins.h>
@@ -327,7 +328,7 @@ void uart_iomux_config(struct rt_serial_device *dev, struct hw_uart_device *uart
     rt_hw_interrupt_mask(uart->irqno);
 }
 
-int rt_hw_uart_init(void)
+void rt_hw_uart_init(void)
 {
     struct serial_configure config;
 
@@ -357,7 +358,4 @@ int rt_hw_uart_init(void)
     rt_hw_serial_register(&_serial2, "uart2",
                           RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, &_uart2_device);
 #endif
-
-    return 0;
 }
-INIT_BOARD_EXPORT(rt_hw_uart_init);

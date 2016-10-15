@@ -281,6 +281,20 @@ _malloc_r (struct _reent *ptr, size_t size)
 }
 
 void *
+_memalign_r (struct _reent *ptr, size_t align, size_t size)
+{
+	void* result;
+
+	result = (void*)rt_malloc_align (size, align);
+	if (result == RT_NULL)
+	{
+		ptr->_errno = ENOMEM;
+	}
+
+	return result;
+}
+
+void *
 _realloc_r (struct _reent *ptr, void *old, size_t newlen)
 {
 	void* result;
