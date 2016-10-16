@@ -114,6 +114,7 @@ static u8 *data_buf = 0;
 static u8 *oob_buf = 0;
 static u32 m_u32BlkMarkBitStart = 0;
 static u32 m_u32BlkMarkByteOfs = 0;
+static int m_plan_num = 0;
 
 /*
  * Cache management functions
@@ -219,7 +220,7 @@ static int send_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.data =
 		MXS_DMA_DESC_COMMAND_DMA_READ | MXS_DMA_DESC_IRQ |
 		MXS_DMA_DESC_DEC_SEM |
-		MXS_DMA_DESC_WAIT4END | (4 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
+		MXS_DMA_DESC_WAIT4END | (1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
 		(length << MXS_DMA_DESC_BYTES_OFFSET);
 
 	d->cmd.address = buffer;
@@ -229,14 +230,10 @@ static int send_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_WORD_LENGTH |
 		(chip << GPMI_CTRL0_CS_OFFSET) |
 		GPMI_CTRL0_ADDRESS_NAND_DATA |
-		GPMI_CTRL0_ADDRESS_INCREMENT |
 		length;
-	d->cmd.pio_words[1] = 0;
-	d->cmd.pio_words[2] = 0;
-	d->cmd.pio_words[3] = 0;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_flush_cmd_buf((u8 *)buffer);
+	mxs_nand_flush_data_buf((u8 *)buffer);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
@@ -276,19 +273,16 @@ static int read_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_WORD_LENGTH |
 		(chip << GPMI_CTRL0_CS_OFFSET) |
 		GPMI_CTRL0_ADDRESS_NAND_DATA |
-		GPMI_CTRL0_ADDRESS_INCREMENT |
 		length;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_flush_cmd_buf((u8 *)buffer);
 
 	d = dma_desc[1];
 
 	d->cmd.data =
 		MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_IRQ |
 		MXS_DMA_DESC_DEC_SEM | MXS_DMA_DESC_NAND_WAIT_4_READY |
-		MXS_DMA_DESC_WAIT4END | (4 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
-		(0 << MXS_DMA_DESC_BYTES_OFFSET);
+		MXS_DMA_DESC_WAIT4END | (1 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
 
 	d->cmd.address = 0;
 
@@ -296,18 +290,14 @@ static int read_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_COMMAND_MODE_WAIT_FOR_READY |
 		GPMI_CTRL0_WORD_LENGTH |
 		(chip << GPMI_CTRL0_CS_OFFSET) |
-		GPMI_CTRL0_ADDRESS_NAND_DATA |
-		GPMI_CTRL0_ADDRESS_INCREMENT |
-		0;
-	d->cmd.pio_words[1] = 0;
-	d->cmd.pio_words[2] = 0;
-	d->cmd.pio_words[3] = 0;
+		GPMI_CTRL0_ADDRESS_NAND_DATA;
 
 	mxs_dma_desc_append(dma_channel, d);
-	//mxs_nand_flush_cmd_buf(0);
+	mxs_nand_inval_data_buf((u8 *)buffer);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
+	mxs_nand_inval_data_buf((u8 *)buffer);
 
 	if (error)
 		rt_kprintf("[%s] DMA error\n", __func__);
@@ -359,8 +349,7 @@ static int send_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.data =
 		MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_IRQ |
 		MXS_DMA_DESC_DEC_SEM |
-		MXS_DMA_DESC_WAIT4END | (6 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
-		(0 << MXS_DMA_DESC_BYTES_OFFSET);
+		MXS_DMA_DESC_WAIT4END | (6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
 
 	d->cmd.address = 0;
 
@@ -368,9 +357,7 @@ static int send_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_COMMAND_MODE_WRITE |
 		GPMI_CTRL0_WORD_LENGTH |
 		(chip << GPMI_CTRL0_CS_OFFSET) |
-		GPMI_CTRL0_ADDRESS_NAND_DATA |
-		GPMI_CTRL0_ADDRESS_INCREMENT |
-		0;
+		GPMI_CTRL0_ADDRESS_NAND_DATA;
 	d->cmd.pio_words[1] = 0;
 	d->cmd.pio_words[2] =
 		GPMI_ECCCTRL_ENABLE_ECC |
@@ -381,7 +368,7 @@ static int send_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.pio_words[5] = auxiliary;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_flush_cmd_buf((u8 *)payload);
+	mxs_nand_flush_data_buf((u8 *)payload);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
@@ -418,8 +405,7 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.data =
 		MXS_DMA_DESC_COMMAND_NO_DMAXFER |
 		MXS_DMA_DESC_CHAIN | MXS_DMA_DESC_NAND_WAIT_4_READY |
-		MXS_DMA_DESC_WAIT4END | (1 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
-		(0 << MXS_DMA_DESC_BYTES_OFFSET);
+		MXS_DMA_DESC_WAIT4END | (1 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
 
 	d->cmd.address = 0;
 
@@ -427,20 +413,16 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_COMMAND_MODE_WAIT_FOR_READY |
 		GPMI_CTRL0_WORD_LENGTH |
 		(chip << GPMI_CTRL0_CS_OFFSET) |
-		GPMI_CTRL0_ADDRESS_NAND_DATA |
-		GPMI_CTRL0_ADDRESS_INCREMENT |
-		0;
+		GPMI_CTRL0_ADDRESS_NAND_DATA;
 
 	mxs_dma_desc_append(dma_channel, d);
-	//mxs_nand_flush_cmd_buf(0);
 
 	d = dma_desc[1];
 
 	d->cmd.data =
 		MXS_DMA_DESC_COMMAND_NO_DMAXFER |
 		MXS_DMA_DESC_CHAIN |
-		MXS_DMA_DESC_WAIT4END | (6 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
-		(0 << MXS_DMA_DESC_BYTES_OFFSET);
+		MXS_DMA_DESC_WAIT4END | (6 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
 
 	d->cmd.address = 0;
 
@@ -449,7 +431,6 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_WORD_LENGTH |
 		(chip << GPMI_CTRL0_CS_OFFSET) |
 		GPMI_CTRL0_ADDRESS_NAND_DATA |
-		GPMI_CTRL0_ADDRESS_INCREMENT |
 		page_size;
 	d->cmd.pio_words[1] = 0;
 	d->cmd.pio_words[2] =
@@ -463,15 +444,13 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.pio_words[5] = auxiliary;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_flush_cmd_buf((u8 *)payload);
 
 	d = dma_desc[2];
 
 	d->cmd.data =
 		MXS_DMA_DESC_COMMAND_NO_DMAXFER |
 		MXS_DMA_DESC_CHAIN | MXS_DMA_DESC_NAND_WAIT_4_READY |
-		MXS_DMA_DESC_WAIT4END | (3 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
-		(0 << MXS_DMA_DESC_BYTES_OFFSET);
+		MXS_DMA_DESC_WAIT4END | (3 << MXS_DMA_DESC_PIO_WORDS_OFFSET);
 
 	d->cmd.address = 0;
 
@@ -480,25 +459,22 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_WORD_LENGTH |
 		(chip << GPMI_CTRL0_CS_OFFSET) |
 		GPMI_CTRL0_ADDRESS_NAND_DATA |
-		GPMI_CTRL0_ADDRESS_INCREMENT |
 		page_size;
 	d->cmd.pio_words[1] = 0;
 	d->cmd.pio_words[2] = 0;
 
 	mxs_dma_desc_append(dma_channel, d);
-	//mxs_nand_flush_cmd_buf(0);
 
 	d = dma_desc[3];
 
 	d->cmd.data =
 		MXS_DMA_DESC_COMMAND_NO_DMAXFER | MXS_DMA_DESC_IRQ |
-		MXS_DMA_DESC_DEC_SEM | (0 << MXS_DMA_DESC_PIO_WORDS_OFFSET) |
-		(0 << MXS_DMA_DESC_BYTES_OFFSET);
+		MXS_DMA_DESC_DEC_SEM ;
 
 	d->cmd.address = 0;
 
 	mxs_dma_desc_append(dma_channel, d);
-	//mxs_nand_flush_cmd_buf(0);
+	mxs_nand_inval_data_buf((u8*)payload);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
@@ -507,6 +483,7 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 		rt_kprintf("[%s] DMA error\n", __func__);
 
 	error = wait_for_bch_completion(10000);
+	mxs_nand_inval_data_buf((u8*)payload);
 
 	error = (error) ? -ETIMEDOUT : 0;
 
@@ -588,7 +565,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
 	for (i = 0; i < cmd_Q_len; i++)
 		sprintf(display + strlen(display),
 			" 0x%02x", cmd_queue[i] & 0xff);
-	MTDDEBUG(MTD_DEBUG_LEVEL1, "%s: command: %s\n", __func__, display);
+	rt_kprintf("%s: command: %s\n", __func__, display);
 #endif
 
 	error = send_command(mtd, 0, (dma_addr_t)cmd_queue, cmd_Q_len);
@@ -647,10 +624,10 @@ static void nand_read_buf(struct rt_mtd_nand_device *mtd, uint8_t *buf, int len)
 {
 
 	if (len > PAGE_SIZE)
-		printf("[%s] Inadequate DMA buffer\n", __func__);
+		rt_kprintf("[%s] Inadequate DMA buffer\n", __func__);
 
 	if (!buf)
-		printf("[%s] Buffer pointer is NULL\n", __func__);
+		rt_kprintf("[%s] Buffer pointer is NULL\n", __func__);
 
 	/* Ask the NFC. */
 	read_data(mtd, 0, (dma_addr_t)data_buf, len);
@@ -695,6 +672,10 @@ static void nand_command(struct rt_mtd_nand_device *mtd, unsigned int command,
 			cmd_ctrl(mtd, page_addr, ctrl);
 			cmd_ctrl(mtd, page_addr >> 8,
 				       NAND_NCE | NAND_ALE);
+			if (m_plan_num > 1) {
+			cmd_ctrl(mtd, page_addr >> 16,
+				       NAND_NCE | NAND_ALE);
+			}
 		}
 	}
 	cmd_ctrl(mtd, NAND_CMD_NONE, NAND_NCE | NAND_CTRL_CHANGE);
@@ -1144,7 +1125,7 @@ void rt_hw_mtd_nand_init(void)
 
 	/* Translate the abstract choices into register fields. */
 	block_count = GPMI_NFC_ECC_CHUNK_CNT(PAGE_DATA_SIZE);
-	block_size = GPMI_NFC_CHUNK_DATA_CHUNK_SIZE;
+	block_size = GPMI_NFC_CHUNK_DATA_CHUNK_SIZE/4;
 	metadata_size = GPMI_NFC_METADATA_SIZE;
 	page_size    = PAGE_DATA_SIZE + OOB_SIZE;
 
@@ -1171,7 +1152,7 @@ void rt_hw_mtd_nand_init(void)
 	m_u32BlkMarkByteOfs = blk_mark_bit_offs >> 3;
 	m_u32BlkMarkBitStart  = blk_mark_bit_offs & 0x7;
 
-    _nanddrv_file_device[0].plane_num = 2;
+    _nanddrv_file_device[0].plane_num = m_plan_num;
     _nanddrv_file_device[0].oob_size = OOB_SIZE;
     _nanddrv_file_device[0].oob_free = GPMI_NFC_METADATA_SIZE;
     _nanddrv_file_device[0].page_size = PAGE_DATA_SIZE;
@@ -1181,7 +1162,7 @@ void rt_hw_mtd_nand_init(void)
     _nanddrv_file_device[0].block_total = _nanddrv_file_device[0].block_end - _nanddrv_file_device[0].block_start;
     _nanddrv_file_device[0].ops = &_ops;
 
-    _nanddrv_file_device[1].plane_num = 2;
+    _nanddrv_file_device[1].plane_num = m_plan_num;
     _nanddrv_file_device[1].oob_size = OOB_SIZE;
     _nanddrv_file_device[1].oob_free = GPMI_NFC_METADATA_SIZE;
     _nanddrv_file_device[1].page_size = PAGE_DATA_SIZE;
@@ -1260,11 +1241,19 @@ void nand_init(void)
 	nand_read_buf(&_nanddrv_file_device[0], id, 4);
     rt_kprintf("NAND ID:%02X %02X ", id[0], id[1]);
     if (id[0] == 0xc2 && id[1] == 0xf1)
+    {
         rt_kprintf("MXIC NAND 128Mib\n");
+        m_plan_num = 1;
+    }
     else if (id[0] == 0x01 && id[1] == 0xda)
-        rt_kprintf("CYPRESS NAND 256Mib\n");
+    {
+        rt_kprintf("Spansion NAND 256Mib\n");
+        m_plan_num = 2;
+    }
     else
+    {
         rt_kprintf("Unknow NAND\n");
+    }
 }
 
 #if defined(RT_USING_FINSH)
