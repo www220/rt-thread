@@ -29,8 +29,8 @@ void __udelay(unsigned long usec);
 ulong get_timer_masked(void);
 int print_cpuinfo(void);
 
-#define HEAP_BEGIN      (void*)(0x80000000 + 32 * 1024 * 1024)
-#define HEAP_END        (void*)(0x80000000 + 224 * 1024 * 1024)
+#define HEAP_BEGIN      0x80A00000
+#define HEAP_END        0x8FF00000
 
 #define RT_USING_UART1
 #define RT_USING_UART2
@@ -74,5 +74,13 @@ void inittmppath(void);
 void cleartmppath(void);
 char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *file);
 int SetPrivateStringData(const char *name, const char *buf, const char *file);
+
+extern unsigned char *dma_align_mem;
+#define rt_memalign(x,y) (void *)dma_align_mem; dma_align_mem += (u32)(((u32)(y)+63)&(u32)(~63))
+#define rt_freealign(x)
+
+extern unsigned char *dma_align_max;
+#define rt_memalign_max(x,y) (void *)dma_align_max; dma_align_max += (u32)(((u32)(y)+63)&(u32)(~63))
+#define rt_freealign_max(x)
 
 #endif

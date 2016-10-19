@@ -60,6 +60,10 @@
 #define CONFIG_MXC_OCOTP
 #endif
 
+/* NET Configs */
+#define CONFIG_FEC_MXC
+#define CONFIG_MII
+
 /* MMC Configs */
 #ifdef CONFIG_FSL_USDHC
 #define CONFIG_FSL_ESDHC

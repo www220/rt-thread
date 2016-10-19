@@ -46,6 +46,7 @@
 /* stack */
 .globl stack_start
 .globl stack_top
+.globl system_vectors
 
 stack_start:
 .rept ISR_Stack_Size
@@ -57,12 +58,37 @@ stack_top:
 /* reset entry */
 .globl _reset
 _reset:
-    bl      rt_cpu_mmu_disable
     /* set the cpu to SVC32 mode and disable interrupt */
     mrs     r0, cpsr
     bic     r0, r0, #0x1f
     orr     r0, r0, #0x13|0xc0
     msr     cpsr_c, r0
+
+    /* Set V=0 in CP15 SCTLR register - for VBAR to point to vector */
+    mrc p15, 0, r0, c1, c0, 0
+    bic r0, #2000
+    mcr p15, 0, r0, c1, c0, 0
+
+    /* Set vector address in CP15 VBAR register */
+    ldr r0, =system_vectors
+    mcr p15, 0, r0, c12, c0, 0
+
+    /* Invalidate L1 I/D */
+    mov r0, #0          @ set up for MCR
+    mcr p15, 0, r0, c8, c7, 0   @ invalidate TLBs
+    mcr p15, 0, r0, c7, c5, 0   @ invalidate icache
+    mcr p15, 0, r0, c7, c5, 6   @ invalidate BP array
+    mcr     p15, 0, r0, c7, c10, 4  @ DSB
+    mcr     p15, 0, r0, c7, c5, 4   @ ISB
+
+    /* disable MMU stuff and caches */
+    mrc p15, 0, r0, c1, c0, 0
+    bic r0, r0, #0x00002000 @ clear bits 13 (--V-)
+    bic r0, r0, #0x00000007 @ clear bits 2:0 (-CAM)
+    orr r0, r0, #0x00000002 @ set bit 1 (--A-) Align
+    orr r0, r0, #0x00000800 @ set bit 11 (Z---) BTB
+    orr r0, r0, #0x00001000 @ set bit 12 (I) I-cache
+    mcr p15, 0, r0, c1, c0, 0
 
     /* setup stack */
     bl      stack_setup
@@ -142,10 +168,6 @@ vector_fiq:
 .globl      rt_thread_switch_interrupt_flag
 .globl      rt_interrupt_from_thread
 .globl      rt_interrupt_to_thread
-
-.globl      rt_current_thread
-.globl      vmm_thread
-.globl      vmm_virq_check
 
     .align  5
 .globl vector_irq

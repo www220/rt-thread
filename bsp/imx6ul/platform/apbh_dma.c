@@ -11,6 +11,7 @@
  */
 
 #include <rtthread.h>
+#include <board.h>
 
 #undef ALIGN
 #include <linux/list.h>
@@ -345,7 +346,7 @@ struct mxs_dma_desc *mxs_dma_desc_alloc(void)
 	uint32_t size;
 
 	size = roundup(sizeof(struct mxs_dma_desc), MXS_DMA_ALIGNMENT);
-	pdesc = memalign(MXS_DMA_ALIGNMENT, size);
+	pdesc = rt_memalign(MXS_DMA_ALIGNMENT, size);
 
 	if (pdesc == NULL)
 		return NULL;
@@ -364,7 +365,7 @@ void mxs_dma_desc_free(struct mxs_dma_desc *pdesc)
 	if (pdesc == NULL)
 		return;
 
-	free(pdesc);
+	rt_freealign(pdesc);
 }
 
 /*

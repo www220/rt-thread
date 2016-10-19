@@ -30,15 +30,6 @@ rt_uint32_t rt_interrupt_from_thread;
 rt_uint32_t rt_interrupt_to_thread;
 rt_uint32_t rt_thread_switch_interrupt_flag;
 
-extern void rt_cpu_vector_set_base(unsigned int addr);
-extern int system_vectors;
-
-/* keep compatible with platform SDK */
-void register_interrupt_routine(uint32_t irq_id, irq_hdlr_t isr)
-{
-    rt_hw_interrupt_install(irq_id, (rt_isr_handler_t)isr, NULL, "unknown");
-}
-
 void enable_interrupt(uint32_t irq_id, uint32_t cpu_id, uint32_t priority)
 {
     gic_set_irq_priority(irq_id, priority);
@@ -53,30 +44,11 @@ void disable_interrupt(uint32_t irq_id, uint32_t cpu_id)
     gic_set_cpu_target(irq_id, cpu_id, false);
 }
 
-static void rt_hw_vector_init(void)
-{
-    int sctrl = 0;
-    unsigned int *src = (unsigned int *)&system_vectors;
-
-    /* C12-C0 is only active when SCTLR.V = 0 */
-    asm volatile ("mrc p15, #0, %0, c1, c0, #0"
-                  :"=r" (sctrl));
-    sctrl &= ~(1 << 13);
-    asm volatile ("mcr p15, #0, %0, c1, c0, #0"
-                  :
-                  :"r" (sctrl));
-
-    asm volatile ("mcr p15, #0, %0, c12, c0, #0"
-                  :
-                  :"r" (src));
-}
-
 /**
  * This function will initialize hardware interrupt
  */
 void rt_hw_interrupt_init(void)
 {
-    rt_hw_vector_init();
     gic_init();
 
     /* init interrupt nest, and context in thread sp */

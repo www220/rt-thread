@@ -120,24 +120,24 @@ static int m_plan_num = 0;
  * Cache management functions
  */
 #ifndef	CONFIG_SYS_DCACHE_OFF
-static void mxs_nand_flush_data_buf(u8 *data_buf)
+static void mxs_nand_flush_data_buf(uint32_t data_buf)
 {
 	flush_dcache_range(data_buf, data_buf+PAGE_SIZE);
 }
 
-static void mxs_nand_inval_data_buf(u8 *data_buf)
+static void mxs_nand_inval_data_buf(uint32_t data_buf)
 {
 	invalidate_dcache_range(data_buf, data_buf+PAGE_SIZE);
 }
 
-static void mxs_nand_flush_cmd_buf(u8 *cmd_buf)
+static void mxs_nand_flush_cmd_buf(uint32_t cmd_buf)
 {
-	flush_dcache_range(cmd_buf, cmd_buf+MXS_NAND_COMMAND_BUFFER_SIZE);
+	flush_dcache_range(cmd_buf, cmd_buf+GPMI_NFC_COMMAND_BUFFER_SIZE);
 }
 #else
-static inline void mxs_nand_flush_data_buf(u8 *data_buf) {}
-static inline void mxs_nand_inval_data_buf(u8 *data_buf) {}
-static inline void mxs_nand_flush_cmd_buf(u8 *cmd_buf) {}
+static inline void mxs_nand_flush_data_buf(uint32_t data_buf) {}
+static inline void mxs_nand_inval_data_buf(uint32_t data_buf) {}
+static inline void mxs_nand_flush_cmd_buf(uint32_t cmd_buf) {}
 #endif
 
 /**
@@ -191,7 +191,7 @@ static int send_command(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.pio_words[2] = 0;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_flush_cmd_buf((u8 *)buffer);
+	mxs_nand_flush_cmd_buf(buffer);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
@@ -233,7 +233,7 @@ static int send_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 		length;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_flush_data_buf((u8 *)buffer);
+	mxs_nand_flush_data_buf(buffer);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
@@ -293,11 +293,11 @@ static int read_data(struct rt_mtd_nand_device *mtd, unsigned chip,
 		GPMI_CTRL0_ADDRESS_NAND_DATA;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_inval_data_buf((u8 *)buffer);
+	mxs_nand_inval_data_buf(buffer);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
-	mxs_nand_inval_data_buf((u8 *)buffer);
+	mxs_nand_inval_data_buf(buffer);
 
 	if (error)
 		rt_kprintf("[%s] DMA error\n", __func__);
@@ -368,7 +368,7 @@ static int send_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.pio_words[5] = auxiliary;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_flush_data_buf((u8 *)payload);
+	mxs_nand_flush_data_buf(payload);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
@@ -474,7 +474,7 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 	d->cmd.address = 0;
 
 	mxs_dma_desc_append(dma_channel, d);
-	mxs_nand_inval_data_buf((u8*)payload);
+	mxs_nand_inval_data_buf(payload);
 
 	/* Go! */
 	error = mxs_dma_go(dma_channel);
@@ -483,7 +483,7 @@ static int read_page(struct rt_mtd_nand_device *mtd, unsigned chip,
 		rt_kprintf("[%s] DMA error\n", __func__);
 
 	error = wait_for_bch_completion(10000);
-	mxs_nand_inval_data_buf((u8*)payload);
+	mxs_nand_inval_data_buf(payload);
 
 	error = (error) ? -ETIMEDOUT : 0;
 
@@ -521,7 +521,7 @@ static void cmd_ctrl(struct rt_mtd_nand_device *mtd, int data, unsigned int ctrl
 #endif
 
 	if (!cmd_queue) {
-		cmd_queue = memalign(MXS_DMA_ALIGNMENT, GPMI_NFC_COMMAND_BUFFER_SIZE);
+		cmd_queue = rt_memalign(MXS_DMA_ALIGNMENT, GPMI_NFC_COMMAND_BUFFER_SIZE);
 		if (!cmd_queue) {
 			rt_kprintf("%s: failed to allocate command "
 				"queuebuffer\n",
@@ -1181,7 +1181,7 @@ static int mxs_nand_init(void)
 	int i = 0, j;
 
 	/* Allocate the Data Buffer. */
-	data_buf = memalign(MXS_DMA_ALIGNMENT, PAGE_SIZE);
+	data_buf = rt_memalign(MXS_DMA_ALIGNMENT, PAGE_SIZE);
 	if (!data_buf)
 		goto err1;
 	rt_memset(data_buf, 0, PAGE_SIZE);
@@ -1214,7 +1214,7 @@ err2:
 err1:
 	if (data_buf)
 	{
-		free(data_buf);
+		rt_freealign(data_buf);
 		data_buf = NULL;
 	}
 	rt_kprintf("MXS NAND: Unable to allocate DMA descriptors\n");

@@ -55,6 +55,13 @@ SECTIONS
         PROVIDE(__dtors_end__ = .);
     }
 
+    . = ALIGN(16 * 1024);
+    .l1_page_table :
+    {
+        __l1_page_table_start = .;
+        . += 16K;
+    }
+
     . = ALIGN(4);
     .data :
     {

@@ -34,7 +34,7 @@ if PLATFORM == 'gcc':
     OBJDUMP = PREFIX + 'objdump'
     OBJCPY = PREFIX + 'objcopy'
 
-    DEVICE = ' -march=armv7-a -mtune=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=softfp -ffunction-sections -fdata-sections -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable'
+    DEVICE = ' -march=armv7-a -mtune=cortex-a7 -mfpu=vfpv3-d16 -mfloat-abi=softfp -ffunction-sections -fdata-sections -Wall -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable'
     DEVICE += ' -Iinclude -D__KERNEL__ -D__UBOOT__ -D__ARM__ -D__HAVE_ARCH_BCOPY -DCONFIG_USE_STDINT'
     DEVICE += ' -DCHIP_MX6UL'
     CFLAGS = DEVICE
