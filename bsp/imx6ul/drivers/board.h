@@ -22,6 +22,7 @@ void s_init(void);
 int arch_cpu_init(void);
 int timer_init(void);
 int board_postclk_init(void);
+void enable_caches(void);
 
 void udelay(unsigned long usec);
 void mdelay(unsigned long msec);

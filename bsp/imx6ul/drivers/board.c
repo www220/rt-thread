@@ -16,7 +16,6 @@
 #include <rtthread.h>
 #include "board.h"
 #include <cortex_a.h>
-#include "mmu.h"
 
 #undef ALIGN
 #include <common.h>
@@ -68,6 +67,13 @@ void rt_hw_timer_init(void)
 unsigned char * dma_align_mem = (unsigned char *)0x900000;
 unsigned char * dma_align_max = (unsigned char *)HEAP_END;
 
+/* tlb base mem */
+extern char __l1_page_table_start;
+u32 *rtt_tlb_table;
+/* mmu config */
+u32 rtt_bi_dram_start[CONFIG_NR_DRAM_BANKS];
+u32 rtt_bi_dram_size[CONFIG_NR_DRAM_BANKS];
+
 /**
  * This function will initialize hardware board
  */
@@ -77,8 +83,11 @@ void rt_hw_board_init(void)
     arch_cpu_init();
     timer_init();
     board_postclk_init();
-    mmu_init();
-    arm_dcache_enable();
+
+    rtt_tlb_table = (u32 *)&__l1_page_table_start;
+    rtt_bi_dram_start[0] = 0x80100000;
+    rtt_bi_dram_size[0]  = 0x10000000;
+    enable_caches();
 
     rt_hw_interrupt_init();
     enable_neon_fpu();

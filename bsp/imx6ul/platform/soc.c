@@ -783,7 +783,6 @@ void set_wdog_reset(struct wdog_regs *wdog)
 }
 
 #ifdef CONFIG_LDO_BYPASS_CHECK
-DECLARE_GLOBAL_DATA_PTR;
 static int ldo_bypass;
 
 int check_ldo_bypass(void)

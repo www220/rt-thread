@@ -27,6 +27,7 @@
 #include <asm/imx-common/regs-apbh.h>
 
 static struct mxs_dma_chan mxs_dma_channels[MXS_MAX_DMA_CHANNELS];
+static inline void mxs_dma_flush_desc(struct mxs_dma_desc *desc) {}
 
 /*
  * Test is the DMA channel is valid channel
@@ -85,21 +86,6 @@ static int mxs_dma_read_semaphore(int channel)
 
 	return tmp;
 }
-
-#ifndef	CONFIG_SYS_DCACHE_OFF
-void mxs_dma_flush_desc(struct mxs_dma_desc *desc)
-{
-	uint32_t addr;
-	uint32_t size;
-
-	addr = (uint32_t)desc;
-	size = roundup(sizeof(struct mxs_dma_desc), MXS_DMA_ALIGNMENT);
-
-	flush_dcache_range(addr, addr + size);
-}
-#else
-inline void mxs_dma_flush_desc(struct mxs_dma_desc *desc) {}
-#endif
 
 /*
  * Enable a DMA channel.

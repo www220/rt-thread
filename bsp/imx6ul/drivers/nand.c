@@ -119,26 +119,9 @@ static int m_plan_num = 0;
 /*
  * Cache management functions
  */
-#ifndef	CONFIG_SYS_DCACHE_OFF
-static void mxs_nand_flush_data_buf(uint32_t data_buf)
-{
-	flush_dcache_range(data_buf, data_buf+PAGE_SIZE);
-}
-
-static void mxs_nand_inval_data_buf(uint32_t data_buf)
-{
-	invalidate_dcache_range(data_buf, data_buf+PAGE_SIZE);
-}
-
-static void mxs_nand_flush_cmd_buf(uint32_t cmd_buf)
-{
-	flush_dcache_range(cmd_buf, cmd_buf+GPMI_NFC_COMMAND_BUFFER_SIZE);
-}
-#else
 static inline void mxs_nand_flush_data_buf(uint32_t data_buf) {}
 static inline void mxs_nand_inval_data_buf(uint32_t data_buf) {}
 static inline void mxs_nand_flush_cmd_buf(uint32_t cmd_buf) {}
-#endif
 
 /**
  * is_ready() - Returns the ready/busy status of the given chip.
