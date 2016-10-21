@@ -17,6 +17,7 @@
 
 #include <gic.h>
 #include <irq_numbers.h>
+#include <asm-generic/gpio.h>
 
 void s_init(void);
 int arch_cpu_init(void);
@@ -66,11 +67,22 @@ void rt_hw_usbh_init(void);
 #define EXTVAL
 #endif
 
+#define IMX_GPIO_NR(port, index)		((((port)-1)*32)+((index)&31))
+#define PIN_WDT		IMX_GPIO_NR(5,0)
+#define PIN_RUN		IMX_GPIO_NR(4,16)
+#define PIN_ERR		IMX_GPIO_NR(4,14)
+#define PIN_PZ1		IMX_GPIO_NR(5,8)
+#define PIN_PZ2		IMX_GPIO_NR(5,9)
+#define PIN_NET0	IMX_GPIO_NR(5,3)
+#define PIN_NET1	IMX_GPIO_NR(5,4)
+
 EXTVAL extern volatile int wtdog_count;
 EXTVAL extern volatile int sys_stauts;
 EXTVAL extern volatile int uptime_count;
-EXTVAL extern volatile int fs_system_init;
 EXTVAL extern unsigned char PZ[4];
+EXTVAL extern char RTT_USER[30];
+EXTVAL extern char RTT_PASS[30];
+
 void inittmppath(void);
 void cleartmppath(void);
 char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *file);

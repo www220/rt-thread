@@ -869,9 +869,12 @@ int enable_fec_anatop_clock(int fec_id, enum enet_freq freq)
 	if (0 == fec_id) {
 		reg &= ~BM_ANADIG_PLL_ENET_DIV_SELECT;
 		reg |= BF_ANADIG_PLL_ENET_DIV_SELECT(freq);
-	} else {
+	} if (1 == fec_id) {
 		reg &= ~BM_ANADIG_PLL_ENET2_DIV_SELECT;
 		reg |= BF_ANADIG_PLL_ENET2_DIV_SELECT(freq);
+	} else {
+		reg &= ~(BM_ANADIG_PLL_ENET_DIV_SELECT|BM_ANADIG_PLL_ENET2_DIV_SELECT);
+		reg |= BF_ANADIG_PLL_ENET_DIV_SELECT(freq)|BF_ANADIG_PLL_ENET2_DIV_SELECT(freq);
 	}
 
 	if ((reg & BM_ANADIG_PLL_ENET_POWERDOWN) ||
@@ -889,8 +892,10 @@ int enable_fec_anatop_clock(int fec_id, enum enet_freq freq)
 	/* Enable FEC clock */
 	if (0 == fec_id)
 		reg |= BM_ANADIG_PLL_ENET_ENABLE;
-	else
+	if (1 == fec_id)
 		reg |= BM_ANADIG_PLL_ENET2_ENABLE;
+	else
+		reg |= BM_ANADIG_PLL_ENET_ENABLE|BM_ANADIG_PLL_ENET2_ENABLE;
 	reg &= ~BM_ANADIG_PLL_ENET_BYPASS;
 #ifdef CONFIG_FEC_MXC_25M_REF_CLK
 	reg |= BM_ANADIG_PLL_ENET_REF_25M_ENABLE;

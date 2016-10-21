@@ -21,6 +21,8 @@
 #include <common.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
+#include <asm/arch/mx6-pins.h>
+#include <asm/imx-common/iomux-v3.h>
 
 #define CONFIG_WD_PERIOD 2000000
 void udelay(unsigned long usec)
@@ -74,11 +76,36 @@ u32 *rtt_tlb_table;
 u32 rtt_bi_dram_start[CONFIG_NR_DRAM_BANKS];
 u32 rtt_bi_dram_size[CONFIG_NR_DRAM_BANKS];
 
+static iomux_v3_cfg_t const iox_pads[] = {
+	MX6_PAD_NAND_CE1_B__GPIO4_IO14 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_NAND_DQS__GPIO4_IO16 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER0__GPIO5_IO00 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER1__GPIO5_IO01 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER2__GPIO5_IO02 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER3__GPIO5_IO03 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER4__GPIO5_IO04 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER5__GPIO5_IO05 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER6__GPIO5_IO06 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER7__GPIO5_IO07 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER8__GPIO5_IO08 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_SNVS_TAMPER9__GPIO5_IO09 | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
 /**
  * This function will initialize hardware board
  */
 void rt_hw_board_init(void)
 {
+    imx_iomux_v3_setup_multiple_pads(iox_pads, ARRAY_SIZE(iox_pads));
+    gpio_direction_output(PIN_WDT, 0);
+    gpio_direction_output(PIN_RUN, 0);
+    gpio_direction_output(PIN_ERR, 0);
+    gpio_direction_input(PIN_PZ1);
+    gpio_direction_input(PIN_PZ2);
+
+    PZ[0] = gpio_get_value(PIN_PZ1);
+    PZ[1] = gpio_get_value(PIN_PZ2);
+
     s_init();
     arch_cpu_init();
     timer_init();
@@ -97,6 +124,7 @@ void rt_hw_board_init(void)
     /* initialize uart */
     rt_hw_uart_init();
     rt_console_set_device(CONSOLE_DEVICE);
+    gpio_set_value(PIN_WDT, 1);
 
     /* initialize timer */
     rt_hw_timer_init();
@@ -105,6 +133,7 @@ void rt_hw_board_init(void)
     /* initialize gpmi */
     rt_hw_mtd_nand_init();
 #endif
+    gpio_set_value(PIN_WDT, 0);
 
 #ifdef RT_USING_SDIO
     /* initialize ssp */
@@ -115,6 +144,7 @@ void rt_hw_board_init(void)
     print_cpuinfo();
     rt_kprintf("MEM:   256 MiB\n");
     rt_kprintf("NAND:  256 MiB\n");
+    gpio_set_value(PIN_WDT, 1);
 }
 
 #ifdef RT_USING_FINSH

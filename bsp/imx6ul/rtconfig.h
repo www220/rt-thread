@@ -127,7 +127,7 @@
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
 //#define RT_USING_LWIP_HEAD
-//#define RT_USING_LWIP
+#define RT_USING_LWIP
 /* LwIP uses RT-Thread Memory Management */
 #define RT_LWIP_USING_RT_MEM
 /* Enable ICMP protocol*/
@@ -144,11 +144,9 @@
 #define LWIP_RAW 1
 #define MPPE_SUPPORT 1
 #define LWIP_TCP_KEEPALIVE 1
-#define SA_FAMILY_T_DEFINED 1
-#define LWIP_IPV6 1
 
 #define RT_LWIP_DHCP
-#define RT_LWIP_PPP
+//#define RT_LWIP_PPP
 #define RT_LWIP_PPPOS
 #define RT_LWIP_PPPOE
 #define PPPOL2TP_SUPPORT 1
@@ -159,13 +157,13 @@
 /* ip address of target*/
 #define RT_LWIP_IPADDR0	192
 #define RT_LWIP_IPADDR1	168
-#define RT_LWIP_IPADDR2	99
-#define RT_LWIP_IPADDR3	22
+#define RT_LWIP_IPADDR2	1
+#define RT_LWIP_IPADDR3	99
 
 /* gateway address of target*/
 #define RT_LWIP_GWADDR0	192
 #define RT_LWIP_GWADDR1	168
-#define RT_LWIP_GWADDR2	99
+#define RT_LWIP_GWADDR2	1
 #define RT_LWIP_GWADDR3	1
 
 /* mask address of target*/

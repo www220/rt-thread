@@ -34,7 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define LED_ERR_PORT		PIN_ERR
+#define LED_ERR_PORT	PIN_ERR
 #define LED_ERR_PIN		
 #define LED_RUN_PORT	PIN_RUN
 #define LED_RUN_PIN		
@@ -95,28 +95,25 @@ extern void finsh_system_init(void);
 extern void finsh_set_device(const char* device);
 #endif
 
-#ifdef FINSH_USING_MSH
-extern int cmd_sh(int argc, char** argv);
-extern int cmd_beep(int argc, char** argv);
-#endif
-
 volatile int wtdog_count = 0;
 volatile int sys_stauts = -1;
 volatile int uptime_count = 0;
-volatile int fs_system_init = 0;
 
-unsigned char NET_MAC[6] = {0};
+unsigned char NET_MAC[2][6] = {{0}};
 char NET_ADDR[3][30] = {{0}};
-int NET_DHCP = 0;
+char NET_ADDR2[3][30] = {{0}};
+int NET_DHCP[2] = {0};
 unsigned char PZ[4] = {0};
+char RTT_USER[30] = {"admin"};
+char RTT_PASS[30] = {"admin"};
 extern void cpu_usage_idle_hook(void);
 
 #ifdef _MSC_VER
 #define GPIO_ResetBits(x,y)
 #define GPIO_SetBits(x,y)
 #else
-#define GPIO_ResetBits(x,y)
-#define GPIO_SetBits(x,y)
+#define GPIO_ResetBits(x,y) gpio_set_value(x,0)
+#define GPIO_SetBits(x,y) gpio_set_value(x,1)
 #endif
 
 ALIGN(RT_ALIGN_SIZE)
@@ -249,10 +246,8 @@ static void rt_thread_entry_main(void* parameter)
         mkdir("/usr/bin", 666);
         mkdir("/usr/sbin", 666);
         mkdir("/usr/lib", 666);
-        fs_system_init = 1;
         rt_kprintf("File System initialized!\n");
     } else {
-        fs_system_init = 0;
         rt_kprintf("File System failed!\n");
         RT_ASSERT(0);
     }
@@ -305,12 +300,12 @@ static void rt_thread_entry_main(void* parameter)
             int netcfg[6];
             if (sscanf(buf,"%x-%x-%x-%x-%x-%x",&netcfg[0],&netcfg[1],&netcfg[2],&netcfg[3],&netcfg[4],&netcfg[5]) == 6) 
             {
-                NET_MAC[0] = netcfg[0];
-                NET_MAC[1] = netcfg[1];
-                NET_MAC[2] = netcfg[2];
-                NET_MAC[3] = netcfg[3];
-                NET_MAC[4] = netcfg[4];
-                NET_MAC[5] = netcfg[5];
+                NET_MAC[0][0] = netcfg[0];
+                NET_MAC[0][1] = netcfg[1];
+                NET_MAC[0][2] = netcfg[2];
+                NET_MAC[0][3] = netcfg[3];
+                NET_MAC[0][4] = netcfg[4];
+                NET_MAC[0][5] = netcfg[5];
             }
         }
         memset(buf, 0, sizeof(buf));
@@ -327,7 +322,15 @@ static void rt_thread_entry_main(void* parameter)
         memset(buf, 0, sizeof(buf));
         GetPrivateStringData("dhcp",buf,100,RTT_DEF_CONF);
         if (buf[0])
-            NET_DHCP = atol(buf);
+            NET_DHCP[0] = atol(buf);
+        memset(buf, 0, sizeof(buf));
+        GetPrivateStringData("user",buf,100,RTT_DEF_CONF);
+        if (buf[0])
+            rt_strncpy(RTT_USER,buf,30);
+        memset(buf, 0, sizeof(buf));
+        GetPrivateStringData("pass",buf,100,RTT_DEF_CONF);
+        if (buf[0])
+            rt_strncpy(RTT_PASS,buf,30);
     }
 
 #ifdef RT_USING_PROCESS

@@ -88,7 +88,6 @@
 #define OOB_SIZE        64
 #define PAGE_DATA_SIZE  2048
 #define PAGE_PER_BLOCK  64
-#define BLOCK_NUM       1024
 
 #define BLOCK_SIZE      (PAGE_SIZE * PAGE_PER_BLOCK)
 #define PAGE_SIZE       (PAGE_DATA_SIZE + OOB_SIZE)
