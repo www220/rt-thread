@@ -549,9 +549,6 @@ void enable_caches(void)
 	mmu_set_region_dcache_behaviour(ROMCP_ARB_BASE_ADDR,
 					ROMCP_ARB_END_ADDR,
 					option);
-	mmu_set_region_dcache_behaviour(IRAM_BASE_ADDR,
-					IRAM_SIZE,
-					option);
 }
 #endif
 
@@ -783,6 +780,7 @@ void set_wdog_reset(struct wdog_regs *wdog)
 }
 
 #ifdef CONFIG_LDO_BYPASS_CHECK
+DECLARE_GLOBAL_DATA_PTR;
 static int ldo_bypass;
 
 int check_ldo_bypass(void)

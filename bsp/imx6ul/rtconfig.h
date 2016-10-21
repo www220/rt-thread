@@ -75,7 +75,7 @@
 #define RT_USING_DEVICE_IPC
 #define RT_USING_SERIAL
 //#define RT_USING_SPI
-//#define RT_USING_RTC
+#define RT_USING_RTC
 //#define RT_MTD_NAND_DEBUG
 #define RT_USING_MTD_NAND
 //#define RT_MMCSD_DBG

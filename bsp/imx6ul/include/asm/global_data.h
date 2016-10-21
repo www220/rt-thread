@@ -86,4 +86,7 @@ static inline gd_t *get_gd(void)
 #endif
 #endif
 
+/* build in rtthread */
+#undef DECLARE_GLOBAL_DATA_PTR
+
 #endif /* __ASM_GBL_DATA_H */

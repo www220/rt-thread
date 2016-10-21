@@ -64,8 +64,8 @@ void rt_hw_timer_init(void)
 }
 
 /* None-cached RAM DMA */
-unsigned char * dma_align_mem = (unsigned char *)0x900000;
-unsigned char * dma_align_max = (unsigned char *)HEAP_END;
+unsigned char * dma_align_mem = (unsigned char *)0x00900000;
+unsigned char * dma_align_max = (unsigned char *)0x80000000;
 
 /* tlb base mem */
 extern char __l1_page_table_start;
@@ -85,6 +85,7 @@ void rt_hw_board_init(void)
     board_postclk_init();
 
     rtt_tlb_table = (u32 *)&__l1_page_table_start;
+    rt_memset(rtt_tlb_table, 0, 4*4096);
     rtt_bi_dram_start[0] = 0x80100000;
     rtt_bi_dram_size[0]  = 0x10000000;
     enable_caches();

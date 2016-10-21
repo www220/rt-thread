@@ -1140,8 +1140,8 @@ void rt_hw_mtd_nand_init(void)
     _nanddrv_file_device[0].oob_free = GPMI_NFC_METADATA_SIZE;
     _nanddrv_file_device[0].page_size = PAGE_DATA_SIZE;
     _nanddrv_file_device[0].pages_per_block = PAGE_PER_BLOCK;
-    _nanddrv_file_device[0].block_start = 160;
-    _nanddrv_file_device[0].block_end = BLOCK_NUM / 2 + 160;
+    _nanddrv_file_device[0].block_start = 32;
+    _nanddrv_file_device[0].block_end = _nanddrv_file_device[0].block_start + 512;
     _nanddrv_file_device[0].block_total = _nanddrv_file_device[0].block_end - _nanddrv_file_device[0].block_start;
     _nanddrv_file_device[0].ops = &_ops;
 
@@ -1151,7 +1151,7 @@ void rt_hw_mtd_nand_init(void)
     _nanddrv_file_device[1].page_size = PAGE_DATA_SIZE;
     _nanddrv_file_device[1].pages_per_block = PAGE_PER_BLOCK;
     _nanddrv_file_device[1].block_start = _nanddrv_file_device[0].block_end;
-    _nanddrv_file_device[1].block_end = BLOCK_NUM / 2 + 240;
+    _nanddrv_file_device[1].block_end = _nanddrv_file_device[1].block_start + 80;
     _nanddrv_file_device[1].block_total = _nanddrv_file_device[1].block_end - _nanddrv_file_device[1].block_start;
     _nanddrv_file_device[1].ops = &_ops;
 
@@ -1230,7 +1230,7 @@ void nand_init(void)
     }
     else if (id[0] == 0x01 && id[1] == 0xda)
     {
-        rt_kprintf("Spansion NAND 256Mib\n");
+        rt_kprintf("SPSN NAND 256Mib\n");
         m_plan_num = 2;
     }
     else

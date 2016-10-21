@@ -43,6 +43,10 @@ void set_section_dcache(int section, enum dcache_option option)
 
 	value = (section << MMU_SECTION_SHIFT) | (3 << 10);
 	value |= option;
+#ifdef MMDC0_ARB_BASE_ADDR
+	if (section >= (MMDC0_ARB_BASE_ADDR >> MMU_SECTION_SHIFT))
+		value |= (1 << 12);
+#endif
 	page_table[section] = value;
 }
 
@@ -71,8 +75,8 @@ __weak void dram_bank_mmu_setup(int bank)
 	int	i;
 
 	debug("%s: bank: %d\n", __func__, bank);
-	for (i = rtt_bi_dram_start[bank] >> 20;
-	     i < (rtt_bi_dram_start[bank] >> 20) + (rtt_bi_dram_size[bank] >> 20);
+	for (i = rtt_bi_dram_start[bank] >> MMU_SECTION_SHIFT;
+	     i < (rtt_bi_dram_start[bank] >> MMU_SECTION_SHIFT) + (rtt_bi_dram_size[bank] >> MMU_SECTION_SHIFT);
 	     i++) {
 #if defined(CONFIG_SYS_ARM_CACHE_WRITETHROUGH)
 		set_section_dcache(i, DCACHE_WRITETHROUGH);
