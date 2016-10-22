@@ -96,7 +96,10 @@ typedef struct cpm_buf_desc {
 #define BD_ENET_TX_STATS	((ushort)0x03ff)	/* All status bits */
 
 #define PKTBUFSRX	4
-#define PKTSIZE		1518
+#define LAST_PKTBUFSRX		(PKTBUFSRX - 1)
+#define TX_BUF_CNT	2
+#define PKTSIZE				1518
+#define PKT_MAXBLR_SIZE		1536
 
 /*********************************************************************
 * Fast Ethernet Controller (FEC)
@@ -184,6 +187,8 @@ typedef struct fec {
 /* Bit definitions and macros for FEC_ECR */
 #define FEC_ECR_ETHER_EN		(0x00000002)
 #define FEC_ECR_RESET			(0x00000001)
+#define FEC_ECR_DBSWAP			(0x00000100)
+#define FEC_ECR_SPEED			(0x00000020)
 
 /* Bit definitions and macros for FEC_MMFR */
 #define FEC_MMFR_DATA(x)		(((x)&0xFFFF))
@@ -245,6 +250,7 @@ typedef struct fec {
 #define FEC_TFWR_X_WMRK_64		(0x01)
 #define FEC_TFWR_X_WMRK_128		(0x02)
 #define FEC_TFWR_X_WMRK_192		(0x03)
+#define FEC_TFWR_X_WMRK_STRFWD	(0x0100)
 
 /* Bit definitions and macros for FEC_FRBR */
 #define FEC_FRBR_R_BOUND(x)		(((x)&0xFF)<<2)
@@ -260,11 +266,5 @@ typedef struct fec {
 
 /* Bit definitions and macros for FEC_EMRBR */
 #define FEC_EMRBR_R_BUF_SIZE(x)		(((x)&0x7F)<<4)
-
-#define	FEC_RESET_DELAY			100
-#define FEC_RX_TOUT			100
-
-#define FEC_MAX_TIMEOUT			50000
-#define FEC_TIMEOUT_TICKET		2
 
 #endif				/* fec_h */

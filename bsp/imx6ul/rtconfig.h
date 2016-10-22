@@ -126,7 +126,7 @@
 #define DFS_FD_MAX					64
 
 /* SECTION: lwip, a lighwight TCP/IP protocol stack */
-//#define RT_USING_LWIP_HEAD
+#define RT_USING_LWIP_HEAD
 #define RT_USING_LWIP
 /* LwIP uses RT-Thread Memory Management */
 #define RT_LWIP_USING_RT_MEM
@@ -138,6 +138,7 @@
 #define RT_LWIP_TCP
 /* Enable DNS */
 #define RT_LWIP_DNS
+#define DNS_SERVER_ADDRESS(ipaddr) (ip4_addr_set_u32(ipaddr, ipaddr_addr("114.114.114.114")))
 
 #define MEMP_NUM_NETCONN 64
 #define SO_REUSE 1

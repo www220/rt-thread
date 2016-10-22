@@ -40,6 +40,12 @@
 #define STM32_ETH_PRINTF(...)
 #endif
 
+#if defined(ETH_RX_DUMP) || defined(ETH_TX_DUMP)
+#define STM32_DUMP_PRINTF          rt_kprintf
+#else
+#define STM32_DUMP_PRINTF(...)
+#endif
+
 struct fec_info_s fec_info[] = {
 	{
 	 0,			/* index */
@@ -80,6 +86,7 @@ struct rt_stm32_eth
 	char *irqname;
 	int irq;
 	char phy_addr;
+	volatile int init;
 };
 
 static struct rt_stm32_eth stm32_eth_device[2] = {
@@ -98,12 +105,6 @@ static struct rt_stm32_eth stm32_eth_device[2] = {
 };
 
 /* Ethernet Transmit and Receive Buffers */
-#define DBUF_LENGTH		1520
-#define TX_BUF_CNT		2
-#define PKT_MAXBUF_SIZE		1518
-#define PKT_MINBUF_SIZE		64
-#define PKT_MAXBLR_SIZE		1520
-#define LAST_PKTBUFSRX		(PKTBUFSRX - 1)
 #define BD_ENET_RX_W_E		(BD_ENET_RX_WRAP | BD_ENET_RX_EMPTY)
 #define BD_ENET_TX_RDY_LST	(BD_ENET_TX_READY | BD_ENET_TX_LAST)
 
@@ -133,7 +134,10 @@ static struct rt_stm32_eth stm32_eth_device[2] = {
 			FEC_MII_PA(pa) | FEC_MII_RA(ra) | FEC_MII_SET_DATA(v))
 
 #define FEC_MII_TIMEOUT		5000
-#define FEC_MII_TICK        1
+#define FEC_MII_TICK		1
+#define	FEC_RESET_DELAY		1000
+#define FEC_MAX_TIMEOUT		10000
+#define FEC_MAX_TICKET		1
 
 static inline int __fec_mii_read(volatile fec_t *fecp, unsigned char addr,
 				 unsigned char reg, unsigned short *value)
@@ -194,23 +198,12 @@ static void fec_reset(struct rt_stm32_eth *dev)
 	volatile fec_t *fecp = (fec_t *)(info->iobase);
 	int i;
 
-	fecp->ecr = FEC_ECR_RESET;
+	fecp->ecr |= FEC_ECR_RESET;
 	for (i = 0; (fecp->ecr & FEC_ECR_RESET) && (i < FEC_RESET_DELAY); ++i)
 		udelay(10);
 
 	if (i == FEC_RESET_DELAY)
 		rt_kprintf("PHY %02X FEC_ECR_RESET timeout\n", dev->phy_addr);
-}
-
-static void fec_get_mac_addr(unsigned char *mac)
-{
-	u32 val = 0x11223344;
-	mac[0] = 0x00;
-	mac[1] = 0x04;
-	mac[2] = (val >> 24) & 0xFF;
-	mac[3] = (val >> 16) & 0xFF;
-	mac[4] = (val >> 8) & 0xFF;
-	mac[5] = (val >> 0) & 0xFF;
 }
 
 /* initialize the interface */
@@ -223,29 +216,31 @@ static rt_err_t rt_stm32_eth_init(rt_device_t dev)
 	u8 *ea = NULL;
 
 	fec_reset(stm32_eth);
-    
-    mxc_fec_mii_init(fecp);
-	fecp->rcr = FEC_RCR_MAX_FL(PKT_MAXBUF_SIZE) | FEC_RCR_RMII_MODE;
-	fecp->tcr = FEC_TCR_FDEN;
 
-	/* We use strictly polling mode only */
-	fecp->eimr = 0x00000000;
-
+	/* We use interrupt mode only */
+	fecp->eimr = FEC_EIR_RXF|FEC_EIR_EBERR;
 	/* Clear any pending interrupt */
 	fecp->eir = 0xffffffff;
+
+	fecp->rcr = FEC_RCR_MAX_FL(PKTSIZE) | FEC_RCR_RMII_MODE | FEC_RCR_MII_MODE | FEC_RCR_FCE;
+	fecp->tcr = FEC_TCR_FDEN;
+	mxc_fec_mii_init(fecp);
+	stm32_eth->init = 1;
+
+	fecp->opd = 0x00010020;
+	fecp->tfwr = FEC_TFWR_X_WMRK_128;
+
+	/* Clear unicast address hash table */
+	fecp->iaur = 0;
+	fecp->ialr = 0;
+	/* Clear multicast address hash table */
+	fecp->gaur = 0;
+	fecp->galr = 0;
 
 	/* Set station address   */
 	ea = stm32_eth->dev_addr;
 	fecp->palr = (ea[0] << 24) | (ea[1] << 16) | (ea[2] << 8) | (ea[3]);
 	fecp->paur = (ea[4] << 24) | (ea[5] << 16);
-
-	/* Clear unicast address hash table */
-	fecp->iaur = 0;
-	fecp->ialr = 0;
-
-	/* Clear multicast address hash table */
-	fecp->gaur = 0;
-	fecp->galr = 0;
 
 	/* Set maximum receive buffer size. */
 	fecp->emrbr = PKT_MAXBLR_SIZE;
@@ -274,7 +269,7 @@ static rt_err_t rt_stm32_eth_init(rt_device_t dev)
 	 *    Last, Tx CRC
 	 */
 	for (i = 0; i < TX_BUF_CNT; i++) {
-		info->txbd[i].cbd_sc = BD_ENET_TX_LAST | BD_ENET_TX_TC;
+		info->txbd[i].cbd_sc = 0;
 		info->txbd[i].cbd_datlen = 0;	/* Reset */
 		info->txbd[i].cbd_bufaddr = (uint)&info->txbuf[0];
 	}
@@ -284,12 +279,23 @@ static rt_err_t rt_stm32_eth_init(rt_device_t dev)
 	fecp->erdsr = (uint)(&info->rxbd[0]);
 	fecp->etdsr = (uint)(&info->txbd[0]);
 
+#ifdef FEC_QUIRK_ENET_MAC
+	fecp->ecr |= FEC_ECR_DBSWAP;
+	fecp->tfwr |= FEC_TFWR_X_WMRK_STRFWD;
+#endif
+
 	/* Now enable the transmit and receive processing */
 	fecp->ecr |= FEC_ECR_ETHER_EN;
 
+#ifdef FEC_QUIRK_ENET_MAC
+	fecp->ecr &= ~FEC_ECR_SPEED;
+	fecp->rcr &= ~FEC_RCR_RMII_10T;
+#endif
+
 	/* And last, try to fill Rx Buffer Descriptors */
-	fecp->rdar = 0x01000000;	/* Descriptor polling active    */
-    return RT_EOK;
+	fecp->rdar = FEC_RDAR_R_DES_ACTIVE;	/* Descriptor polling active    */
+	udelay(100000);
+	return RT_EOK;
 }
 
 static rt_err_t rt_stm32_eth_open(rt_device_t dev, rt_uint16_t oflag)
@@ -355,22 +361,22 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
         rt_uint32_t i;
         rt_uint8_t *ptr = (rt_uint8_t*)(info->txbd[info->txIdx].cbd_bufaddr);
 
-        STM32_ETH_PRINTF("tx_dump, len:%d\r\n", p->tot_len);
+        STM32_DUMP_PRINTF("tx_dump, len:%d\r\n", p->tot_len);
         for(i=0; i<p->tot_len; i++)
         {
-            STM32_ETH_PRINTF("%02x ",*ptr);
+            STM32_DUMP_PRINTF("%02x ",*ptr);
             ptr++;
 
             if(((i+1)%8) == 0)
             {
-                STM32_ETH_PRINTF("  ");
+                STM32_DUMP_PRINTF("  ");
             }
             if(((i+1)%16) == 0)
             {
-                STM32_ETH_PRINTF("\r\n");
+                STM32_DUMP_PRINTF("\r\n");
             }
         }
-        STM32_ETH_PRINTF("\r\ndump done!\r\n");
+        STM32_DUMP_PRINTF("\r\ndump done!\r\n");
     }
 #endif
 	info->txbd[info->txIdx].cbd_datlen = offset;
@@ -379,17 +385,12 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 	    BD_ENET_TX_TC | BD_ENET_TX_RDY_LST;
 
 	/* Activate transmit Buffer Descriptor polling */
-	fecp->tdar = 0x01000000;	/* Descriptor polling active    */
-
-	/* FEC fix for MCF5275, FEC unable to initial transmit data packet.
-	 * A nop will ensure the descriptor polling active completed.
-	 */
-	__asm__("nop");
+	fecp->tdar = FEC_TDAR_X_DES_ACTIVE;	/* Descriptor polling active    */
 
 	j = 0;
 	while ((info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY) &&
 	       (j < FEC_MAX_TIMEOUT)) {
-		udelay(FEC_TIMEOUT_TICKET);
+		udelay(FEC_MAX_TICKET);
 		j++;
 	}
 	if (j >= FEC_MAX_TIMEOUT)
@@ -398,7 +399,7 @@ rt_err_t rt_stm32_eth_tx( rt_device_t dev, struct pbuf* p)
 	rc = (info->txbd[info->txIdx].cbd_sc & BD_ENET_TX_READY);
 	info->txIdx = (info->txIdx + 1) % TX_BUF_CNT;
 
-	return (rc & BD_ENET_TX_READY) ? RT_EOK : -RT_ERROR;
+	return ((rc & BD_ENET_TX_READY)==0) ? RT_EOK : -RT_ERROR;
 }
 
 /* reception packet. */
@@ -443,22 +444,22 @@ struct pbuf *rt_stm32_eth_rx(rt_device_t dev)
             rt_uint32_t i;
             rt_uint8_t *ptr = (rt_uint8_t*)(info->rxbd[info->rxIdx].cbd_bufaddr);
 
-            STM32_ETH_PRINTF("rx_dump, len:%d\r\n", p->tot_len);
+            STM32_DUMP_PRINTF("rx_dump, len:%d\r\n", p->tot_len);
             for(i=0; i<p->tot_len; i++)
             {
-                STM32_ETH_PRINTF("%02x ", *ptr);
+                STM32_DUMP_PRINTF("%02x ", *ptr);
                 ptr++;
 
                 if(((i+1)%8) == 0)
                 {
-                    STM32_ETH_PRINTF("  ");
+                    STM32_DUMP_PRINTF("  ");
                 }
                 if(((i+1)%16) == 0)
                 {
-                    STM32_ETH_PRINTF("\r\n");
+                    STM32_DUMP_PRINTF("\r\n");
                 }
             }
-            STM32_ETH_PRINTF("\r\ndump done!\r\n");
+            STM32_DUMP_PRINTF("\r\ndump done!\r\n");
         }
 #endif
 	} while (0);
@@ -475,7 +476,7 @@ struct pbuf *rt_stm32_eth_rx(rt_device_t dev)
 	}
 
     /* Try to fill Buffer Descriptors */
-	fecp->rdar = 0x01000000; /* Descriptor polling active    */
+	fecp->rdar = FEC_RDAR_R_DES_ACTIVE; /* Descriptor polling active    */
         
 	return p;
 }
@@ -548,22 +549,34 @@ uint16_t ETH_ReadPHYRegister(u32 iobase, uint8_t PHYAddress, uint8_t PHYReg)
 #define PHY_DUPLEX_MASK     (1<<2)
 static void phy_monitor_thread_entry(void *parameter)
 {
+    struct rt_stm32_eth * stm32_eth = (struct rt_stm32_eth *)parameter;
+    struct fec_info_s *info = stm32_eth->priv;
+    uint32_t mem_addr = info->iobase;
+
     uint8_t phy_speed[2] = {0};
     uint8_t phy_speed_new[2] = {0};
     int i = 0,reset_count[2] = {0};
-    uint32_t mem_addr = (uint32_t)parameter;
-
-    /* RESET PHY */
-    STM32_LINK_PRINTF("reset PHY address:%02X\r\n", 0x01);
-    ETH_WritePHYRegister(mem_addr, 0x01, PHY_BCR, PHY_Reset);
-    STM32_LINK_PRINTF("reset PHY address:%02X\r\n", 0x05);
-    ETH_WritePHYRegister(mem_addr, 0x05, PHY_BCR, PHY_Reset);
-    rt_thread_delay(RT_TICK_PER_SECOND * 2);
-    ETH_WritePHYRegister(mem_addr, 0x01, PHY_BCR, PHY_AutoNegotiation);
-    ETH_WritePHYRegister(mem_addr, 0x05, PHY_BCR, PHY_AutoNegotiation);
 
     while (1)
     {
+        if (stm32_eth->init == 0)
+        {
+            rt_thread_delay(RT_TICK_PER_SECOND/2);
+            continue;
+        }
+        else if (stm32_eth->init == 1)
+        {
+            /* RESET PHY */
+            STM32_LINK_PRINTF("reset PHY address:%02X\r\n", 0x01);
+            ETH_WritePHYRegister(mem_addr, 0x01, PHY_BCR, PHY_Reset);
+            STM32_LINK_PRINTF("reset PHY address:%02X\r\n", 0x05);
+            ETH_WritePHYRegister(mem_addr, 0x05, PHY_BCR, PHY_Reset);
+            rt_thread_delay(RT_TICK_PER_SECOND);
+            ETH_WritePHYRegister(mem_addr, 0x01, PHY_BCR, PHY_AutoNegotiation);
+            ETH_WritePHYRegister(mem_addr, 0x05, PHY_BCR, PHY_AutoNegotiation);
+            stm32_eth->init = 2;
+            continue;
+        }
         uint8_t phy_addr = stm32_eth_device[i].phy_addr;
         uint16_t status  = ETH_ReadPHYRegister(mem_addr, phy_addr, PHY_BSR);
         STM32_ETH_PRINTF("PHY %02X DP83848 status:0x%04X\r\n", phy_addr, status);
@@ -626,7 +639,7 @@ static void phy_monitor_thread_entry(void *parameter)
 
                 /* send link up. */
                 eth_device_linkchange(&stm32_eth_device[i].parent, RT_TRUE);
-           } /* link up. */
+            } /* link up. */
             else
             {
                 STM32_LINK_PRINTF("PHY %02X link down\r\n", phy_addr);
@@ -689,7 +702,26 @@ static iomux_v3_cfg_t const fec2_pads[] = {
 
 void rt_hw_enetmac_handler(int vector, void *param)
 {
+    struct rt_stm32_eth * stm32_eth = (struct rt_stm32_eth *)param;
+	struct fec_info_s *info = stm32_eth->priv;
+	volatile fec_t *fecp = (fec_t *) (info->iobase);
 
+    rt_uint32_t ievent = fecp->eir;
+    STM32_ETH_PRINTF("ETH_ITR %x\r\n",ievent);
+
+    if (ievent & FEC_EIR_EBERR)
+    {
+        /* bus dma err stoped */
+        stm32_eth->init = 0;
+        rt_stm32_eth_init(&stm32_eth->parent.parent);
+    }
+    else if (ievent & FEC_EIR_RXF)
+    {
+        /* a frame has been received */
+        eth_device_ready(&stm32_eth->parent);
+    }
+
+    fecp->eir = FEC_EIR_RXF|FEC_EIR_EBERR;
 }
 
 void rt_hw_eth_init(void)
@@ -722,18 +754,15 @@ void rt_hw_eth_init(void)
     for (i=0; i<2; i++) {
     fec_info[i].rxbd = (cbd_t *)rt_memalign(ARCH_DMA_MINALIGN, (PKTBUFSRX * sizeof(cbd_t)));
     fec_info[i].txbd = (cbd_t *)rt_memalign(ARCH_DMA_MINALIGN, (TX_BUF_CNT * sizeof(cbd_t)));
-    fec_info[i].txbuf = (char *)rt_memalign(ARCH_DMA_MINALIGN, DBUF_LENGTH);
+    fec_info[i].txbuf = (char *)rt_memalign(ARCH_DMA_MINALIGN, PKT_MAXBLR_SIZE);
     for (j = 0; j < PKTBUFSRX; ++j) {
-        fec_info[i].rxbuf[j] = (char *)rt_memalign(ARCH_DMA_MINALIGN, PKTSIZE);
+        fec_info[i].rxbuf[j] = (char *)rt_memalign(ARCH_DMA_MINALIGN, PKT_MAXBLR_SIZE);
     }
 
     stm32_eth_device[i].priv = &fec_info[i];
     stm32_eth_device[i].ETH_Speed = ETH_Speed_100M;
     stm32_eth_device[i].ETH_Mode  = ETH_Mode_FullDuplex;
 
-    /* generate MAC addr from 96bit unique ID (only for test). */
-    fec_get_mac_addr(stm32_eth_device[i].dev_addr);
-    stm32_eth_device[i].dev_addr[1] = i;
 	/* load or save net mac addr */
 	if (NET_MAC[i][0] == 0 && NET_MAC[i][1] == 0 && NET_MAC[i][2] == 0)
 	{
@@ -772,12 +801,12 @@ void rt_hw_eth_init(void)
     eth_device_init_with_flag(&stm32_eth_device[i].parent, stm32_eth_device[i].devname, flags);
 
     /* start phy monitor */
-    if (i==0)
+    if (i==1)
     {
         rt_thread_t tid;
         tid = rt_thread_create("phy",
                                phy_monitor_thread_entry,
-                               (void *)ENET2_BASE_ADDR,
+                               &stm32_eth_device[i],
                                512,
                                RT_THREAD_PRIORITY_MAX - 4,
                                20);

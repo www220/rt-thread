@@ -321,7 +321,7 @@ int cmd_dns(int argc, char **argv)
     if (argc == 1)
     {
         int index;
-        struct ip_addr ip_addr;
+        ip_addr_t ip_addr;
         for(index=0; index<DNS_MAX_SERVERS; index++)
         {
             ip_addr = dns_getserver(index);

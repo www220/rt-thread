@@ -99,10 +99,11 @@ volatile int wtdog_count = 0;
 volatile int sys_stauts = -1;
 volatile int uptime_count = 0;
 
-unsigned char NET_MAC[2][6] = {{0}};
-char NET_ADDR[3][30] = {{0}};
-char NET_ADDR2[3][30] = {{0}};
-int NET_DHCP[2] = {0};
+unsigned char NET_MAC[2][6] = {{0x00,0x01,0x02,0x03,0x04,0x05},
+		{0x00,0x02,0x04,0x03,0x04,0x05}};
+char NET_ADDR[2][3][30] = {{{"192.168.1.99"},{"255.255.255.0"},{"192.168.1.1"}},
+		{{"192.168.2.99"},{"255.255.255.0"},{"192.168.2.1"}}};
+int NET_DHCP[2] = {0,0};
 unsigned char PZ[4] = {0};
 char RTT_USER[30] = {"admin"};
 char RTT_PASS[30] = {"admin"};
@@ -311,14 +312,14 @@ static void rt_thread_entry_main(void* parameter)
         memset(buf, 0, sizeof(buf));
         GetPrivateStringData("ip",buf,100,RTT_DEF_CONF);
         if (buf[0])
-            rt_strncpy(NET_ADDR[0],buf,30);
+            rt_strncpy(NET_ADDR[0][0],buf,30);
         memset(buf, 0, sizeof(buf));
         GetPrivateStringData("mask",buf,100,RTT_DEF_CONF);
         if (buf[0])
-            rt_strncpy(NET_ADDR[1],buf,30);
+            rt_strncpy(NET_ADDR[0][1],buf,30);
         GetPrivateStringData("gw",buf,100,RTT_DEF_CONF);
         if (buf[0])
-            rt_strncpy(NET_ADDR[2],buf,30);
+            rt_strncpy(NET_ADDR[0][2],buf,30);
         memset(buf, 0, sizeof(buf));
         GetPrivateStringData("dhcp",buf,100,RTT_DEF_CONF);
         if (buf[0])

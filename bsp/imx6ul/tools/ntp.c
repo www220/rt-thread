@@ -184,8 +184,184 @@ int cmd_ntp(int argc, char *argv[])
     return 1;
 }
 
+
+#define HTTP_PORT (80)
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+// Convert month to the month number. Return -1 on error, or month number
+static int get_month_index(const char *s) {
+  static const char *month_names[] = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  };
+  int i;
+
+  for (i = 0; i < (int) ARRAY_SIZE(month_names); i++)
+    if (!strcmp(s, month_names[i]))
+      return i;
+
+  return -1;
+}
+// Parse UTC date-time string, and return the corresponding time_t value.
+static time_t parse_date_string(const char *datetime) {
+  char month_str[32];
+  int second, minute, hour, day, month, year;
+  time_t result = (time_t) 0;
+
+  if (((sscanf(datetime, "%d/%3s/%d %d:%d:%d",
+               &day, month_str, &year, &hour, &minute, &second) == 6) ||
+       (sscanf(datetime, "%d %3s %d %d:%d:%d",
+               &day, month_str, &year, &hour, &minute, &second) == 6) ||
+       (sscanf(datetime, "%*3s, %d %3s %d %d:%d:%d",
+               &day, month_str, &year, &hour, &minute, &second) == 6) ||
+       (sscanf(datetime, "%d-%3s-%d %d:%d:%d",
+               &day, month_str, &year, &hour, &minute, &second) == 6)) &&
+      year > 1970 &&
+      (month = get_month_index(month_str)) != -1) {
+    struct tm time_temp;
+    time_temp.tm_year = year - 1900;
+    time_temp.tm_mon = month;
+    time_temp.tm_mday = day;
+    time_temp.tm_hour = hour;
+    time_temp.tm_min = minute;
+    time_temp.tm_sec = second;
+    //强制+8 CST时区
+    result = mktime(&time_temp) + 28800;
+  }
+
+  return result;
+}
+
+static int send_packet_tcp(int sock, char *srv)
+{
+    int len = 0, alllen = 0;
+    char *find = NULL,*datetime = NULL;
+    static char sendbuf[4096];
+    struct timeval timeout = {5,0};
+    struct timeval tv_set;
+    time_t now;
+
+    sprintf(sendbuf,"GET / HTTP/1.1\r\n"
+                    "Host: %s\r\n"
+                    "Accept: */*\r\n"
+                    "Connection: close\r\n\r\n",
+                    srv);
+    len = send(sock,sendbuf,strlen(sendbuf),0);
+    if (len != strlen(sendbuf))
+    {
+        printf("connect\n");
+        return -1;
+    }
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    len = recv(sock,sendbuf,sizeof(sendbuf)-1,0);
+    if (len <= 0)
+    {
+        printf("recv\n");
+        return -1;
+    }
+    alllen = len;
+    sendbuf[alllen] = 0;
+    find = strstr(sendbuf,"\r\n\r\n");
+    if (find == NULL)
+    {
+        len = recv(sock,sendbuf+alllen,sizeof(sendbuf)-alllen-1,0);
+        if (len > 0)
+            alllen += len;
+        sendbuf[alllen] = 0;
+        find = strstr(sendbuf,"\r\n\r\n");
+        if (find == NULL)
+        {
+            printf("recv\n");
+            return -1;
+        }
+    }
+    *find = '\0';
+    datetime = strstr(sendbuf,"Date: ");
+    if (datetime == NULL)
+    {
+        printf("parse\n");
+        return -1;
+    }
+    datetime += 6;
+    find = strstr(datetime,"\r\n");
+    if (find == NULL)
+    {
+        printf("parse\n");
+        return -1;
+    }
+    *find = '\0';
+    now = parse_date_string(datetime);
+    if (now <= 0)
+    {
+        printf("parse\n");
+        return -1;
+    }
+    tv_set.tv_sec  = now;
+    tv_set.tv_usec = 0;
+    if (settimeofday(&tv_set, NULL) < 0)
+    {
+        printf("settimeofday\n");
+        return -1;
+    }
+    return 0;
+}
+
+int ntphttp(int argc, char *argv[])
+{
+    int usd;
+    struct sockaddr_in sa;
+    struct hostent *he;
+    int i;
+    char *srv;
+    char buf[256];
+
+    if (argc <= 1) {
+        printf("Usage: %s <server> [server [...]]\n", argv[0]);
+        return 1;
+    }
+
+    for (i = 1; i < argc; ++i) {
+        // ntphttp.c passes servers as one block of string, so we need to break it down
+        strcpy(buf, argv[i]);
+        srv = strtok(buf, " ");
+        while (srv) {
+            if ((usd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+                printf("socket error\n");
+                return 1;
+            }
+            if ((he = gethostbyname(srv)) != NULL) {
+                memset(&sa, 0, sizeof(sa));
+                memcpy(&sa.sin_addr, he->h_addr_list[0], sizeof(sa.sin_addr));
+                sa.sin_port = htons(HTTP_PORT);
+                sa.sin_family = AF_INET;
+
+                printf("trying %s [%s]\n", argv[i], inet_ntoa(sa.sin_addr));
+                if (connect(usd, (struct sockaddr*)&sa, sizeof(sa)) != -1) {
+                    if (send_packet_tcp(usd,srv) == 0) {
+                        time_t now;
+                        closesocket(usd);
+                        now = time(NULL);
+                        printf("time updated %s",ctime(&now));
+                        return 0;
+                    }
+                }
+                else {
+                    printf("connect\n");
+                }
+            }
+            else {
+                printf("gethostbyname\n");
+            }
+            closesocket(usd);
+            srv = strtok(NULL, " ");
+        }
+    }
+    return 1;
+}
+
 #if defined(FINSH_USING_MSH)
 #include <finsh.h>
 
 FINSH_FUNCTION_EXPORT_ALIAS(cmd_ntp, __cmd_ntp, SetLocalTime From NTP.)
+FINSH_FUNCTION_EXPORT_ALIAS(ntphttp, __cmd_ntphttp, SetLocalTime From HTTP.)
 #endif
