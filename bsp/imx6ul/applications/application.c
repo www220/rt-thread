@@ -57,6 +57,7 @@ extern void dfs_yaffs_init(void);
 #endif
 #ifdef RT_USING_DFS_ROMFS
 #include <dfs_romfs.h>
+extern const struct romfs_dirent mntfs_root;
 #endif
 #ifdef RT_USING_SDIO
 extern void tf_init(void);
@@ -237,7 +238,6 @@ static void rt_thread_entry_main(void* parameter)
         mkdir("/rom", 666);
         mkdir("/dev", 666);
         mkdir("/mnt", 666);
-        mkdir("/mnt/mmc", 666);
 
         mkdir("/root", 666);
         mkdir("/bin", 666);
@@ -261,6 +261,8 @@ static void rt_thread_entry_main(void* parameter)
 #endif
 
 #ifdef RT_USING_DFS_ROMFS
+    dfs_mount(RT_NULL, "/mnt", "rom", 0, &mntfs_root);
+    rt_kprintf("Mount /mnt ok!\n");
     dfs_mount(RT_NULL, "/boot", "rom", 0, &romfs_root);
     rt_kprintf("Mount /boot ok!\n");
 #endif

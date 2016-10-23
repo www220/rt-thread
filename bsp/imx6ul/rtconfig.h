@@ -79,9 +79,11 @@
 //#define RT_MTD_NAND_DEBUG
 #define RT_USING_MTD_NAND
 //#define RT_MMCSD_DBG
-//#define RT_USING_SDIO
+#define RT_USING_SDIO
 #define RT_MMCSD_STACK_SIZE 4096
 //#define RT_USING_USB_HOSTU
+//#define RT_USING_I2C
+//#define RT_USING_I2C_BITOPS
 
 /* SECTION: Console options */
 #define RT_USING_CONSOLE
@@ -105,7 +107,7 @@
 #define DFS_USING_WORKDIR
 //#define DFS_USING_SELECT
 
-//#define RT_USING_DFS_ELMFAT
+#define RT_USING_DFS_ELMFAT
 #define RT_DFS_ELM_DRIVES			2
 #define RT_DFS_ELM_REENTRANT
 //#define RT_DFS_ELM_USE_ERASE

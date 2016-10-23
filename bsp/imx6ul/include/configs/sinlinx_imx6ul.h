@@ -64,6 +64,9 @@
 #define CONFIG_FEC_MXC
 #define CONFIG_MII
 
+#define CONFIG_FSL_ESDHC
+#define CONFIG_MMC
+
 /* MMC Configs */
 #ifdef CONFIG_FSL_USDHC
 #define CONFIG_FSL_ESDHC
