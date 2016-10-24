@@ -15,6 +15,7 @@
 #ifndef __BOARD_H__
 #define __BOARD_H__
 
+#include <rtthread.h>
 #include <gic.h>
 #include <irq_numbers.h>
 #include <asm-generic/gpio.h>
@@ -28,7 +29,7 @@ void enable_caches(void);
 void udelay(unsigned long usec);
 void mdelay(unsigned long msec);
 void __udelay(unsigned long usec);
-ulong get_timer_masked(void);
+ulong get_timer_masked_us(void);
 int print_cpuinfo(void);
 
 #define HEAP_BEGIN      0x80A00000
@@ -45,7 +46,6 @@ int print_cpuinfo(void);
 
 #define CONSOLE_DEVICE "uart1"
 #define FINSH_DEVICE_NAME "uart1"
-#define get_timer_usec() get_timer_masked()
 
 void rt_hw_board_init(void);
 void rt_hw_interrupt_init(void);
@@ -58,6 +58,9 @@ void rt_hw_ssp_init(void);
 void rt_hw_usbh_init(void);
 void rt_hw_i2c_init(void);
 
+rt_uint8_t i2c_reg_read(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg);
+void i2c_reg_write(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, rt_uint8_t val);
+
 #ifdef _MSC_VER
 #ifdef _DLL
 #define EXTVAL __declspec(dllimport)
@@ -69,13 +72,15 @@ void rt_hw_i2c_init(void);
 #endif
 
 #define IMX_GPIO_NR(port, index)		((((port)-1)*32)+((index)&31))
-#define PIN_WDT		IMX_GPIO_NR(5,0)
 #define PIN_RUN		IMX_GPIO_NR(4,16)
 #define PIN_ERR		IMX_GPIO_NR(4,14)
-#define PIN_PZ1		IMX_GPIO_NR(5,8)
-#define PIN_PZ2		IMX_GPIO_NR(5,9)
+#define PIN_WDT		IMX_GPIO_NR(5,0)
+#define PIN_PZ1		IMX_GPIO_NR(5,1)
 #define PIN_NET0	IMX_GPIO_NR(5,3)
 #define PIN_NET1	IMX_GPIO_NR(5,4)
+#define I2C_SDL		IMX_GPIO_NR(5,7)
+#define I2C_SDA		IMX_GPIO_NR(5,8)
+#define PIN_PZ2		IMX_GPIO_NR(5,9)
 
 EXTVAL extern volatile int wtdog_count;
 EXTVAL extern volatile int sys_stauts;

@@ -81,7 +81,7 @@ static inline u32 ssp_mmc_is_wp(struct mmc_mci *mmc)
 {
 	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
 
-	return (esdhc_read32(&regs->prsstat) & PRSSTAT_WPSPL) == 0;
+	return gpio_get_value(USDHC1_WP_GPIO) != 0;
 }
 
 static int ssp_mmc_is_cd(struct mmc_mci *mmc)
@@ -89,7 +89,7 @@ static int ssp_mmc_is_cd(struct mmc_mci *mmc)
 	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
 	int timeout = 100;
 
-	while (!(esdhc_read32(&regs->prsstat) & PRSSTAT_CINS) && --timeout)
+	while (gpio_get_value(USDHC1_CD_GPIO) && --timeout)
 		udelay(100);
 
 	return timeout <= 0;
@@ -139,7 +139,7 @@ static void set_bit_clock(struct mmc_mci *mmc, u32 clock)
 
 static void set_bit_width(struct mmc_mci *mmc, u8 width)
 {
-	int bus_width = 0;
+	int bus_width = 1;
 	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
 
 	/* Set the bus width */
@@ -220,8 +220,8 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 				wml_value = WML_RD_WML_MAX_VAL;
 			esdhc_clrsetbits32(&regs->wml, WML_RD_WML_MASK, wml_value);
 			esdhc_write32(&regs->dsaddr, cmd->data->buf);
-			invalidate_dcache_range((ulong)cmd->data->buf,
-							   (ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize);
+			invalidate_dcache_range(RT_ALIGN_DOWN((ulong)cmd->data->buf,ARCH_DMA_MINALIGN),
+					RT_ALIGN((ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize,ARCH_DMA_MINALIGN));
 		} else {
 			if (wml_value > WML_WR_WML_MAX)
 				wml_value = WML_WR_WML_MAX_VAL;
@@ -231,8 +231,8 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 			}
 			esdhc_clrsetbits32(&regs->wml, WML_WR_WML_MASK, wml_value << 16);
 			esdhc_write32(&regs->dsaddr, cmd->data->buf);
-			flush_dcache_range((ulong)cmd->data->buf,
-							   (ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize);
+			flush_dcache_range(RT_ALIGN_DOWN((ulong)cmd->data->buf,ARCH_DMA_MINALIGN),
+					RT_ALIGN((ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize,ARCH_DMA_MINALIGN));
 		}
 		esdhc_write32(&regs->blkattr, cmd->data->blks << 16 | cmd->data->blksize);
 		/* Calculate the timeout period for data transactions */
@@ -357,8 +357,8 @@ static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd
 	} while ((irqstat & DATA_COMPLETE) != DATA_COMPLETE);
 
 	if (cmd->data->flags & DATA_DIR_READ) {
-		invalidate_dcache_range((ulong)cmd->data->buf,
-						   (ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize);
+		invalidate_dcache_range(RT_ALIGN_DOWN((ulong)cmd->data->buf,ARCH_DMA_MINALIGN),
+				RT_ALIGN((ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize,ARCH_DMA_MINALIGN));
 	}
 
 out:
@@ -414,7 +414,7 @@ static void esdhc_reset(volatile struct fsl_esdhc *regs)
 
 void rt_hw_ssp_init(void)
 {
-	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)USDHC2_BASE_ADDR;
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)USDHC1_BASE_ADDR;
     /* Set up SSP pins */
 	imx_iomux_v3_setup_multiple_pads(usdhc1_pads, ARRAY_SIZE(usdhc1_pads));
 
@@ -530,7 +530,7 @@ static const struct rt_mmcsd_host_ops ops = {
 };
 
 static struct mmc_mci mci = {
-	.iobase = USDHC2_BASE_ADDR,
+	.iobase = USDHC1_BASE_ADDR,
 };
 
 static void sd_monitor_thread_entry(void *parameter)
