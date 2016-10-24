@@ -68,111 +68,92 @@ struct fsl_esdhc {
 	uint    vendorspec2;
 	char	reserved4[48];
 	uint    hostver;	/* Host controller version register */
-#ifndef ARCH_MXC
-	char    reserved5[4];	/* reserved */
-	uint    dmaerraddr;	/* DMA error address register */
-	char    reserved6[4];	/* reserved */
-	uint    dmaerrattr;	/* DMA error attribute register */
-	char    reserved7[4];	/* reserved */
-	uint    hostcapblt2;	/* Host controller capabilities register 2 */
-	char    reserved8[8];	/* reserved */
-	uint    tcr;		/* Tuning control register */
-	char    reserved9[28];	/* reserved */
-	uint    sddirctl;	/* SD direction control register */
-	char    reserved10[712];/* reserved */
-	uint    scr;		/* eSDHC control register */
-#endif
 };
 
-struct imx_ssp_mmc_cfg {
-	u32 ssp_mmc_base;
-	u32 clkctrl_ssp_offset;
-	u32 clkctrl_clkseq_ssp_offset;
-};
-
-struct at91_mci {
+struct mmc_mci {
 	struct rt_mmcsd_host *host;
 	struct rt_mmcsd_io_cfg io_cfg;
-	struct imx_ssp_mmc_cfg *cfg;
 	u32 iobase;
+	int sdhc_clk;
 };
 
-static inline u32 ssp_mmc_is_wp(struct at91_mci *mmc)
+static inline u32 ssp_mmc_is_wp(struct mmc_mci *mmc)
 {
-	return gpio_get_value(USDHC1_WP_GPIO);
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
+
+	return (esdhc_read32(&regs->prsstat) & PRSSTAT_WPSPL) == 0;
 }
 
-static inline int ssp_mmc_read(struct at91_mci *mmc, uint reg)
+static int ssp_mmc_is_cd(struct mmc_mci *mmc)
 {
-	struct imx_ssp_mmc_cfg *cfg = mmc->cfg;
-	return readl(cfg->ssp_mmc_base + reg);
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
+	int timeout = 100;
+
+	while (!(esdhc_read32(&regs->prsstat) & PRSSTAT_CINS) && --timeout)
+		udelay(100);
+
+	return timeout <= 0;
 }
 
-static inline void ssp_mmc_write(struct at91_mci *mmc, uint reg, uint val)
+static void set_bit_clock(struct mmc_mci *mmc, u32 clock)
 {
-	struct imx_ssp_mmc_cfg *cfg = mmc->cfg;
-	writel(cfg->ssp_mmc_base + reg, val);
-}
+	int div, pre_div;
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
+	int sdhc_clk = mmc->sdhc_clk;
+	uint tgtclk, clk;
 
-static void set_bit_clock(struct at91_mci *mmc, u32 clock)
-{
-	const u32 sspclk = 480000 * 18 / 29 / 1;	/* 297931 KHz */
-	u32 divide, rate, tgtclk;
+	if (sdhc_clk / 16 > clock) {
+		for (pre_div = 2; pre_div < 256; pre_div *= 2)
+			if ((sdhc_clk / pre_div) <= (clock * 16))
+				break;
+	} else {
+		pre_div = 2;
+	}
 
-	/*
-	 * SSP bit rate = SSPCLK / (CLOCK_DIVIDE * (1 + CLOCK_RATE)),
-	 * CLOCK_DIVIDE has to be an even value from 2 to 254, and
-	 * CLOCK_RATE could be any integer from 0 to 255.
-	 */
-	clock /= 1000;		/* KHz */
-	for (divide = 2; divide < 254; divide += 2) {
-		rate = sspclk / clock / divide;
-		if (rate <= 256)
+	tgtclk = sdhc_clk / pre_div;
+	for (div = 1; div <= 16; div++) {
+		if ((sdhc_clk / (div * pre_div)) <= clock) {
+			tgtclk = sdhc_clk / (div * pre_div);
 			break;
+		}
 	}
 
-	tgtclk = sspclk / divide / rate;
-	while (tgtclk > clock) {
-		rate++;
-		tgtclk = sspclk / divide / rate;
-	}
-	if (rate > 256)
-		rate = 256;
+	pre_div >>= 1;
+	div -= 1;
 
-	/* Always set timeout the maximum */
-	ssp_mmc_write(mmc, HW_SSP_TIMING, BM_SSP_TIMING_TIMEOUT |
-		divide << BP_SSP_TIMING_CLOCK_DIVIDE |
-		(rate - 1) << BP_SSP_TIMING_CLOCK_RATE);
+	clk = (pre_div << 8) | (div << 4);
+
+	esdhc_clrbits32(&regs->sysctl, SYSCTL_CKEN);
+
+	esdhc_clrsetbits32(&regs->sysctl, SYSCTL_CLOCK_MASK, clk);
+
+	udelay(10000);
+
+	clk = SYSCTL_PEREN | SYSCTL_CKEN;
+
+	esdhc_setbits32(&regs->sysctl, clk);
 
 	rt_kprintf("MMC: Set clock rate to %d KHz (requested %d KHz)\n",
 		tgtclk, clock);
 }
 
-static void set_bit_width(struct at91_mci *mmc, u8 width)
+static void set_bit_width(struct mmc_mci *mmc, u8 width)
 {
 	int bus_width = 0;
-	u32 regval;
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
 
 	/* Set the bus width */
-	regval = ssp_mmc_read(mmc, HW_SSP_CTRL0);
-	regval &= ~BM_SSP_CTRL0_BUS_WIDTH;
+	esdhc_clrbits32(&regs->proctl, PROCTL_DTW_4 | PROCTL_DTW_8);
+
 	switch (width) {
-	case MMCSD_BUS_WIDTH_1:
-		regval |= (BV_SSP_CTRL0_BUS_WIDTH__ONE_BIT <<
-				BP_SSP_CTRL0_BUS_WIDTH);
-		bus_width = 1;
-		break;
 	case MMCSD_BUS_WIDTH_4:
-		regval |= (BV_SSP_CTRL0_BUS_WIDTH__FOUR_BIT <<
-				BP_SSP_CTRL0_BUS_WIDTH);
+		esdhc_setbits32(&regs->proctl, PROCTL_DTW_4);
 		bus_width = 4;
 		break;
 	case MMCSD_BUS_WIDTH_8:
-		regval |= (BV_SSP_CTRL0_BUS_WIDTH__EIGHT_BIT <<
-				BP_SSP_CTRL0_BUS_WIDTH);
+		esdhc_setbits32(&regs->proctl, PROCTL_DTW_8);
 		bus_width = 8;
 	}
-	ssp_mmc_write(mmc, HW_SSP_CTRL0, regval);
 
 	rt_kprintf("MMC: Set %d bits bus width\n",
 		bus_width);
@@ -187,151 +168,213 @@ static volatile int mci_run;
 extern int __rt_ffs(int value);
 static int ssp_mmc_send_cmd(struct rt_mmcsd_host *host, struct rt_mmcsd_cmd *cmd)
 {
-	int i;
-	struct at91_mci *mmc = (struct at91_mci*)host->private_data;
+	int	err = 0;
+	uint	xfertyp;
+	uint	irqstat;
+	struct mmc_mci *mmc = (struct mmc_mci*)host->private_data;
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
 
 	mmcsd_dbg("Sending command %2d flag = %08X, arg = %08X, blocks = %d, length = %d\n",
 		cmd->cmd_code, cmd->flags, cmd->arg,
 		(cmd->data?cmd->data->blks:0),(cmd->data?cmd->data->blksize:0));
 
-	/* Check bus busy */
-	i = 0;
-	while (ssp_mmc_read(mmc, HW_SSP_STATUS) & (BM_SSP_STATUS_BUSY |
-		BM_SSP_STATUS_DATA_BUSY | BM_SSP_STATUS_CMD_BUSY)) {
-		udelay(100);
-		if (i++ == 10000) {
-			rt_kprintf("MMC: Bus busy timeout!\n");
-			return TIMEOUT;
-		}
-	}
+	esdhc_write32(&regs->irqstat, -1);
+	sync();
+
+	/* Wait for the bus to be idle */
+	while ((esdhc_read32(&regs->prsstat) & PRSSTAT_CICHB) ||
+			(esdhc_read32(&regs->prsstat) & PRSSTAT_CIDHB));
+	while (esdhc_read32(&regs->prsstat) & PRSSTAT_DLA);
 
 	/* See if card is present */
-	if (ssp_mmc_read(mmc, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT) {
+	if (ssp_mmc_is_cd(mmc)) {
 		mci_run = 0;
 		return NO_CARD_ERR;
 	}
 
-	/* Clear all control bits except bus width */
-	ssp_mmc_write(mmc, HW_SSP_CTRL0_CLR, 0xff3fffff);
-
 	/* Set up command */
-	if (resp_type(cmd) == RESP_R3 || resp_type(cmd) == RESP_R4)
-		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_IGNORE_CRC);
-	if (resp_type(cmd) != RESP_NONE)	/* Need to get response */
-		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_GET_RESP);
-	if (resp_type(cmd) == RESP_R2)	/* It's a 136 bits response */
-		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_LONG_RESP);
+	xfertyp = 0;
+	if (resp_type(cmd) != RESP_NONE) {
+		if (resp_type(cmd) != RESP_R3 && resp_type(cmd) != RESP_R4)
+			xfertyp |= XFERTYP_CCCEN;
+		if (resp_type(cmd) != RESP_R2 && resp_type(cmd) != RESP_R3 && resp_type(cmd) != RESP_R4)
+			xfertyp |= XFERTYP_CICEN;
+		if (resp_type(cmd) == RESP_R2)	/* It's a 136 bits response */
+			xfertyp |= XFERTYP_RSPTYP_136;
+		else if (resp_type(cmd) == RESP_R1B)
+			xfertyp |= XFERTYP_RSPTYP_48_BUSY;
+		else
+			xfertyp |= XFERTYP_RSPTYP_48;
+	}
 
 	/* Command index */
-	ssp_mmc_write(mmc, HW_SSP_CMD0,
-		(ssp_mmc_read(mmc, HW_SSP_CMD0) & ~BM_SSP_CMD0_CMD) |
-		(cmd->cmd_code << BP_SSP_CMD0_CMD));
-	/* Command argument */
-	ssp_mmc_write(mmc, HW_SSP_CMD1, cmd->arg);
+	xfertyp |= XFERTYP_CMD(cmd->cmd_code);
 
 	/* Set up data */
 	if (cmd->data) {
+		int timeout;
+		uint wml_value = cmd->data->blksize/4;
 		/* READ or WRITE */
 		if (cmd->data->flags & DATA_DIR_READ) {
-			ssp_mmc_write(mmc, HW_SSP_CTRL0_SET,
-				BM_SSP_CTRL0_READ);
-		} else if (ssp_mmc_is_wp(mmc)) {
-			rt_kprintf("MMC: Can not write a locked card!\n");
-			return UNUSABLE_ERR;
+			if (wml_value > WML_RD_WML_MAX)
+				wml_value = WML_RD_WML_MAX_VAL;
+			esdhc_clrsetbits32(&regs->wml, WML_RD_WML_MASK, wml_value);
+			esdhc_write32(&regs->dsaddr, cmd->data->buf);
+			invalidate_dcache_range((ulong)cmd->data->buf,
+							   (ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize);
+		} else {
+			if (wml_value > WML_WR_WML_MAX)
+				wml_value = WML_WR_WML_MAX_VAL;
+			if (ssp_mmc_is_wp(mmc)) {
+				rt_kprintf("MMC: Can not write a locked card!\n");
+				return UNUSABLE_ERR;
+			}
+			esdhc_clrsetbits32(&regs->wml, WML_WR_WML_MASK, wml_value << 16);
+			esdhc_write32(&regs->dsaddr, cmd->data->buf);
+			flush_dcache_range((ulong)cmd->data->buf,
+							   (ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize);
 		}
-		ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_DATA_XFER);
-		ssp_mmc_write(mmc, HW_SSP_BLOCK_SIZE,
-			((cmd->data->blks - 1) <<
-				BP_SSP_BLOCK_SIZE_BLOCK_COUNT) |
-			((__rt_ffs(cmd->data->blksize) - 1) <<
-				BP_SSP_BLOCK_SIZE_BLOCK_SIZE));
-		ssp_mmc_write(mmc, HW_SSP_XFER_SIZE,
-			cmd->data->blksize * cmd->data->blks);
+		esdhc_write32(&regs->blkattr, cmd->data->blks << 16 | cmd->data->blksize);
+		/* Calculate the timeout period for data transactions */
+		/*
+		 * 1)Timeout period = (2^(timeout+13)) SD Clock cycles
+		 * 2)Timeout period should be minimum 0.250sec as per SD Card spec
+		 *  So, Number of SD Clock cycles for 0.25sec should be minimum
+		 *		(SD Clock/sec * 0.25 sec) SD Clock cycles
+		 *		= (mmc->clock * 1/4) SD Clock cycles
+		 * As 1) >=  2)
+		 * => (2^(timeout+13)) >= mmc->clock * 1/4
+		 * Taking log2 both the sides
+		 * => timeout + 13 >= log2(mmc->clock/4)
+		 * Rounding up to next power of 2
+		 * => timeout + 13 = log2(mmc->clock/4) + 1
+		 * => timeout + 13 = fls(mmc->clock/4)
+		 */
+		timeout = fls(mmc->sdhc_clk/4);
+		timeout -= 13;
+
+		if (timeout > 14)
+			timeout = 14;
+
+		if (timeout < 0)
+			timeout = 0;
+		esdhc_clrsetbits32(&regs->sysctl, SYSCTL_TIMEOUT_MASK, timeout << 16);
+
+		/* READ or WRITE */
+		if (cmd->data->flags & DATA_DIR_READ)
+			xfertyp |= XFERTYP_DTDSEL;
+		xfertyp |= XFERTYP_DPSEL;
+		xfertyp |= XFERTYP_DMAEN;
+		if (cmd->data->blks > 1) {
+			xfertyp |= XFERTYP_MSBSEL;
+			xfertyp |= XFERTYP_BCEN;
+		}
 	}
 
-	/* Kick off the command */
-	ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_WAIT_FOR_IRQ);
-	ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_ENABLE);
-	ssp_mmc_write(mmc, HW_SSP_CTRL0_SET, BM_SSP_CTRL0_RUN);
+	/* Mask all irqs */
+	esdhc_write32(&regs->irqsigen, 0);
+
+	/* Send the command */
+	esdhc_write32(&regs->cmdarg, cmd->arg);
+	esdhc_write32(&regs->mixctrl, (esdhc_read32(&regs->mixctrl) & 0xFFFFFF80) | (xfertyp & 0x7F));
+	esdhc_write32(&regs->xfertyp, xfertyp & 0xFFFF0000);
 
 	/* Wait for the command to complete */
-	i = 0;
-	do {
-		udelay(100);
-		if (i++ == 10000) {
-			rt_kprintf("MMC: Command %ld busy\n",
-				cmd->cmd_code);
-			break;
-		}
-	} while (ssp_mmc_read(mmc, HW_SSP_STATUS) &
-		BM_SSP_STATUS_CMD_BUSY);
+	while (!(esdhc_read32(&regs->irqstat) & (IRQSTAT_CC | IRQSTAT_CTOE)));
+	irqstat = esdhc_read32(&regs->irqstat);
 
 	/* Check command timeout */
-	if (ssp_mmc_read(mmc, HW_SSP_STATUS) &
-		BM_SSP_STATUS_RESP_TIMEOUT) {
+	if (irqstat & IRQSTAT_CTOE) {
 		rt_kprintf("MMC: Command %ld timeout\n",
 			cmd->cmd_code);
-		return TIMEOUT;
+		err = TIMEOUT;
+		goto out;
 	}
 
 	/* Check command errors */
-	if (ssp_mmc_read(mmc, HW_SSP_STATUS) &
-		(BM_SSP_STATUS_RESP_CRC_ERR | BM_SSP_STATUS_RESP_ERR)) {
+	if (irqstat & CMD_ERR) {
 		rt_kprintf("MMC: Command %ld error (status 0x%08x)!\n",
 			cmd->cmd_code,
-			ssp_mmc_read(mmc, HW_SSP_STATUS));
-		return COMM_ERR;
+			(irqstat & CMD_ERR));
+		err = COMM_ERR;
+		goto out;
+	}
+
+	/* Workaround for ESDHC errata ENGcm03648 */
+	if (!cmd->data && (resp_type(cmd) == RESP_R1B)) {
+		int timeout = 2500;
+
+		/* Poll on DATA0 line for cmd with busy signal for 250 ms */
+		while (timeout > 0 && !(esdhc_read32(&regs->prsstat) &
+					PRSSTAT_DAT0)) {
+			udelay(100);
+			timeout--;
+		}
+
+		if (timeout <= 0) {
+			rt_kprintf("MMC: Timeout waiting for DAT0 to go high\n");
+			err = TIMEOUT;
+			goto out;
+		}
 	}
 
 	/* Copy response to response buffer */
 	if (resp_type(cmd) == RESP_R2) {
-		cmd->resp[3] = ssp_mmc_read(mmc, HW_SSP_SDRESP0);
-		cmd->resp[2] = ssp_mmc_read(mmc, HW_SSP_SDRESP1);
-		cmd->resp[1] = ssp_mmc_read(mmc, HW_SSP_SDRESP2);
-		cmd->resp[0] = ssp_mmc_read(mmc, HW_SSP_SDRESP3);
+		u32 cmdrsp3, cmdrsp2, cmdrsp1, cmdrsp0;
+		cmdrsp3 = esdhc_read32(&regs->cmdrsp3);
+		cmdrsp2 = esdhc_read32(&regs->cmdrsp2);
+		cmdrsp1 = esdhc_read32(&regs->cmdrsp1);
+		cmdrsp0 = esdhc_read32(&regs->cmdrsp0);
+		cmd->resp[3] = (cmdrsp0 << 8);
+		cmd->resp[2] = (cmdrsp1 << 8) | (cmdrsp0 >> 24);
+		cmd->resp[1] = (cmdrsp2 << 8) | (cmdrsp1 >> 24);
+		cmd->resp[0] = (cmdrsp3 << 8) | (cmdrsp2 >> 24);
 	} else {
-		cmd->resp[0] = ssp_mmc_read(mmc, HW_SSP_SDRESP0);
+		cmd->resp[0] = esdhc_read32(&regs->cmdrsp0);
 	}
 
 	/* Return if no data to process */
 	if (!cmd->data)
 		return 0;
 
-	/* Process the data */
-	u32 xfer_cnt = cmd->data->blksize * cmd->data->blks;
-	u32 *tmp_ptr;
+	do {
+		irqstat = esdhc_read32(&regs->irqstat);
+
+		if (irqstat & IRQSTAT_DTOE) {
+			rt_kprintf("MMC: Data timeout with Command %ld\n",
+				cmd->cmd_code);
+			err = TIMEOUT;
+			goto out;
+		}
+
+		if (irqstat & DATA_ERR) {
+			rt_kprintf("MMC: Data error with command %ld (status 0x%08x)!\n",
+				cmd->cmd_code,
+				(irqstat & DATA_ERR));
+			err = COMM_ERR;
+			goto out;
+		}
+	} while ((irqstat & DATA_COMPLETE) != DATA_COMPLETE);
 
 	if (cmd->data->flags & DATA_DIR_READ) {
-		tmp_ptr = (u32 *)cmd->data->buf;
-		while (xfer_cnt > 0) {
-			if ((ssp_mmc_read(mmc, HW_SSP_STATUS) &
-				BM_SSP_STATUS_FIFO_EMPTY) == 0) {
-				*tmp_ptr++ = ssp_mmc_read(mmc, HW_SSP_DATA);
-				xfer_cnt -= 4;
-			}
-		}
-	} else {
-		tmp_ptr = (u32 *)cmd->data->buf;
-		while (xfer_cnt > 0) {
-			if ((ssp_mmc_read(mmc, HW_SSP_STATUS) &
-				BM_SSP_STATUS_FIFO_FULL) == 0) {
-				ssp_mmc_write(mmc, HW_SSP_DATA, *tmp_ptr++);
-				xfer_cnt -= 4;
-			}
+		invalidate_dcache_range((ulong)cmd->data->buf,
+						   (ulong)cmd->data->buf+cmd->data->blks*cmd->data->blksize);
+	}
+
+out:
+	/* Reset CMD and DATA portions on error */
+	if (err) {
+		esdhc_write32(&regs->sysctl, esdhc_read32(&regs->sysctl) | SYSCTL_RSTC);
+		while (esdhc_read32(&regs->sysctl) & SYSCTL_RSTC);
+
+		if (cmd->data) {
+			esdhc_write32(&regs->sysctl, esdhc_read32(&regs->sysctl) | SYSCTL_RSTD);
+			while ((esdhc_read32(&regs->sysctl) & SYSCTL_RSTD));
 		}
 	}
 
-	/* Check data errors */
-	if (ssp_mmc_read(mmc, HW_SSP_STATUS) &
-		(BM_SSP_STATUS_TIMEOUT | BM_SSP_STATUS_DATA_CRC_ERR |
-		BM_SSP_STATUS_FIFO_OVRFLW | BM_SSP_STATUS_FIFO_UNDRFLW)) {
-		rt_kprintf("MMC: Data error with command %ld (status 0x%08x)!\n",
-			cmd->cmd_code,
-			ssp_mmc_read(mmc, HW_SSP_STATUS));
-		return COMM_ERR;
-	}
-
-	return 0;
+	esdhc_write32(&regs->irqstat, -1);
+	return err;
 }
 
 #define USDHC_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_PUE |		\
@@ -355,7 +398,7 @@ static iomux_v3_cfg_t const usdhc1_pads[] = {
 	MX6_PAD_UART1_CTS_B__USDHC1_WP  | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 };
 
-static void esdhc_reset(struct fsl_esdhc *regs)
+static void esdhc_reset(volatile struct fsl_esdhc *regs)
 {
 	unsigned long timeout = 100; /* wait max 100 ms */
 
@@ -371,7 +414,7 @@ static void esdhc_reset(struct fsl_esdhc *regs)
 
 void rt_hw_ssp_init(void)
 {
-	struct fsl_esdhc *regs = (struct fsl_esdhc *)USDHC2_BASE_ADDR;
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)USDHC2_BASE_ADDR;
     /* Set up SSP pins */
 	imx_iomux_v3_setup_multiple_pads(usdhc1_pads, ARRAY_SIZE(usdhc1_pads));
 
@@ -387,7 +430,7 @@ void rt_hw_ssp_init(void)
 /*
  * Handle an MMC request
  */
-static void at91_mci_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *req)
+static void mmc_mci_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *req)
 {
 	if (req->cmd->cmd_code == 5)
 	{
@@ -406,14 +449,21 @@ static void at91_mci_request(struct rt_mmcsd_host *host, struct rt_mmcsd_req *re
 /*
  * Set the IOCFG
  */
-static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cfg *io_cfg)
+static void mmc_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cfg *io_cfg)
 {
-	rt_uint32_t regval;
-	struct at91_mci *mmc = (struct at91_mci*)host->private_data;
-	struct fsl_esdhc *regs = mmc->iobase;
+	struct mmc_mci *mmc = (struct mmc_mci*)host->private_data;
+	volatile struct fsl_esdhc *regs = (struct fsl_esdhc *)mmc->iobase;
+	int timeout = 1000;
 
 	if (io_cfg->power_mode == MMCSD_POWER_UP) {
 		mmc->io_cfg = *io_cfg;
+
+		/* Reset the entire host controller */
+		esdhc_setbits32(&regs->sysctl, SYSCTL_RSTA);
+
+		/* Wait until the controller is available */
+		while ((esdhc_read32(&regs->sysctl) & SYSCTL_RSTA) && --timeout)
+			udelay(1000);
 
 		/* RSTA doesn't reset MMC_BOOT register, so manually reset it */
 		esdhc_write32(&regs->mmcboot, 0x0);
@@ -423,8 +473,6 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 
 		/* Put VEND_SPEC to default value */
 		esdhc_write32(&regs->vendorspec, VENDORSPEC_INIT);
-		/* Enable cache snooping */
-		esdhc_write32(&regs->scr, 0x00000040);
 
 		esdhc_setbits32(&regs->sysctl, SYSCTL_HCKEN | SYSCTL_IPGEN);
 
@@ -437,17 +485,9 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 		/* Set timout to the maximum value */
 		esdhc_clrsetbits32(&regs->sysctl, SYSCTL_TIMEOUT_MASK, 14 << 16);
 
-#ifdef CONFIG_SYS_FSL_ESDHC_FORCE_VSELECT
-		esdhc_setbits32(&regs->vendorspec, ESDHC_VENDORSPEC_VSELECT);
-#endif
 		/* Set initial bit clock 400 KHz */
 		set_bit_clock(mmc, 400000);
 		mmc->io_cfg.clock = 400000;
-
-		/* Send initial 74 clock cycles (185 us @ 400 KHz)*/
-		ssp_mmc_write(mmc, HW_SSP_CMD0_SET, BM_SSP_CMD0_CONT_CLKING_EN);
-		udelay(200);
-		ssp_mmc_write(mmc, HW_SSP_CMD0_CLR, BM_SSP_CMD0_CONT_CLKING_EN);
 
 		set_bit_width(mmc, 0);
 		mmc->io_cfg.bus_width = 0;
@@ -483,28 +523,25 @@ static void at91_mci_set_iocfg(struct rt_mmcsd_host *host, struct rt_mmcsd_io_cf
 }
 
 static const struct rt_mmcsd_host_ops ops = {
-	at91_mci_request,
-	at91_mci_set_iocfg,
+	mmc_mci_request,
+	mmc_mci_set_iocfg,
 	RT_NULL,
 	RT_NULL,
 };
 
-struct imx_ssp_mmc_cfg ssp_mmc_cfg = {
-	USDHC2_BASE_ADDR, HW_CLKCTRL_SSP0, BM_CLKCTRL_CLKSEQ_BYPASS_SSP0
-};
-static struct at91_mci mci = {
-	.cfg = &ssp_mmc_cfg,
+static struct mmc_mci mci = {
 	.iobase = USDHC2_BASE_ADDR,
 };
 
 static void sd_monitor_thread_entry(void *parameter)
 {
     uint32_t card,status;
-    card  = (ssp_mmc_read(&mci, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT);
+    struct mmc_mci *mmc = (struct mmc_mci*)parameter;
+    card  = ssp_mmc_is_cd(mmc);
 
     while(1)
     {
-        status  = (ssp_mmc_read(&mci, HW_SSP_STATUS) & BM_SSP_STATUS_CARD_DETECT);
+        status  = ssp_mmc_is_cd(mmc);
         if (status != card) {
             if (status) {
             	SD_LINK_PRINTF("MMC: No card detected!\n");
@@ -512,9 +549,9 @@ static void sd_monitor_thread_entry(void *parameter)
             		mmcsd_change(mci.host);
             		mmcsd_wait_cd_changed(5000);
             		if (mci.host->card == NULL)
-            			rt_kprintf("Unmount /mnt/mmc ok!\n");
+            			SD_LINK_PRINTF("Unmount /mnt/mmc ok!\n");
             		else
-            			rt_kprintf("Unmount /mnt/mmc failed!\n");
+            			SD_LINK_PRINTF("Unmount /mnt/mmc failed!\n");
         		}
         	} else {
         		SD_LINK_PRINTF("MMC: Card detected!\n");
@@ -522,9 +559,9 @@ static void sd_monitor_thread_entry(void *parameter)
         		mmcsd_change(mci.host);
         		mmcsd_wait_cd_changed(5000);
         	    if (dfs_mount("sd0", "/mnt/mmc", "elm", 0, 0) == 0)
-        	        rt_kprintf("Mount /mnt/mmc ok!\n");
+        	    	SD_LINK_PRINTF("Mount /mnt/mmc ok!\n");
         	    else
-        	        rt_kprintf("Mount /mnt/mmc failed!\n");
+        	    	SD_LINK_PRINTF("Mount /mnt/mmc failed!\n");
         	}
             card = status;
         }
@@ -545,6 +582,7 @@ void tf_init(void)
 		return;
 
 	mci.host = host;
+	mci.sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK);
 	host->ops = &ops;
 	host->freq_min = 400000;
 	host->freq_max = 148000000;
@@ -570,7 +608,7 @@ void tf_init(void)
         rt_thread_t tid;
         tid = rt_thread_create("sd_mon",
                                sd_monitor_thread_entry,
-                               RT_NULL,
+                               &mci,
                                2048,
                                RT_THREAD_PRIORITY_MAX - 2,
                                20);

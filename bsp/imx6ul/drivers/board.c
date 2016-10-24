@@ -139,6 +139,13 @@ void rt_hw_board_init(void)
     /* initialize ssp */
     rt_hw_ssp_init();
 #endif
+    gpio_set_value(PIN_WDT, 1);
+
+#ifdef RT_USING_I2C
+    /* initialize ssp */
+    rt_hw_i2c_init();
+#endif
+    gpio_set_value(PIN_WDT, 0);
 
     rt_kprintf("\n\n");
     print_cpuinfo();

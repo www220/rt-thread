@@ -135,7 +135,7 @@ static struct rt_stm32_eth stm32_eth_device[2] = {
 
 #define FEC_MII_TIMEOUT		5000
 #define FEC_MII_TICK		1
-#define	FEC_RESET_DELAY		1000
+#define	FEC_RESET_DELAY		10000
 #define FEC_MAX_TIMEOUT		10000
 #define FEC_MAX_TICKET		1
 
@@ -200,7 +200,7 @@ static void fec_reset(struct rt_stm32_eth *dev)
 
 	fecp->ecr |= FEC_ECR_RESET;
 	for (i = 0; (fecp->ecr & FEC_ECR_RESET) && (i < FEC_RESET_DELAY); ++i)
-		udelay(10);
+		udelay(1000);
 
 	if (i == FEC_RESET_DELAY)
 		rt_kprintf("PHY %02X FEC_ECR_RESET timeout\n", dev->phy_addr);

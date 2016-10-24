@@ -52,6 +52,10 @@ tfsim_src = Split("""
 simtf.c
 """)
 
+i2c_src = Split("""
+iic.c
+""")
+
 usbhdev_src = Split("""
 usb_host.c
 usb_storage.c
@@ -98,6 +102,10 @@ if rtconfig.PLATFORM != 'cl':
 else:
     if GetDepend(['RT_USING_SDIO']):
         src += tfsim_src
+
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_I2C']):
+        src += i2c_src
 
 CPPPATH = [cwd]
 

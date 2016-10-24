@@ -56,6 +56,7 @@ void rt_hw_rtc_init(void);
 void rt_hw_mtd_nand_init(void);
 void rt_hw_ssp_init(void);
 void rt_hw_usbh_init(void);
+void rt_hw_i2c_init(void);
 
 #ifdef _MSC_VER
 #ifdef _DLL

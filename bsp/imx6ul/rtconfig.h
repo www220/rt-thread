@@ -81,9 +81,9 @@
 //#define RT_MMCSD_DBG
 #define RT_USING_SDIO
 #define RT_MMCSD_STACK_SIZE 4096
+#define RT_USING_I2C
+#define RT_USING_I2C_BITOPS
 //#define RT_USING_USB_HOSTU
-//#define RT_USING_I2C
-//#define RT_USING_I2C_BITOPS
 
 /* SECTION: Console options */
 #define RT_USING_CONSOLE
