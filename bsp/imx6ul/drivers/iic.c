@@ -513,8 +513,8 @@ static const struct rt_i2c_bit_ops _i2c_bit_ops =
     gpio_get_sda,
     gpio_get_scl,
     gpio_udelay,
-    5,
-    100
+    10,
+    10
 };
 struct rt_i2c_bus_device bit_i2c;
 
@@ -561,11 +561,60 @@ void i2c_reg_write(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, rt_uint8_t
 		if (bus_i2c_write((void *)i2c0.iobase, addr, reg, 1, &val, 1) != 1)
 			return;
 #else
-		if (rt_i2c_master_send(&bit_i2c, addr, 0, &reg, 1) != 1)
-			return;
-		if (rt_i2c_master_send(&bit_i2c, addr, 0, &val, 1) != 1)
+		rt_uint8_t buf[2] = {reg,val};
+		if (rt_i2c_master_send(&bit_i2c, addr, 0, buf, 2) != 2)
 			return;
 #endif
 	}
+}
+
+int i2c_reg_readbuf(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, rt_uint8_t* buf, int count)
+{
+	int ret = 0;
+	if (index == 0)
+	{
+#if 0
+		ret = bus_i2c_read((void *)i2c0.iobase, addr, reg, 1, buf, count);
+#else
+		struct rt_i2c_msg msg[2];
+		msg[0].addr  = addr;
+		msg[0].flags = RT_I2C_WR;
+		msg[0].len   = 1;
+		msg[0].buf   = &reg;
+		msg[1].addr  = addr;
+		msg[1].flags = RT_I2C_RD;
+		msg[1].len   = count;
+		msg[1].buf   = buf;
+		ret = rt_i2c_transfer(&bit_i2c, msg, 2);
+		if (ret == 2)
+			ret = count;
+#endif
+	}
+	return ret;
+}
+
+int i2c_reg_writebuf(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, const rt_uint8_t* buf, int count)
+{
+	int ret = 0;
+	if (index == 0)
+	{
+#if 0
+		ret = bus_i2c_write((void *)i2c0.iobase, addr, reg, 1, buf, count);
+#else
+		struct rt_i2c_msg msg[2];
+		msg[0].addr  = addr;
+		msg[0].flags = RT_I2C_WR;
+		msg[0].len   = 1;
+		msg[0].buf   = &reg;
+		msg[1].addr  = addr;
+		msg[1].flags = RT_I2C_WR|RT_I2C_NO_START;
+		msg[1].len   = count;
+		msg[1].buf   = (rt_uint8_t *)buf;
+		ret = rt_i2c_transfer(&bit_i2c, msg, 2);
+		if (ret == 2)
+			ret = count;
+#endif
+	}
+	return ret;
 }
 

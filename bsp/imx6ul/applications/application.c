@@ -67,12 +67,8 @@ extern void nand_init(void);
 #endif
 #endif
 
-#ifdef RT_USING_I2C
-extern rt_uint8_t i2c_reg_read(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg);
-extern void i2c_reg_write(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, rt_uint8_t val);
-#endif
-
 #ifdef RT_USING_RTC
+extern void sync_date(void);
 extern void list_date(void);
 #ifndef RT_USING_FINSH
 void list_date(void)
@@ -122,79 +118,6 @@ extern void cpu_usage_idle_hook(void);
 #define GPIO_ResetBits(x,y) gpio_set_value(x,0)
 #define GPIO_SetBits(x,y) gpio_set_value(x,1)
 #endif
-
-static inline unsigned int bcd2bin(rt_uint8_t val)
-{
-	return ((val) & 0x0f) + ((val) >> 4) * 10;
-}
-
-static inline rt_uint8_t bin2bcd (unsigned int val)
-{
-	return (((val / 10) << 4) | (val % 10));
-}
-
-void rtc_reset (void)
-{
-	/* clear all control & status registers */
-	i2c_reg_write (0, 0x51, 0x00, 0x00);
-	i2c_reg_write (0, 0x51, 0x01, 0x00);
-	i2c_reg_write (0, 0x51, 0x0D, 0x00);
-
-	/* clear Voltage Low bit */
-	i2c_reg_write (0, 0x51, 0x02, i2c_reg_read (0, 0x51, 0x02) & 0x7F);
-
-	/* reset all alarms */
-	i2c_reg_write (0, 0x51, 0x09, 0x00);
-	i2c_reg_write (0, 0x51, 0x0A, 0x00);
-	i2c_reg_write (0, 0x51, 0x0B, 0x00);
-	i2c_reg_write (0, 0x51, 0x0C, 0x00);
-}
-
-int rtc_set (struct tm *tmp)
-{
-	rt_uint8_t century;
-
-	rt_kprintf ( "Set DATE: %4d-%02d-%02d (wday=%d)  TIME: %2d:%02d:%02d\n",
-		tmp->tm_year+1900, tmp->tm_mon+1, tmp->tm_mday, tmp->tm_wday,
-		tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
-
-	i2c_reg_write (0, 0x51, 0x08, bin2bcd(tmp->tm_year % 100));
-
-	century = (tmp->tm_year >= 2000) ? 0 : 0x80;
-	i2c_reg_write (0, 0x51, 0x07, bin2bcd(tmp->tm_mon) | century);
-
-	i2c_reg_write (0, 0x51, 0x06, bin2bcd(tmp->tm_wday));
-	i2c_reg_write (0, 0x51, 0x05, bin2bcd(tmp->tm_mday));
-	i2c_reg_write (0, 0x51, 0x04, bin2bcd(tmp->tm_hour));
-	i2c_reg_write (0, 0x51, 0x03, bin2bcd(tmp->tm_min ));
-	i2c_reg_write (0, 0x51, 0x02, bin2bcd(tmp->tm_sec ));
-
-	return 0;
-}
-int rtc_get (void)
-{
-	int rel = 0;
-	rt_uint8_t sec, min, hour, mday, wday, mon_cent, year;
-
-	sec	= i2c_reg_read (0, 0x51, 0x02);
-	min	= i2c_reg_read (0, 0x51, 0x03);
-	hour	= i2c_reg_read (0, 0x51, 0x04);
-	mday	= i2c_reg_read (0, 0x51, 0x05);
-	wday	= i2c_reg_read (0, 0x51, 0x06);
-	mon_cent= i2c_reg_read (0, 0x51, 0x07);
-	year	= i2c_reg_read (0, 0x51, 0x08);
-
-	rt_kprintf ( "Get RTC year: %02x mon/cent: %02x mday: %02x wday: %02x "
-		"hr: %02x min: %02x sec: %02x\n",
-		year, mon_cent&0x1f, mday&0x3f, wday&0x07,
-		hour&0x3f, min&0x7f, sec&0x7f );
-	if (sec & 0x80) {
-		rt_kprintf ("### Warning: RTC Low Voltage - date/time not reliable\n");
-		rel = -1;
-	}
-
-	return rel;
-}
 
 ALIGN(RT_ALIGN_SIZE)
 static char thread_wtdog_stack[2048];
@@ -519,19 +442,19 @@ static void rt_thread_entry_main(void* parameter)
 #endif
     }
 
-    rtc_reset();
-    time_t tt = time(NULL);
-    tt += (365*45*3600*24)+124543;
-    rtc_set(localtime(&tt));
     while (1)
     {
         uptime_count++;
+#ifdef RT_USING_RTC
+        //同步i2c的rtc时钟
+        if ((uptime_count%4096) == 0)
+            sync_date();
+#endif
 #ifdef RT_USING_PROCESS
         extern void rt_process_wait(int delay);
         rt_process_wait(1000);
 #else
         rt_thread_delay(1000);
-        rtc_get();
 #endif
     }
 }

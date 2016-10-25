@@ -60,6 +60,8 @@ void rt_hw_i2c_init(void);
 
 rt_uint8_t i2c_reg_read(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg);
 void i2c_reg_write(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, rt_uint8_t val);
+int i2c_reg_readbuf(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, rt_uint8_t* buf, int count);
+int i2c_reg_writebuf(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, const rt_uint8_t* buf, int count);
 
 #ifdef _MSC_VER
 #ifdef _DLL

@@ -5,11 +5,67 @@
 #include <stdlib.h>
 #include "board.h"
 #include <errno.h>
+#include <time.h>
 
 #undef ALIGN
 #include <common.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
+
+#define RT_USING_PCF85063
+#if defined(RT_USING_I2C) && defined(RT_USING_PCF85063)
+static inline unsigned int bcd2bin(rt_uint8_t val)
+{
+	return ((val) & 0x0f) + ((val) >> 4) * 10;
+}
+
+static inline rt_uint8_t bin2bcd (unsigned int val)
+{
+	return (((val / 10) << 4) | (val % 10));
+}
+
+int rtc_set (time_t *tim)
+{
+	struct tm t;
+	localtime_r(tim,&t);
+	rt_uint8_t sec[9];
+
+	sec[0] = 0;
+	sec[1] = 0;
+	sec[2] = bin2bcd(t.tm_sec);
+	sec[3] = bin2bcd(t.tm_min);
+	sec[4] = bin2bcd(t.tm_hour);
+	sec[5] = bin2bcd(t.tm_mday);
+	sec[6] = t.tm_wday;
+	sec[7] = ((t.tm_year>=100)?(0x80):(0x00))|(bin2bcd(t.tm_mon+1));
+	sec[8] = bin2bcd(t.tm_year);
+
+	return (i2c_reg_writebuf(0, 0x71, 0, sec, 9) != 9);
+}
+
+int rtc_get (time_t *tim)
+{
+	int rel = 0;
+	rt_uint8_t sec[9];
+	struct tm t;
+
+	if ((i2c_reg_readbuf(0, 0x51, 0, sec, 9) != 9) || (sec[2] & 0x80))
+	{
+		rel = -1;
+		return rel;
+	}
+
+	t.tm_sec = bcd2bin(sec[2]&0x7f);
+	t.tm_min = bcd2bin(sec[3]&0x7f);
+	t.tm_hour = bcd2bin(sec[4]&0x3f);
+	t.tm_mday = bcd2bin(sec[5]&0x3f);
+	t.tm_mon = bcd2bin(sec[7]&0x1f)-1;
+	t.tm_year = (sec[7]&0x80)?(bcd2bin(sec[8])+100):(bcd2bin(sec[8]));
+	*tim = mktime(&t);
+
+	return rel;
+}
+#endif
 
 /* These register offsets are relative to LP (Low Power) range */
 #define SNVS_HPCR		0x08
@@ -125,6 +181,7 @@ static rt_err_t rt_rtc_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 
     case RT_DEVICE_CTRL_RTC_SET_TIME:
         snvs_rtc_set_time(SNVS_BASE, time);
+        rtc_set(time);
         break;
     }
 
@@ -152,6 +209,11 @@ void rt_hw_rtc_init(void)
 
 	rt_mutex_init(&rtc_mutex, "rtc", RT_IPC_FLAG_FIFO);
     rt_device_register(&rtc, "rtc", RT_DEVICE_FLAG_RDWR);
+
+    /* load time from 85063 */
+    time_t now;
+    if (rtc_get(&now) == 0)
+        snvs_rtc_set_time(SNVS_BASE, &now);
     return;
 }
 
@@ -183,6 +245,13 @@ int setdate(int argc, char** argv)
         return 0;
     }
     return 0;
+}
+
+void sync_date(void)
+{
+    time_t now;
+    if (rtc_get(&now) == 0)
+        snvs_rtc_set_time(SNVS_BASE, &now);
 }
 
 #ifdef RT_USING_FINSH
