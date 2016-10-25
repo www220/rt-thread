@@ -17,6 +17,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/crm_regs.h>
+#include <mxsfb.h>
 
 #ifdef CONFIG_VIDEO_GIS
 #include <gis.h>

@@ -27,7 +27,7 @@ static inline rt_uint8_t bin2bcd (unsigned int val)
 int rtc_set (time_t *tim)
 {
 	struct tm t;
-	localtime_r(tim,&t);
+	gmtime_r(tim,&t);
 	rt_uint8_t sec[9];
 
 	sec[0] = 0;
@@ -38,9 +38,18 @@ int rtc_set (time_t *tim)
 	sec[5] = bin2bcd(t.tm_mday);
 	sec[6] = t.tm_wday;
 	sec[7] = ((t.tm_year>=100)?(0x80):(0x00))|(bin2bcd(t.tm_mon+1));
-	sec[8] = bin2bcd(t.tm_year);
+	sec[8] = bin2bcd(t.tm_year%100);
 
-	return (i2c_reg_writebuf(0, 0x71, 0, sec, 9) != 9);
+	i2c_reg_write(0, 0x51, 0, sec[2]);
+	i2c_reg_write(0, 0x51, 1, sec[2]);
+	i2c_reg_write(0, 0x51, 2, sec[2]);
+	i2c_reg_write(0, 0x51, 3, sec[3]);
+	i2c_reg_write(0, 0x51, 4, sec[4]);
+	i2c_reg_write(0, 0x51, 5, sec[5]);
+	i2c_reg_write(0, 0x51, 6, sec[6]);
+	i2c_reg_write(0, 0x51, 7, sec[7]);
+	i2c_reg_write(0, 0x51, 8, sec[8]);
+	return 1;
 }
 
 int rtc_get (time_t *tim)
@@ -60,7 +69,7 @@ int rtc_get (time_t *tim)
 	t.tm_hour = bcd2bin(sec[4]&0x3f);
 	t.tm_mday = bcd2bin(sec[5]&0x3f);
 	t.tm_mon = bcd2bin(sec[7]&0x1f)-1;
-	t.tm_year = (sec[7]&0x80)?(bcd2bin(sec[8])+100):(bcd2bin(sec[8]));
+	t.tm_year = 1900+(sec[7]&0x80)?(bcd2bin(sec[8])+100):(bcd2bin(sec[8]));
 	*tim = mktime(&t);
 
 	return rel;
@@ -214,6 +223,9 @@ void rt_hw_rtc_init(void)
     time_t now;
     if (rtc_get(&now) == 0)
         snvs_rtc_set_time(SNVS_BASE, &now);
+    /* re load time */
+    if (rtc_get(&now) == 0)
+        snvs_rtc_set_time(SNVS_BASE, &now);
     return;
 }
 
@@ -249,9 +261,8 @@ int setdate(int argc, char** argv)
 
 void sync_date(void)
 {
-    time_t now;
-    if (rtc_get(&now) == 0)
-        snvs_rtc_set_time(SNVS_BASE, &now);
+    time_t now = time(NULL);
+    rtc_set(&now);
 }
 
 #ifdef RT_USING_FINSH

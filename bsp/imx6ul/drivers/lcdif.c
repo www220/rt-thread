@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "board.h"
+#include <rtgui/driver.h>
 
 #undef ALIGN
 #include <common.h>
@@ -128,23 +129,23 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
 {
     struct sdlfb_device *device;
     device = (struct sdlfb_device *)dev;
-
+    
     RT_ASSERT(device != RT_NULL);
     RT_ASSERT(device->entry != RT_NULL);
 
-    switch (cmd)
+    switch (cmd) 
     {
     case RTGRAPHIC_CTRL_GET_INFO: {
         struct rt_device_graphic_info *info;
         info = (struct rt_device_graphic_info *) args;
-
+        
         info->bits_per_pixel = 16;
         info->pixel_format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
         info->framebuffer = device->phys[2];
-        info->width = device->entry->y_res;
-        info->height = device->entry->x_res;
+        info->width = device->entry->winSizeY;
+        info->height = device->entry->winSizeX;
     break; }
-
+    
     case RTGRAPHIC_CTRL_RECT_UPDATE: {
         struct rt_device_rect_info *rect;
         rect = (struct rt_device_rect_info *)args;
@@ -152,10 +153,10 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
         if (++_frame_flg >= 2)
             _frame_flg = 0;
         rt_memcpy(device->phys[_frame_flg],device->phys[2],device->memsize);
-        device->entry->pan_display((dma_addr_t)device->phys[_frame_flg]);
+        //device->entry->pan_display((dma_addr_t)device->phys[_frame_flg]);
         break; }
     }
-
+    
     return RT_EOK;
 }
 
@@ -169,16 +170,9 @@ int lcd_init(void)
 	mxs_lcd_panel_setup(displays.mode, displays.depth, displays.lcdif_base_addr);
 
     _device.entry = video_hw_init();
-    _device.memsize = fb_entry.y_res * fb_entry.x_res * fb_entry.bpp / 8;
-    _device.phys[0] = memalign_max(32, _device.memsize);
-    _device.phys[1] = memalign_max(32, _device.memsize);
-    _device.phys[2] = memalign_max(32, _device.memsize);
     //初始化启动使用第一个缓存区
     _frame_flg = 0;
-#ifndef RTGUI_USING_HZ_FILE
-    rt_memcpy((void *)_device.phys[0],gImage_im,_device.memsize);
-#else
-{
+#ifdef RTGUI_USING_HZ_FILE
     FILE *file;
     if ((file = fopen("/etc/logo.bin", "rb")) != NULL)
     {
@@ -189,7 +183,6 @@ int lcd_init(void)
     {
         rt_memset((void *)_device.phys[0],0x00,_device.memsize);
     }
-}
 #endif
 
     _device.parent.type = RT_Device_Class_Graphic;
@@ -208,17 +201,22 @@ out_panel:
     return ret;
 }
 
+void touch_init(void)
+{
+
+}
+
 #if defined(RT_USING_FINSH)
 #include <finsh.h>
 void lcd_intensity(int intensity)
 {
-    bl_data.set_bl_intensity(&bl_data, intensity);
+    //bl_data.set_bl_intensity(&bl_data, intensity);
     rt_kprintf("lcd intensity:%d\n",intensity);
 }
 
 void lcd_blank(int blank)
 {
-    fb_entry.blank_panel(blank);
+    //fb_entry.blank_panel(blank);
     rt_kprintf("lcd blank:%d\n",blank);
 }
 
