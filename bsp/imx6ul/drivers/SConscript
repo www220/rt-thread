@@ -66,8 +66,6 @@ usb/ehci-hcd.c
 
 lcddev_src = Split("""
 lcdif.c
-mxsfb.c
-mxsts.c
 """)
 
 if rtconfig.PLATFORM != 'cl':
@@ -106,6 +104,10 @@ else:
 if rtconfig.PLATFORM != 'cl':
     if GetDepend(['RT_USING_I2C']):
         src += i2c_src
+
+if rtconfig.PLATFORM != 'cl':
+    if GetDepend(['RT_USING_RTGUI']):
+        src += lcddev_src
 
 CPPPATH = [cwd]
 

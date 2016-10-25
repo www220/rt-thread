@@ -67,6 +67,10 @@ extern void nand_init(void);
 #endif
 #endif
 
+#ifdef RT_USING_USB_HOSTU
+extern void usbh_init(void);
+#endif
+
 #ifdef RT_USING_RTC
 extern void sync_date(void);
 extern void list_date(void);
@@ -90,6 +94,12 @@ extern void libc_system_init(void);
 extern void rt_hw_eth_init(void);
 extern int eth_system_device_init(void);
 extern void lwip_sys_init(void);
+#endif
+
+#ifdef RT_USING_RTGUI
+extern int rtgui_system_server_init(void);
+extern int lcd_init(void);
+extern int touch_init(void);
 #endif
 
 #ifdef RT_USING_FINSH
@@ -236,7 +246,7 @@ static void rt_thread_entry_main(void* parameter)
     if (dfs_mount("nand0", "/", "yaffs2", 0, 0) == 0) {
         mkdir("/etc", 666);
         mkdir("/var", 666);
-        mkdir("/rom", 666);
+        mkdir("/font", 666);
         mkdir("/dev", 666);
         mkdir("/mnt", 666);
 
@@ -280,6 +290,10 @@ static void rt_thread_entry_main(void* parameter)
     }
 #endif
 
+#endif
+
+#ifdef RT_USING_USB_HOSTU
+    usbh_init();
 #endif
 
 #ifdef RT_USING_LIBC
@@ -384,6 +398,13 @@ static void rt_thread_entry_main(void* parameter)
     rt_hw_eth_init();
     lwip_sys_init();
     rt_kprintf("TCP/IP initialized!\n");
+#endif
+
+#ifdef RT_USING_RTGUI
+    lcd_init();
+    touch_init();
+    rtgui_system_server_init();
+    rt_kprintf("RtGUI initialized!\n");
 #endif
 
     /* list date */

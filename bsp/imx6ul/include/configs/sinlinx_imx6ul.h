@@ -64,8 +64,14 @@
 #define CONFIG_FEC_MXC
 #define CONFIG_MII
 
+/* MMC Configs */
 #define CONFIG_FSL_ESDHC
 #define CONFIG_MMC
+
+/* Video/LCD support */
+#define	CONFIG_VIDEO_MXS
+#define	CONFIG_VIDEO_LOGO
+#define	CONFIG_SPLASH_SCREEN
 
 /* MMC Configs */
 #ifdef CONFIG_FSL_USDHC
