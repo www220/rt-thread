@@ -42,6 +42,9 @@
 #include <video_fb.h>
 #include <pwm.h>
 
+#define LIGHT_PWM	0
+#define LIGHT_GPIO	IMX_GPIO_NR(3, 4)
+
 struct lcd_panel_info_t {
 	unsigned int lcdif_base_addr;
 	int depth;
@@ -116,18 +119,22 @@ static void display_panel(dma_addr_t addr, struct mxs_platform_fb_entry *pentry)
 {
 	struct mxs_lcdif_regs *regs = (struct mxs_lcdif_regs *)(pentry->display->isaBase);
 
-	writel(addr, &regs->hw_lcdif_cur_buf);
+	writel(addr, &regs->hw_lcdif_next_buf);
 }
 
 static int init_bl(struct mxs_platform_bl_data *data)
 {
+#if LIGHT_PWM
 	pwm_enable(4);
+#endif
 	return 0;
 }
 
 static void free_bl(struct mxs_platform_bl_data *data)
 {
+#if LIGHT_PWM
 	pwm_disable(4);
+#endif
 }
 
 static int values[] = { 0, 4, 9, 14, 20, 27, 35, 45, 57, 75, 100 };
@@ -145,7 +152,11 @@ static int set_bl_intensity(struct mxs_platform_bl_data *data, int intensity)
 					values[intensity / 10]) / 10;
 	}
 
+#if LIGHT_PWM
 	pwm_config(4, (scaled_int*400)/100, 400);
+#else
+	gpio_set_value(LIGHT_GPIO, scaled_int>50);
+#endif
 	return 0;
 }
 
@@ -186,8 +197,6 @@ static struct mxs_platform_fb_entry fb_entry = {
 
 #define LCD_PAD_CTRL    (PAD_CTL_HYS | PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | \
 	PAD_CTL_PKE | PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm)
-#define PWM_PAD_CTRL    (PAD_CTL_HYS | \
-	PAD_CTL_PKE | PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm)
 
 iomux_v3_cfg_t const lcd_pads[] = {
 	MX6_PAD_LCD_CLK__LCDIF_CLK | MUX_PAD_CTRL(LCD_PAD_CTRL),
@@ -210,11 +219,6 @@ iomux_v3_cfg_t const lcd_pads[] = {
 	MX6_PAD_LCD_DATA13__LCDIF_DATA13 | MUX_PAD_CTRL(LCD_PAD_CTRL),
 	MX6_PAD_LCD_DATA14__LCDIF_DATA14 | MUX_PAD_CTRL(LCD_PAD_CTRL),
 	MX6_PAD_LCD_DATA15__LCDIF_DATA15 | MUX_PAD_CTRL(LCD_PAD_CTRL),
-
-	MX6_PAD_LCD_DATA18__PWM5_OUT     | MUX_PAD_CTRL(PWM_PAD_CTRL),
-	MX6_PAD_LCD_DATA19__PWM6_OUT     | MUX_PAD_CTRL(PWM_PAD_CTRL),
-	MX6_PAD_LCD_DATA22__MQS_RIGHT    | MUX_PAD_CTRL(NO_PAD_CTRL),
-	MX6_PAD_LCD_DATA23__MQS_LEFT     | MUX_PAD_CTRL(NO_PAD_CTRL),
 
 	/*
 	 * Use GPIO for Brightness adjustment, duty cycle = period.
@@ -264,8 +268,8 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
         info->bits_per_pixel = device->entry->info.depth;
         info->pixel_format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
         info->framebuffer = device->draw;
-        info->width = device->entry->info.mode.yres;
-        info->height = device->entry->info.mode.xres;
+        info->width = device->entry->info.mode.xres;
+        info->height = device->entry->info.mode.yres;
     break; }
     
     case RTGRAPHIC_CTRL_RECT_UPDATE: {
@@ -278,6 +282,8 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
             if ((readl(&regs->hw_lcdif_ctrl1)&LCDIF_CTRL1_CUR_FRAME_DONE_IRQ)
                     || (++_frame_chg > 1000))
                 _frame_chg = 0;
+            if (_frame_chg > 1)
+                rt_kprintf("lcd update rect timeout\n");
         }
         //如果画的太快都没有显示出去，直接跳过
         if (!_frame_chg)
@@ -296,7 +302,7 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
     return RT_EOK;
 }
 
-#ifndef RTGUI_USING_HZ_FILE
+#if 0
 #include "im.h"
 #endif
 int lcd_init(void)
@@ -304,8 +310,12 @@ int lcd_init(void)
     int ret = 0,i;
     int memsize;
 
+#if LIGHT_PWM
     pwm_init(4, 0, 0);
     pwm_config(4, 400, 400);
+#else
+    gpio_direction_output(LIGHT_GPIO , 1);
+#endif
 
     enable_lcdif_clock(fb_entry.info.lcdif_base_addr);
     imx_iomux_v3_setup_multiple_pads(lcd_pads, ARRAY_SIZE(lcd_pads));
@@ -327,21 +337,19 @@ int lcd_init(void)
     //初始化启动使用第一个缓存区
     _frame_flg = 0;
     _frame_chg = 0;
-#ifndef RTGUI_USING_HZ_FILE
-    rt_memcpy((void *)_device.phys[0],gImage_im,_device.memsize);
+#if 0
+    rt_memcpy((void *)_device.phys[0], gImage_im, memsize);
 #else
-{
     FILE *file;
-    if ((file = fopen("/etc/splash.logo", "rb")) != NULL)
+    if ((file = fopen("/resource/splash.logo", "rb")) != NULL)
     {
         fread((void *)_device.phys[0], memsize, 1, file);
         fclose(file);
     }
     else
     {
-        rt_memset((void *)_device.phys[0], 0x00, memsize);
+        rt_memset((void *)_device.phys[0], 0xff, memsize);
     }
-}
 #endif
     ret = fb_entry.init_panel(RT_DEVICE(&_device),(dma_addr_t)_device.phys[0],&fb_entry);
     if (ret != 0)
@@ -349,6 +357,7 @@ int lcd_init(void)
         rt_kprintf("cannot initialize LCD panel\n");
         goto out_panel;
     }
+#if LIGHT_PWM
     //延时一下让图片加载完成
     for (i=0; i<100; i+=2)
     {
@@ -356,6 +365,7 @@ int lcd_init(void)
         rt_thread_delay(10);
     }
     bl_data.set_bl_intensity(&bl_data,bl_data.bl_max_intensity);
+#endif
 
     _device.parent.type = RT_Device_Class_Graphic;
     _device.parent.init = sdlfb_init;

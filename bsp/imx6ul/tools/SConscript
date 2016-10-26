@@ -11,6 +11,7 @@ cpuusage.c
 file_src = Split("""
 readspeed.c
 writespeed.c
+vi.c
 """)
 
 ethdev_src = Split("""

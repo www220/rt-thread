@@ -373,4 +373,5 @@ void list_apps(void)
     }
 }
 FINSH_FUNCTION_EXPORT(list_apps, show the application list);
+MSH_CMD_EXPORT(list_apps, show the application list);
 #endif

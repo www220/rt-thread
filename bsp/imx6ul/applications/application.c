@@ -100,8 +100,8 @@ extern int touch_init(void);
 #endif
 
 #ifdef RT_USING_FINSH
-extern void finsh_system_init(void);
-extern void finsh_set_device(const char* device);
+#include <shell.h>
+#include <msh.h>
 #endif
 
 volatile int wtdog_count = 0;
@@ -243,7 +243,6 @@ static void rt_thread_entry_main(void* parameter)
     if (dfs_mount("nand0", "/", "yaffs2", 0, 0) == 0) {
         mkdir("/etc", 666);
         mkdir("/var", 666);
-        mkdir("/font", 666);
         mkdir("/dev", 666);
         mkdir("/mnt", 666);
 
@@ -399,8 +398,8 @@ static void rt_thread_entry_main(void* parameter)
 
 #ifdef RT_USING_RTGUI
     lcd_init();
-    touch_init();
     rtgui_system_server_init();
+    touch_init();
     rt_kprintf("RtGUI initialized!\n");
 #endif
 
@@ -459,6 +458,15 @@ static void rt_thread_entry_main(void* parameter)
         rt_process_exec_cmd(bupath, bupath " " buargc, -1);
 #endif
     }
+
+#define RTT_DEF_SH    "/etc/init.sh"
+#if defined(RT_USING_DFS)
+	if (PZ[0] && stat(RTT_DEF_SH, &st) == 0)
+	{
+		rt_kprintf("exec init.sh...\n");
+		msh_exec(RTT_DEF_SH, sizeof(RTT_DEF_SH));
+	}
+#endif
 
     while (1)
     {

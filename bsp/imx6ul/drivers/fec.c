@@ -91,13 +91,13 @@ struct rt_stm32_eth
 static struct rt_stm32_eth stm32_eth_device[2] = {
 	{
 	.devname = "e0",
-	.irqname = "EMac0",
+	.irqname = "EMac1",
 	.irq = IMX_INT_ENET1,
 	.phy_addr = 1,
 	},
 	{
 	.devname = "e1",
-	.irqname = "EMac1",
+	.irqname = "EMac2",
 	.irq = IMX_INT_ENET2,
 	.phy_addr = 5,
 	},

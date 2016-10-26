@@ -11,6 +11,9 @@
  * SPDX-License-Identifier:	GPL-2.0
  */
 
+#include <rtthread.h>
+ 
+#undef ALIGN
 #include <common.h>
 #include <div64.h>
 #include <asm/arch/imx-regs.h>
@@ -44,7 +47,7 @@ struct pwm_regs *pwm_id_to_reg(int pwm_id)
 		return (struct pwm_regs *)PWM8_BASE_ADDR;
 		break;
 	default:
-		printf("unknown pwm_id: %d\n", pwm_id);
+		rt_kprintf("unknown pwm_id: %d\n", pwm_id);
 		break;
 	}
 	return NULL;

@@ -444,5 +444,6 @@ void calibration(void)
     calibration_init(RT_NULL);
 }
 FINSH_FUNCTION_EXPORT(calibration, perform touch calibration);
+MSH_CMD_EXPORT(calibration, perform touch calibration);
 #endif
 
