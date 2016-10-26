@@ -1,3 +1,8 @@
+/**
+ * @file
+ * IPv4 API
+ */
+
 /*
  * Copyright (c) 2001-2004 Swedish Institute of Computer Science.
  * All rights reserved.
@@ -38,8 +43,7 @@
 
 #include "lwip/def.h"
 #include "lwip/pbuf.h"
-#include "lwip/ip_addr.h"
-#include "lwip/ip6_addr.h"
+#include "lwip/ip4_addr.h"
 #include "lwip/err.h"
 #include "lwip/netif.h"
 

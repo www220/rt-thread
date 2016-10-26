@@ -33,16 +33,16 @@ ulong get_timer_masked_us(void);
 int print_cpuinfo(void);
 
 #define HEAP_BEGIN      0x80A00000
-#define HEAP_END        0x8FF00000
+#define HEAP_END        0x90000000
 
 #define RT_USING_UART1
 #define RT_USING_UART2
-//#define RT_USING_UART3
-//#define RT_USING_UART4
-//#define RT_USING_UART5
-//#define RT_USING_UART6
-//#define RT_USING_UART7
-//#define RT_USING_UART8
+#define RT_USING_UART3
+#define RT_USING_UART4
+#define RT_USING_UART5
+#define RT_USING_UART6
+#define RT_USING_UART7
+#define RT_USING_UART8
 
 #define CONSOLE_DEVICE "uart1"
 #define FINSH_DEVICE_NAME "uart1"

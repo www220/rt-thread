@@ -1,3 +1,8 @@
+/**
+ * @file
+ * DHCP client API
+ */
+
 /*
  * Copyright (c) 2001-2004 Leon Woestenberg <leon.woestenberg@gmx.net>
  * Copyright (c) 2001-2004 Axon Digital Design B.V., The Netherlands.
@@ -59,10 +64,10 @@ struct dhcp
 {
   /** transaction identifier of last sent request */
   u32_t xid;
-  /** our connection to the DHCP server */
-  struct udp_pcb *pcb;
   /** incoming msg */
   struct dhcp_msg *msg_in;
+  /** track PCB allocation state */
+  u8_t pcb_allocated;
   /** current DHCP state machine state */
   u8_t state;
   /** retries of current request */
@@ -159,7 +164,7 @@ void dhcp_arp_reply(struct netif *netif, const ip4_addr_t *addr);
 #endif
 
 /** check if DHCP supplied netif->ip_addr */
-u8_t dhcp_supplied_address(struct netif *netif);
+u8_t dhcp_supplied_address(const struct netif *netif);
 
 /** to be called every minute */
 void dhcp_coarse_tmr(void);
@@ -199,9 +204,9 @@ void dhcp_fine_tmr(void);
 #define DHCP_STATE_SELECTING    6
 #define DHCP_STATE_INFORMING    7
 #define DHCP_STATE_CHECKING     8
-/** not yet implemented #define DHCP_STATE_PERMANENT 9 */
+/** not yet implemented \#define DHCP_STATE_PERMANENT 9 */
 #define DHCP_STATE_BOUND        10
-/** not yet implemented #define DHCP_STATE_RELEASING 11 */
+/** not yet implemented \#define DHCP_STATE_RELEASING 11 */
 #define DHCP_STATE_BACKING_OFF  12
 
 /** AUTOIP cooperation flags */

@@ -68,7 +68,7 @@
  * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "lwip/opt.h"
+#include "netif/ppp/ppp_opts.h"
 #if PPP_SUPPORT /* don't build if not configured for use in lwipopts.h */
 
 #if 0 /* UNUSED */
@@ -728,7 +728,9 @@ void link_established(ppp_pcb *pcb) {
 #if PPP_AUTH_SUPPORT
     int auth;
 #if PPP_SERVER
+#if PAP_SUPPORT
     lcp_options *wo = &pcb->lcp_wantoptions;
+#endif /* PAP_SUPPORT */
     lcp_options *go = &pcb->lcp_gotoptions;
 #endif /* PPP_SERVER */
     lcp_options *ho = &pcb->lcp_hisoptions;
@@ -777,7 +779,11 @@ void link_established(ppp_pcb *pcb) {
 	    set_allowed_addrs(unit, NULL, NULL);
 	} else
 #endif /* PPP_ALLOWED_ADDRS */
-	if (!wo->neg_upap || !pcb->settings.null_login) {
+	if (!pcb->settings.null_login
+#if PAP_SUPPORT
+	    || !wo->neg_upap
+#endif /* PAP_SUPPORT */
+	    ) {
 	    ppp_warn("peer refused to authenticate: terminating link");
 #if 0 /* UNUSED */
 	    status = EXIT_PEER_AUTH_FAILED;

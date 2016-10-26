@@ -51,43 +51,9 @@
 #include "lwip/inet_chksum.h"
 #include "lwip/netif.h"
 #include "lwip/icmp6.h"
+#include "netif/ethernet.h"
 
 #include <string.h>
-
-#define ETHTYPE_IPV6        0x86DD
-
-/** The ethernet address */
-#ifdef PACK_STRUCT_USE_INCLUDES
-#  include "arch/bpstruct.h"
-#endif
-PACK_STRUCT_BEGIN
-struct eth_addr {
-  PACK_STRUCT_FLD_8(u8_t addr[6]);
-} PACK_STRUCT_STRUCT;
-PACK_STRUCT_END
-#ifdef PACK_STRUCT_USE_INCLUDES
-#  include "arch/epstruct.h"
-#endif
-
-/** Ethernet header */
-#ifdef PACK_STRUCT_USE_INCLUDES
-#  include "arch/bpstruct.h"
-#endif
-PACK_STRUCT_BEGIN
-struct eth_hdr {
-#if ETH_PAD_SIZE
-  PACK_STRUCT_FLD_8(u8_t padding[ETH_PAD_SIZE]);
-#endif
-  PACK_STRUCT_FLD_S(struct eth_addr dest);
-  PACK_STRUCT_FLD_S(struct eth_addr src);
-  PACK_STRUCT_FIELD(u16_t type);
-} PACK_STRUCT_STRUCT;
-PACK_STRUCT_END
-#ifdef PACK_STRUCT_USE_INCLUDES
-#  include "arch/epstruct.h"
-#endif
-
-#define SIZEOF_ETH_HDR (14 + ETH_PAD_SIZE)
 
 /**
  * Send an IPv6 packet on the network using netif->linkoutput
@@ -122,7 +88,7 @@ ethip6_send(struct netif *netif, struct pbuf *p, struct eth_addr *src, struct et
  *
  * For unicast addresses, ...
  *
- * @TODO anycast addresses
+ * @todo anycast addresses
  *
  * @param netif The lwIP network interface which the IP packet will be sent on.
  * @param q The pbuf(s) containing the IP packet to be sent.
@@ -161,7 +127,7 @@ ethip6_output(struct netif *netif, struct pbuf *q, const ip6_addr_t *ip6addr)
   }
 
   /* We have a unicast destination IP address */
-  /* TODO anycast? */
+  /* @todo anycast? */
   /* Get next hop record. */
   i = nd6_get_next_hop_entry(ip6addr, netif);
   if (i < 0) {
@@ -175,7 +141,7 @@ ethip6_output(struct netif *netif, struct pbuf *q, const ip6_addr_t *ip6addr)
     neighbor_cache[i].state = ND6_DELAY;
     neighbor_cache[i].counter.delay_time = LWIP_ND6_DELAY_FIRST_PROBE_TIME;
   }
-  /* TODO should we send or queue if PROBE? send for now, to let unicast NS pass. */
+  /* @todo should we send or queue if PROBE? send for now, to let unicast NS pass. */
   if ((neighbor_cache[i].state == ND6_REACHABLE) ||
       (neighbor_cache[i].state == ND6_DELAY) ||
       (neighbor_cache[i].state == ND6_PROBE)) {

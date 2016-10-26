@@ -1,3 +1,8 @@
+/**
+ * @file
+ * TCP internal implementations (do not use in application code)
+ */
+
 /*
  * Copyright (c) 2001-2004 Swedish Institute of Computer Science.
  * All rights reserved.
@@ -178,8 +183,8 @@ PACK_STRUCT_END
 #  include "arch/epstruct.h"
 #endif
 
-#define TCPH_HDRLEN(phdr) (ntohs((phdr)->_hdrlen_rsvd_flags) >> 12)
-#define TCPH_FLAGS(phdr)  (ntohs((phdr)->_hdrlen_rsvd_flags) & TCP_FLAGS)
+#define TCPH_HDRLEN(phdr) ((u16_t)(ntohs((phdr)->_hdrlen_rsvd_flags) >> 12))
+#define TCPH_FLAGS(phdr)  ((u16_t)(ntohs((phdr)->_hdrlen_rsvd_flags) & TCP_FLAGS))
 
 #define TCPH_HDRLEN_SET(phdr, len) (phdr)->_hdrlen_rsvd_flags = htons(((len) << 12) | TCPH_FLAGS(phdr))
 #define TCPH_FLAGS_SET(phdr, flags) (phdr)->_hdrlen_rsvd_flags = (((phdr)->_hdrlen_rsvd_flags & PP_HTONS(~TCP_FLAGS)) | htons(flags))
@@ -199,7 +204,7 @@ PACK_STRUCT_END
 
 #if LWIP_EVENT_API
 
-#define TCP_EVENT_ACCEPT(pcb,err,ret)    ret = lwip_tcp_event((pcb)->callback_arg, (pcb),\
+#define TCP_EVENT_ACCEPT(lpcb,pcb,arg,err,ret) ret = lwip_tcp_event(arg, (pcb),\
                 LWIP_EVENT_ACCEPT, NULL, 0, err)
 #define TCP_EVENT_SENT(pcb,space,ret) ret = lwip_tcp_event((pcb)->callback_arg, (pcb),\
                    LWIP_EVENT_SENT, NULL, space, ERR_OK)
@@ -216,10 +221,10 @@ PACK_STRUCT_END
 
 #else /* LWIP_EVENT_API */
 
-#define TCP_EVENT_ACCEPT(pcb,err,ret)                          \
+#define TCP_EVENT_ACCEPT(lpcb,pcb,arg,err,ret)                 \
   do {                                                         \
-    if((pcb)->accept != NULL)                                  \
-      (ret) = (pcb)->accept((pcb)->callback_arg,(pcb),(err));  \
+    if((lpcb != NULL) && ((lpcb)->accept != NULL))             \
+      (ret) = (lpcb)->accept((arg),(pcb),(err));               \
     else (ret) = ERR_ARG;                                      \
   } while (0)
 
@@ -502,17 +507,12 @@ u16_t tcp_eff_send_mss_impl(u16_t sendmss, const ip_addr_t *dest
 #if LWIP_IPV6 || LWIP_IPV4_SRC_ROUTING
                            , const ip_addr_t *src
 #endif /* LWIP_IPV6 || LWIP_IPV4_SRC_ROUTING */
-#if LWIP_IPV6 && LWIP_IPV4
-                           , u8_t isipv6
-#endif /* LWIP_IPV6 && LWIP_IPV4 */
                            );
-#if LWIP_IPV4 && LWIP_IPV6
-#define tcp_eff_send_mss(sendmss, src, dest, isipv6) tcp_eff_send_mss_impl(sendmss, dest, src, isipv6)
-#elif LWIP_IPV6 || LWIP_IPV4_SRC_ROUTING
-#define tcp_eff_send_mss(sendmss, src, dest, isipv6) tcp_eff_send_mss_impl(sendmss, dest, src)
-#else /* LWIP_IPV4 && LWIP_IPV6 */
-#define tcp_eff_send_mss(sendmss, src, dest, isipv6) tcp_eff_send_mss_impl(sendmss, dest)
-#endif /* LWIP_IPV4 && LWIP_IPV6 */
+#if LWIP_IPV6 || LWIP_IPV4_SRC_ROUTING
+#define tcp_eff_send_mss(sendmss, src, dest) tcp_eff_send_mss_impl(sendmss, dest, src)
+#else /* LWIP_IPV6 || LWIP_IPV4_SRC_ROUTING */
+#define tcp_eff_send_mss(sendmss, src, dest) tcp_eff_send_mss_impl(sendmss, dest)
+#endif /* LWIP_IPV6 || LWIP_IPV4_SRC_ROUTING */
 #endif /* TCP_CALCULATE_EFF_SEND_MSS */
 
 #if LWIP_CALLBACK_API

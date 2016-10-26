@@ -68,7 +68,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "lwip/opt.h"
+#include "netif/ppp/ppp_opts.h"
 #if PPP_SUPPORT && PPPOE_SUPPORT /* don't build if not configured for use in lwipopts.h */
 
 #if 0 /* UNUSED */
@@ -76,7 +76,7 @@
 #include <stdio.h>
 #endif /* UNUSED */
 
-#include "lwip/timers.h"
+#include "lwip/timeouts.h"
 #include "lwip/memp.h"
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
@@ -85,6 +85,9 @@
 #include "netif/ppp/lcp.h"
 #include "netif/ppp/ipcp.h"
 #include "netif/ppp/pppoe.h"
+
+/* Memory pool */
+LWIP_MEMPOOL_DECLARE(PPPOE_IF, MEMP_NUM_PPPOE_INTERFACES, sizeof(struct pppoe_softc), "PPPOE_IF")
 
 /* Add a 16 bit unsigned value to a buffer pointed to by PTR */
 #define PPPOE_ADD_16(PTR, VAL) \
@@ -174,14 +177,14 @@ ppp_pcb *pppoe_create(struct netif *pppif,
   LWIP_UNUSED_ARG(service_name);
   LWIP_UNUSED_ARG(concentrator_name);
 
-  sc = (struct pppoe_softc *)memp_malloc(MEMP_PPPOE_IF);
+  sc = (struct pppoe_softc *)LWIP_MEMPOOL_ALLOC(PPPOE_IF);
   if (sc == NULL) {
     return NULL;
   }
 
   ppp = ppp_new(pppif, &pppoe_callbacks, sc, link_status_cb, ctx_cb);
   if (ppp == NULL) {
-    memp_free(MEMP_PPPOE_IF, sc);
+    LWIP_MEMPOOL_FREE(PPPOE_IF, sc);
     return NULL;
   }
 
@@ -306,7 +309,7 @@ pppoe_destroy(ppp_pcb *ppp, void *ctx)
     mem_free(sc->sc_service_name);
   }
 #endif /* PPPOE_TODO */
-  memp_free(MEMP_PPPOE_IF, sc);
+  LWIP_MEMPOOL_FREE(PPPOE_IF, sc);
 
   return ERR_OK;
 }
@@ -467,6 +470,10 @@ pppoe_disc_input(struct netif *netif, struct pbuf *pb)
         break;
       case PPPOE_TAG_ACCOOKIE:
         if (ac_cookie == NULL) {
+          if (len > PPPOE_MAX_AC_COOKIE_LEN) {
+            PPPDEBUG(LOG_DEBUG, ("pppoe: AC cookie is too long: len = %d, max = %d\n", len, PPPOE_MAX_AC_COOKIE_LEN));
+            goto done;
+          }
           ac_cookie = (u8_t*)pb->payload + off + sizeof(pt);
           ac_cookie_len = len;
         }
@@ -918,13 +925,15 @@ pppoe_connect(ppp_pcb *ppp, void *ctx)
   }
 #endif
 
-  ppp_clear(ppp);
+  ppp_link_start(ppp);
 
   lcp_wo = &ppp->lcp_wantoptions;
   lcp_wo->mru = sc->sc_ethif->mtu-PPPOE_HEADERLEN-2; /* two byte PPP protocol discriminator, then IP data */
   lcp_wo->neg_asyncmap = 0;
   lcp_wo->neg_pcompression = 0;
   lcp_wo->neg_accompression = 0;
+  lcp_wo->passive = 0;
+  lcp_wo->silent = 0;
 
   lcp_ao = &ppp->lcp_allowoptions;
   lcp_ao->mru = sc->sc_ethif->mtu-PPPOE_HEADERLEN-2; /* two byte PPP protocol discriminator, then IP data */

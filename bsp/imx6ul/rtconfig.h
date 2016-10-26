@@ -202,7 +202,7 @@
 #define RT_USING_RTGUI
 
 /* name length of RTGUI object */
-#define RTGUI_NAME_MAX		12
+#define RTGUI_NAME_MAX		16
 /* support 16 weight font */
 #define RTGUI_USING_FONT16
 /* support Chinese font */

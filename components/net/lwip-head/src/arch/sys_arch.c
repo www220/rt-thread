@@ -25,10 +25,9 @@
 #include "lwip/tcpip.h"
 #include "netif/ethernetif.h"
 #include "lwip/sio.h"
-#include <lwip/init.h>
-#include <lwip/dhcp.h>
-#include <lwip/netifapi.h>
-#include <lwip/ip_addr.h>
+#include "lwip/init.h"
+#include "lwip/dhcp.h"
+#include "lwip/netifapi.h"
 
 #include <string.h>
 
@@ -630,7 +629,34 @@ u32_t sys_jiffies(void)
 
 u32_t sys_now(void)
 {
-	return rt_tick_get() * (1000 / RT_TICK_PER_SECOND);
+    return rt_tick_get() * (1000 / RT_TICK_PER_SECOND);
+}
+
+WEAK
+void mem_init(void)
+{
+}
+
+void *mem_calloc(mem_size_t count, mem_size_t size)
+{
+    return rt_calloc(count, size);
+}
+
+void *mem_trim(void *mem, mem_size_t size)
+{
+    // return rt_realloc(mem, size);
+    /* not support trim yet */
+    return mem;
+}
+
+void *mem_malloc(mem_size_t size)
+{
+    return rt_malloc(size);
+}
+
+void  mem_free(void *mem)
+{
+    rt_free(mem);
 }
 
 #ifdef RT_LWIP_PPP
@@ -646,7 +672,6 @@ u32_t sio_read(sio_fd_t fd, u8_t *buf, u32_t size)
 
     return len;
 }
-RTM_EXPORT(sio_read)
 
 u32_t sio_write(sio_fd_t fd, u8_t *buf, u32_t size)
 {
@@ -654,8 +679,23 @@ u32_t sio_write(sio_fd_t fd, u8_t *buf, u32_t size)
 
     return rt_device_write((rt_device_t)fd, 0, buf, size);
 }
-RTM_EXPORT(sio_write)
-RTM_EXPORT(netif_set_default)
+
+void sio_read_abort(sio_fd_t fd)
+{
+    rt_kprintf("read_abort\n");
+}
+
+void ppp_trace(int level, const char *format, ...)
+{
+    va_list args;
+    rt_size_t length;
+    static char rt_log_buf[RT_CONSOLEBUF_SIZE];
+
+    va_start(args, format);
+    length = rt_vsprintf(rt_log_buf, format, args);
+    rt_device_write((rt_device_t)rt_console_get_device(), 0, rt_log_buf, length);
+    va_end(args);
+}
 #endif
 
 /*
@@ -688,11 +728,6 @@ RTM_EXPORT(lwip_htons);
 RTM_EXPORT(lwip_ntohs);
 RTM_EXPORT(lwip_htonl);
 RTM_EXPORT(lwip_ntohl);
-
-RTM_EXPORT(ip4addr_aton);
-RTM_EXPORT(ip4addr_ntoa);
-RTM_EXPORT(ip4addr_ntoa_r);
-RTM_EXPORT(ipaddr_addr);
 
 #if LWIP_DNS
 #include <lwip/netdb.h>

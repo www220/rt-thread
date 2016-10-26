@@ -6,7 +6,6 @@
 #include "board.h"
 
 #include <netif/ethernetif.h>
-#include <netif/ethernetif.h>
 #include <netif/etharp.h>
 #include <lwip/icmp.h>
 #include "lwipopts.h"

@@ -219,13 +219,12 @@ void rt_hw_rtc_init(void)
 	rt_mutex_init(&rtc_mutex, "rtc", RT_IPC_FLAG_FIFO);
     rt_device_register(&rtc, "rtc", RT_DEVICE_FLAG_RDWR);
 
-    /* load time from 85063 */
+    /* load time from 8563 */
     time_t now;
     if (rtc_get(&now) == 0)
         snvs_rtc_set_time(SNVS_BASE, &now);
-    /* re load time */
-    if (rtc_get(&now) == 0)
-        snvs_rtc_set_time(SNVS_BASE, &now);
+    else if (rtc_get(&now) == 0)
+         snvs_rtc_set_time(SNVS_BASE, &now);
     return;
 }
 

@@ -28,7 +28,7 @@
  * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "lwip/opt.h"
+#include "netif/ppp/ppp_opts.h"
 #if PPP_SUPPORT /* don't build if not configured for use in lwipopts.h */
 
 #if 0 /* UNUSED */
@@ -591,7 +591,7 @@ void ppp_print_string(const u_char *p, int len, void (*printer) (void *, const c
 		printer(arg, "\\t");
 		break;
 	    default:
-		printer(arg, "\\%.3o", c);
+		printer(arg, "\\%.3o", (u8_t)c);
 		/* no break */
 	    }
 	}

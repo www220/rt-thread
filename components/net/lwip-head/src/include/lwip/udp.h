@@ -1,3 +1,9 @@
+/**
+ * @file
+ * UDP API (to be used from TCPIP thread)\n
+ * See also @ref udp_raw
+ */
+
 /*
  * Copyright (c) 2001-2004 Swedish Institute of Computer Science.
  * All rights reserved.
@@ -88,8 +94,9 @@ struct udp_pcb;
 typedef void (*udp_recv_fn)(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     const ip_addr_t *addr, u16_t port);
 
+/** the UDP protocol control block */
 struct udp_pcb {
-/* Common members of all PCB types */
+/** Common members of all PCB types */
   IP_PCB;
 
 /* Protocol specific PCB members */
@@ -123,6 +130,7 @@ extern struct udp_pcb *udp_pcbs;
 /* The following functions is the application layer interface to the
    UDP code. */
 struct udp_pcb * udp_new        (void);
+struct udp_pcb * udp_new_ip_type(u8_t type);
 void             udp_remove     (struct udp_pcb *pcb);
 err_t            udp_bind       (struct udp_pcb *pcb, const ip_addr_t *ipaddr,
                                  u16_t port);
@@ -164,9 +172,8 @@ void             udp_input      (struct pbuf *p, struct netif *inp);
 
 void             udp_init       (void);
 
-#if LWIP_IPV6
-struct udp_pcb * udp_new_ip6(void);
-#endif /* LWIP_IPV6 */
+/* for compatibility with older implementation */
+#define udp_new_ip6() udp_new_ip_type(IPADDR_TYPE_V6)
 
 #if LWIP_MULTICAST_TX_OPTIONS
 #define udp_set_multicast_netif_addr(pcb, ip4addr) ip_addr_copy_from_ip4((pcb)->multicast_ip, *(ip4addr))

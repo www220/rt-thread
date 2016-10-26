@@ -185,10 +185,9 @@ void lcdif_power_down()
 	mxs_reset_block((struct mxs_register_32 *)&regs->hw_lcdif_ctrl);
 }
 
-void *video_hw_init(void)
+void *video_hw_init(unsigned int fb)
 {
 	int bpp = -1;
-	void *fb;
 	struct ctfb_res_modes mode;
 
 	rt_kprintf("Video: ");
@@ -241,19 +240,6 @@ void *video_hw_init(void)
 	}
 
 	panel.memSize = mode.xres * mode.yres * panel.gdfBytesPP;
-
-
-	/* Allocate framebuffer */
-	fb = memalign(ARCH_DMA_MINALIGN,
-		      roundup(panel.memSize, ARCH_DMA_MINALIGN));
-	if (!fb) {
-		rt_kprintf("MXSFB: Error allocating framebuffer!\n");
-		return NULL;
-	}
-
-	/* Wipe framebuffer */
-	memset(fb, 0, panel.memSize);
-
 	panel.frameAdrs = (u32)fb;
 
 	rt_kprintf("%s\n", panel.modeIdent);

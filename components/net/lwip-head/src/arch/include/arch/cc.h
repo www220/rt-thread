@@ -38,14 +38,6 @@
 #include <rthw.h>
 #include <rtthread.h>
 
-typedef rt_uint8_t	u8_t;
-typedef rt_int8_t	s8_t;
-typedef rt_uint16_t	u16_t;
-typedef rt_int16_t	s16_t;
-typedef rt_uint32_t	u32_t;
-typedef rt_int32_t	s32_t;
-typedef rt_uint32_t	mem_ptr_t;
-
 #define U16_F "hu"
 #define S16_F "hd"
 #define X16_F "hx"
@@ -76,7 +68,7 @@ typedef rt_uint32_t	mem_ptr_t;
 #define LWIP_TIMEVAL_PRIVATE	   1
 #endif
 
-#if defined(RT_USING_DFS_LWIP)
+#if defined(RT_USING_DFS_NET)
 #define LWIP_COMPAT_SOCKETS        0
 #endif
 

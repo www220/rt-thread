@@ -15,6 +15,7 @@
  * 2012-11-12     Bernard      The network interface can be initialized
  *                             after lwIP initialization.
  * 2013-02-28     aozima       fixed list_tcps bug: ipaddr_ntoa isn't reentrant.
+ * 2016-08-18     Bernard      port to lwIP 2.0.0
  */
 
 /*
@@ -49,7 +50,14 @@
  *
  */
 
-#include <rtthread.h>
+/*
+ * This file is a skeleton for developing Ethernet network interface
+ * drivers for lwIP. Add code to the low_level functions and do a
+ * search-and-replace for the word "ethernetif" to replace it with
+ * something that better describes your network interface.
+ */
+
+#include "lwip/opt.h"
 
 #include "lwip/opt.h"
 #include "lwip/debug.h"
@@ -70,9 +78,9 @@
 #define netifapi_netif_set_link_down(n)    netifapi_netif_common(n, netif_set_link_down, NULL)
 
 #ifndef RT_LWIP_ETHTHREAD_PRIORITY
-#define RT_ETHERNETIF_THREAD_PREORITY	0x90
+#define RT_ETHERNETIF_THREAD_PREORITY   0x90
 #else
-#define RT_ETHERNETIF_THREAD_PREORITY	RT_LWIP_ETHTHREAD_PRIORITY
+#define RT_ETHERNETIF_THREAD_PREORITY   RT_LWIP_ETHTHREAD_PRIORITY
 #endif
 
 #ifndef LWIP_NO_TX_THREAD
@@ -81,8 +89,8 @@
  */
 struct eth_tx_msg
 {
-    struct netif 	*netif;
-    struct pbuf 	*buf;
+    struct netif    *netif;
+    struct pbuf     *buf;
 };
 
 static struct rt_mailbox eth_tx_thread_mb;
@@ -114,7 +122,7 @@ static err_t ethernetif_linkoutput(struct netif *netif, struct pbuf *p)
     struct eth_tx_msg msg;
     struct eth_device* enetif;
 
-	RT_ASSERT(netif != RT_NULL);
+    RT_ASSERT(netif != RT_NULL);
     enetif = (struct eth_device*)netif->state;
 
     /* send a message to eth tx thread */
@@ -128,13 +136,13 @@ static err_t ethernetif_linkoutput(struct netif *netif, struct pbuf *p)
 #else
     struct eth_device* enetif;
 
-	RT_ASSERT(netif != RT_NULL);
+    RT_ASSERT(netif != RT_NULL);
     enetif = (struct eth_device*)netif->state;
 
-	if (enetif->eth_tx(&(enetif->parent), p) != RT_EOK)
-	{
-		return ERR_IF;
-	}
+    if (enetif->eth_tx(&(enetif->parent), p) != RT_EOK)
+    {
+        return ERR_IF;
+    }
 #endif
     return ERR_OK;
 }
@@ -165,6 +173,8 @@ static err_t eth_netif_device_init(struct netif *netif)
 #if LWIP_DHCP
         if (ethif->flags & NETIF_FLAG_DHCP)
         {
+            /* set interface up */
+            netif_set_up(ethif->netif);
             /* if this interface uses DHCP, start the DHCP client */
             dhcp_start(ethif->netif);
         }
@@ -216,16 +226,24 @@ rt_err_t eth_device_init_with_flag(struct eth_device *dev, char *name, rt_uint16
     netif->name[1] = name[1];
 
     /* set hw address to 6 */
-    netif->hwaddr_len 	= 6;
+    netif->hwaddr_len   = 6;
     /* maximum transfer unit */
-    netif->mtu			= ETHERNET_MTU;
+    netif->mtu          = ETHERNET_MTU;
 
     /* get hardware MAC address */
     rt_device_control(&(dev->parent), NIOCTL_GADDR, netif->hwaddr);
 
     /* set output */
-    netif->output		= etharp_output;
-    netif->linkoutput	= ethernetif_linkoutput;
+    netif->output       = etharp_output;
+#if LWIP_IPV6
+    netif->output_ip6   = ethip6_output;
+#endif /* LWIP_IPV6 */
+    netif->linkoutput   = ethernetif_linkoutput;
+
+#if LWIP_NETIF_HOSTNAME
+    /* Initialize interface hostname */
+    netif->hostname = "rtthread";
+#endif /* LWIP_NETIF_HOSTNAME */
 
     /* if tcp thread has been started up, we add this netif to the system */
     if (rt_thread_find("tcpip") != RT_NULL)
@@ -252,10 +270,18 @@ rt_err_t eth_device_init(struct eth_device * dev, char *name)
 {
     rt_uint16_t flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP;
 
-#if LWIP_DHCP
-    /* DHCP support */
-    flags |= NETIF_FLAG_DHCP;
-#endif
+#if LWIP_IPV6 && LWIP_IPV6_MLD
+    /*
+    * For hardware/netifs that implement MAC filtering.
+    * All-nodes link-local is handled by default, so we must let the hardware know
+    * to allow multicast packets in.
+    * Should set mld_mac_filter previously. */
+    if (netif->mld_mac_filter != NULL) {
+        ip6_addr_t ip6_allnodes_ll;
+        ip6_addr_set_allnodes_linklocal(&ip6_allnodes_ll);
+        netif->mld_mac_filter(netif, &ip6_allnodes_ll, MLD6_ADD_MAC_FILTER);
+    }
+#endif /* LWIP_IPV6 && LWIP_IPV6_MLD */
 
 #if LWIP_IGMP
     /* IGMP support */
@@ -296,12 +322,12 @@ rt_err_t eth_device_linkchange(struct eth_device* dev, rt_bool_t up)
 /* NOTE: please not use it in interrupt when no RxThread exist */
 rt_err_t eth_device_linkchange(struct eth_device* dev, rt_bool_t up)
 {
-	if (up == RT_TRUE)
-		netifapi_netif_set_link_up(dev->netif);
-	else
-		netifapi_netif_set_link_down(dev->netif);
+    if (up == RT_TRUE)
+        netifapi_netif_set_link_up(dev->netif);
+    else
+        netifapi_netif_set_link_down(dev->netif);
 
-	return RT_EOK;
+    return RT_EOK;
 }
 #endif
 
@@ -428,7 +454,7 @@ int eth_system_device_init(void)
     RT_ASSERT(result == RT_EOK);
 #endif
 
-	return (int)result;
+    return (int)result;
 }
 INIT_DEVICE_EXPORT(eth_system_device_init);
 
@@ -485,11 +511,11 @@ FINSH_FUNCTION_EXPORT(set_if, set network interface address);
 #include <lwip/dns.h>
 void set_dns(char* dns_server)
 {
-    ip_addr_t addr;
+    ip_addr_t *addr = RT_NULL;
 
-    if ((dns_server != RT_NULL) && ipaddr_aton(dns_server, &addr))
+    if ((dns_server != RT_NULL) && ipaddr_aton(dns_server, addr))
     {
-        dns_setserver(0, &addr);
+        dns_setserver(0, addr);
     }
 }
 FINSH_FUNCTION_EXPORT(set_dns, set DNS server address);
@@ -499,10 +525,12 @@ void list_if(void)
 {
     rt_ubase_t index;
     struct netif * netif;
+    struct eth_device *ethif;
 
     rt_enter_critical();
 
     netif = netif_list;
+    ethif = (struct eth_device *)netif->state;
 
     while( netif != RT_NULL )
     {
@@ -521,6 +549,8 @@ void list_if(void)
         else rt_kprintf(" LINK_DOWN");
         if (netif->flags & NETIF_FLAG_ETHARP) rt_kprintf(" ETHARP");
         if (netif->flags & NETIF_FLAG_IGMP) rt_kprintf(" IGMP");
+        if (ethif->flags & NETIF_FLAG_DHCP) rt_kprintf(" DHCP");
+        if (ethif->flags & ETHIF_LINK_PHYUP) rt_kprintf(" PHYUP");
         rt_kprintf("\n");
         rt_kprintf("ip address: %s\n", ipaddr_ntoa(&(netif->ip_addr)));
         rt_kprintf("gw address: %s\n", ipaddr_ntoa(&(netif->gw)));
@@ -528,16 +558,17 @@ void list_if(void)
         rt_kprintf("\r\n");
 
         netif = netif->next;
+        ethif = (struct eth_device *)netif->state;
     }
 
 #if LWIP_DNS
     {
-        ip_addr_t ip_addr;
+        const ip_addr_t *ip_addr;
 
         for(index=0; index<DNS_MAX_SERVERS; index++)
         {
             ip_addr = dns_getserver(index);
-            rt_kprintf("dns server #%d: %s\n", index, ipaddr_ntoa(&(ip_addr)));
+            rt_kprintf("dns server #%d: %s\n", index, ipaddr_ntoa(ip_addr));
         }
     }
 #endif /**< #if LWIP_DNS */

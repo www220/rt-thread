@@ -59,11 +59,6 @@
 #include "lwip/debug.h"
 #include "lwip/stats.h"
 
-#if !LWIP_IPV4
-/** Global data for IPv6 only */
-struct ip_globals ip_data;
-#endif /* !LWIP_IPV4 */
-
 /**
  * Finds the appropriate network interface for a given IPv6 address. It tries to select
  * a netif following a sequence of heuristics:
@@ -85,13 +80,6 @@ ip6_route(const ip6_addr_t *src, const ip6_addr_t *dest)
 {
   struct netif *netif;
   s8_t i;
-
-#ifdef LWIP_HOOK_IP6_ROUTE
-  netif = LWIP_HOOK_IP6_ROUTE(src, dest);
-  if (netif != NULL) {
-    return netif;
-  }
-#endif
 
   /* If single netif configuration, fast return. */
   if ((netif_list != NULL) && (netif_list->next == NULL)) {
@@ -130,6 +118,14 @@ ip6_route(const ip6_addr_t *src, const ip6_addr_t *dest)
     }
     return netif_default;
   }
+
+  /* we come here for non-link-local addresses */
+#ifdef LWIP_HOOK_IP6_ROUTE
+  netif = LWIP_HOOK_IP6_ROUTE(src, dest);
+  if (netif != NULL) {
+    return netif;
+  }
+#endif
 
   /* See if the destination subnet matches a configured address. */
   for (netif = netif_list; netif != NULL; netif = netif->next) {
@@ -189,7 +185,7 @@ ip6_route(const ip6_addr_t *src, const ip6_addr_t *dest)
 #endif /* LWIP_NETIF_LOOPBACK && !LWIP_HAVE_LOOPIF */
 
   /* no matching netif found, use default netif, if up */
-  if (!netif_is_up(netif_default) || !netif_is_link_up(netif_default)) {
+  if ((netif_default == NULL) || !netif_is_up(netif_default) || !netif_is_link_up(netif_default)) {
     return NULL;
   }
   return netif_default;
@@ -253,7 +249,7 @@ ip6_select_source_address(struct netif *netif, const ip6_addr_t * dest)
         }
         else {
           /* Replace src only if we find a prefix match. */
-          /* TODO find longest matching prefix. */
+          /* @todo find longest matching prefix. */
           if ((!(ip6_addr_netcmp(ip_2_ip6(src), dest))) &&
               ip6_addr_netcmp(netif_ip6_addr(netif, i), dest)) {
             src = netif_ip_addr6(netif, i);
@@ -374,18 +370,6 @@ ip6_forward(struct pbuf *p, struct ip6_hdr *iphdr, struct netif *inp)
 }
 #endif /* LWIP_IPV6_FORWARD */
 
-#if !LWIP_IPV4
-/* If both IP versions are enabled, this function can dispatch packets to the correct one.
- * If only IPv6 is enabled, this directly maps at ip6_input.
- * May be used as netif input function.
- */
-err_t
-ip_input(struct pbuf *p, struct netif *inp)
-{
-  return ip6_input(p, inp);
-}
-#endif /* !LWIP_IPV4 */
-
 /**
  * This function is called by the network interface device driver when
  * an IPv6 packet is received. The function does the basic checks of the
@@ -438,12 +422,12 @@ ip6_input(struct pbuf *p, struct netif *inp)
     if (IP6_HLEN > p->len) {
       LWIP_DEBUGF(IP6_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
         ("IPv6 header (len %"U16_F") does not fit in first pbuf (len %"U16_F"), IP packet dropped.\n",
-            IP6_HLEN, p->len));
+            (u16_t)IP6_HLEN, p->len));
     }
     if ((IP6H_PLEN(ip6hdr) + IP6_HLEN) > p->tot_len) {
       LWIP_DEBUGF(IP6_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
         ("IPv6 (plen %"U16_F") is longer than pbuf (len %"U16_F"), IP packet dropped.\n",
-            IP6H_PLEN(ip6hdr) + IP6_HLEN, p->tot_len));
+            (u16_t)(IP6H_PLEN(ip6hdr) + IP6_HLEN), p->tot_len));
     }
     /* free (drop) packet pbufs */
     pbuf_free(p);
@@ -460,6 +444,14 @@ ip6_input(struct pbuf *p, struct netif *inp)
   ip_addr_copy_from_ip6(ip_data.current_iphdr_dest, ip6hdr->dest);
   ip_addr_copy_from_ip6(ip_data.current_iphdr_src, ip6hdr->src);
 
+  /* Don't accept virtual IPv6 mapped IPv4 addresses */
+  if (ip6_addr_isipv6mappedipv4(ip_2_ip6(&ip_data.current_iphdr_dest)) ||
+     ip6_addr_isipv6mappedipv4(ip_2_ip6(&ip_data.current_iphdr_src))     ) {
+    IP6_STATS_INC(ip6.err);
+    IP6_STATS_INC(ip6.drop);
+    return ERR_OK;
+  }
+  
   /* current header pointer. */
   ip_data.current_ip6_header = ip6hdr;
 
@@ -763,7 +755,7 @@ options_done:
         icmp6_param_problem(p, ICMP6_PP_HEADER, ip_data.current_ip_header_tot_len - hlen);
       }
 #endif /* LWIP_ICMP */
-      LWIP_DEBUGF(IP6_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("ip6_input: Unsupported transport protocol %"U16_F"\n", IP6H_NEXTH(ip6hdr)));
+      LWIP_DEBUGF(IP6_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("ip6_input: Unsupported transport protocol %"U16_F"\n", (u16_t)IP6H_NEXTH(ip6hdr)));
       pbuf_free(p);
       IP6_STATS_INC(ip6.proterr);
       IP6_STATS_INC(ip6.drop);
@@ -878,7 +870,7 @@ ip6_output_if_src(struct pbuf *p, const ip6_addr_t *src, const ip6_addr_t *dest,
 
   IP6_STATS_INC(ip6.xmit);
 
-  LWIP_DEBUGF(IP6_DEBUG, ("ip6_output_if: %c%c%"U16_F"\n", netif->name[0], netif->name[1], netif->num));
+  LWIP_DEBUGF(IP6_DEBUG, ("ip6_output_if: %c%c%"U16_F"\n", netif->name[0], netif->name[1], (u16_t)netif->num));
   ip6_debug_print(p);
 
 #if ENABLE_LOOPBACK

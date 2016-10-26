@@ -892,7 +892,7 @@ int enable_fec_anatop_clock(int fec_id, enum enet_freq freq)
 	/* Enable FEC clock */
 	if (0 == fec_id)
 		reg |= BM_ANADIG_PLL_ENET_ENABLE;
-	if (1 == fec_id)
+	else if (1 == fec_id)
 		reg |= BM_ANADIG_PLL_ENET2_ENABLE;
 	else
 		reg |= BM_ANADIG_PLL_ENET_ENABLE|BM_ANADIG_PLL_ENET2_ENABLE;

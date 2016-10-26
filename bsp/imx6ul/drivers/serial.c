@@ -286,7 +286,7 @@ static const struct rt_uart_ops _uart_ops =
 static struct hw_uart_device _uart1_device =
 {
     UART1_BASE,
-    "uart1",
+    "Uart1",
     IMX_INT_UART1,
     {
         MX6_PAD_UART1_TX_DATA__UART1_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -300,7 +300,7 @@ static struct rt_serial_device _serial1;
 static struct hw_uart_device _uart2_device =
 {
     UART2_BASE,
-    "uart2",
+    "Uart2",
     IMX_INT_UART2,
     {
         MX6_PAD_UART2_TX_DATA__UART2_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -308,6 +308,34 @@ static struct hw_uart_device _uart2_device =
     }
 };
 static struct rt_serial_device _serial2;
+#endif
+#ifdef RT_USING_UART7
+/* UART7 device driver structure */
+static struct hw_uart_device _uart7_device =
+{
+    UART7_IPS_BASE_ADDR,
+    "Uart7",
+    IMX_INT_UART7,
+    {
+        MX6_PAD_LCD_DATA16__UART7_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+        MX6_PAD_LCD_DATA17__UART7_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+    }
+};
+static struct rt_serial_device _serial7;
+#endif
+#ifdef RT_USING_UART8
+/* UART8 device driver structure */
+static struct hw_uart_device _uart8_device =
+{
+    UART8_IPS_BASE_ADDR,
+    "Uart8",
+    IMX_INT_UART8,
+    {
+        MX6_PAD_LCD_DATA20__UART8_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
+        MX6_PAD_LCD_DATA21__UART8_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
+    }
+};
+static struct rt_serial_device _serial8;
 #endif
 
 void uart_iomux_config(struct rt_serial_device *dev, struct hw_uart_device *uart)
@@ -357,5 +385,23 @@ void rt_hw_uart_init(void)
     uart_iomux_config(&_serial2, &_uart2_device);
     rt_hw_serial_register(&_serial2, "uart2",
                           RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, &_uart2_device);
+#endif
+#ifdef RT_USING_UART7
+    _serial7.ops = &_uart_ops;
+    _serial7.config = config;
+
+    /* register UART7 device */
+    uart_iomux_config(&_serial7, &_uart7_device);
+    rt_hw_serial_register(&_serial7, "uart7",
+                          RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, &_uart7_device);
+#endif
+#ifdef RT_USING_UART8
+    _serial8.ops = &_uart_ops;
+    _serial8.config = config;
+
+    /* register UART8 device */
+    uart_iomux_config(&_serial8, &_uart8_device);
+    rt_hw_serial_register(&_serial8, "uart8",
+                          RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, &_uart8_device);
 #endif
 }

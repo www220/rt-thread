@@ -66,6 +66,7 @@ usb/ehci-hcd.c
 
 lcddev_src = Split("""
 lcdif.c
+ts.c
 """)
 
 if rtconfig.PLATFORM != 'cl':

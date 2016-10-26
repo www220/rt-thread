@@ -88,9 +88,6 @@ extern void libc_system_init(void);
 #endif
 
 #ifdef RT_USING_LWIP
-#include <lwip/sys.h>
-#include <lwip/api.h>
-#include <netif/ethernetif.h>
 extern void rt_hw_eth_init(void);
 extern int eth_system_device_init(void);
 extern void lwip_sys_init(void);

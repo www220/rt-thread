@@ -61,7 +61,7 @@ void rt_hw_timer_init(void)
     __REG(EPIT_BASE+8) = 999;
     __REG(EPIT_BASE) = __REG(EPIT_BASE)|0x05;
 
-    rt_hw_interrupt_install(IMX_INT_EPIT1, rt_hw_timer_isr, RT_NULL, "tick");
+    rt_hw_interrupt_install(IMX_INT_EPIT1, rt_hw_timer_isr, RT_NULL, "Tick");
     rt_hw_interrupt_umask(IMX_INT_EPIT1);
 }
 

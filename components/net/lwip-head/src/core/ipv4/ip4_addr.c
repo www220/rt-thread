@@ -276,14 +276,8 @@ ip4addr_aton(const char *cp, ip4_addr_t *addr)
 char*
 ip4addr_ntoa(const ip4_addr_t *addr)
 {
-  static int idx = 0;
-  static char str[128][16];
-  rt_base_t level;
-  level = rt_hw_interrupt_disable();
-  if (++idx >= 128)
-      idx = 0;
-  rt_hw_interrupt_enable(level);
-  return ipaddr_ntoa_r(addr, str[idx], 16);
+  static char str[IP4ADDR_STRLEN_MAX];
+  return ip4addr_ntoa_r(addr, str, IP4ADDR_STRLEN_MAX);
 }
 
 /**

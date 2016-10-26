@@ -30,10 +30,11 @@
 #
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
-COREFILES=$(LWIPDIR)/core/def.c \
+COREFILES=$(LWIPDIR)/core/init.c \
+	$(LWIPDIR)/core/def.c \
 	$(LWIPDIR)/core/dns.c \
 	$(LWIPDIR)/core/inet_chksum.c \
-	$(LWIPDIR)/core/init.c \
+	$(LWIPDIR)/core/ip.c \
 	$(LWIPDIR)/core/mem.c \
 	$(LWIPDIR)/core/memp.c \
 	$(LWIPDIR)/core/netif.c \
@@ -44,20 +45,22 @@ COREFILES=$(LWIPDIR)/core/def.c \
 	$(LWIPDIR)/core/tcp.c \
 	$(LWIPDIR)/core/tcp_in.c \
 	$(LWIPDIR)/core/tcp_out.c \
-	$(LWIPDIR)/core/timers.c \
+	$(LWIPDIR)/core/timeouts.c \
 	$(LWIPDIR)/core/udp.c
 
 CORE4FILES=$(LWIPDIR)/core/ipv4/autoip.c \
 	$(LWIPDIR)/core/ipv4/dhcp.c \
+	$(LWIPDIR)/core/ipv4/etharp.c \
 	$(LWIPDIR)/core/ipv4/icmp.c \
 	$(LWIPDIR)/core/ipv4/igmp.c \
-	$(LWIPDIR)/core/ipv4/ip_frag.c \
+	$(LWIPDIR)/core/ipv4/ip4_frag.c \
 	$(LWIPDIR)/core/ipv4/ip4.c \
 	$(LWIPDIR)/core/ipv4/ip4_addr.c
 
 CORE6FILES=$(LWIPDIR)/core/ipv6/dhcp6.c \
 	$(LWIPDIR)/core/ipv6/ethip6.c \
 	$(LWIPDIR)/core/ipv6/icmp6.c \
+	$(LWIPDIR)/core/ipv6/inet6.c \
 	$(LWIPDIR)/core/ipv6/ip6.c \
 	$(LWIPDIR)/core/ipv6/ip6_addr.c \
 	$(LWIPDIR)/core/ipv6/ip6_frag.c \
@@ -71,13 +74,15 @@ APIFILES=$(LWIPDIR)/api/api_lib.c \
 	$(LWIPDIR)/api/netbuf.c \
 	$(LWIPDIR)/api/netdb.c \
 	$(LWIPDIR)/api/netifapi.c \
-	$(LWIPDIR)/api/pppapi.c \
 	$(LWIPDIR)/api/sockets.c \
 	$(LWIPDIR)/api/tcpip.c
 
 # NETIFFILES: Files implementing various generic network interface functions
-NETIFFILES=$(LWIPDIR)/netif/etharp.c \
+NETIFFILES=$(LWIPDIR)/netif/ethernet.c \
 	$(LWIPDIR)/netif/slipif.c
+
+# SIXLOWPAN: 6LoWPAN
+SIXLOWPAN=$(LWIPDIR)/netif/lowpan6.c \
 
 # PPPFILES: PPP
 PPPFILES=$(LWIPDIR)/netif/ppp/auth.c \
@@ -97,6 +102,7 @@ PPPFILES=$(LWIPDIR)/netif/ppp/auth.c \
 	$(LWIPDIR)/netif/ppp/mppe.c \
 	$(LWIPDIR)/netif/ppp/multilink.c \
 	$(LWIPDIR)/netif/ppp/ppp.c \
+	$(LWIPDIR)/netif/ppp/pppapi.c \
 	$(LWIPDIR)/netif/ppp/pppcrypt.c \
 	$(LWIPDIR)/netif/ppp/pppoe.c \
 	$(LWIPDIR)/netif/ppp/pppol2tp.c \
@@ -116,20 +122,31 @@ LWIPNOAPPSFILES=$(COREFILES) \
 	$(CORE6FILES) \
 	$(APIFILES) \
 	$(NETIFFILES) \
-	$(PPPFILES)
+	$(PPPFILES) \
+	$(SIXLOWPAN)
 
 # SNMPFILES: SNMPv2c agent
 SNMPFILES=$(LWIPDIR)/apps/snmp/snmp_asn1.c \
 	$(LWIPDIR)/apps/snmp/snmp_core.c \
 	$(LWIPDIR)/apps/snmp/snmp_mib2.c \
+	$(LWIPDIR)/apps/snmp/snmp_mib2_icmp.c \
+	$(LWIPDIR)/apps/snmp/snmp_mib2_interfaces.c \
+	$(LWIPDIR)/apps/snmp/snmp_mib2_ip.c \
+	$(LWIPDIR)/apps/snmp/snmp_mib2_snmp.c \
+	$(LWIPDIR)/apps/snmp/snmp_mib2_system.c \
+	$(LWIPDIR)/apps/snmp/snmp_mib2_tcp.c \
+	$(LWIPDIR)/apps/snmp/snmp_mib2_udp.c \
 	$(LWIPDIR)/apps/snmp/snmp_msg.c \
+	$(LWIPDIR)/apps/snmp/snmpv3.c \
 	$(LWIPDIR)/apps/snmp/snmp_netconn.c \
 	$(LWIPDIR)/apps/snmp/snmp_pbuf_stream.c \
 	$(LWIPDIR)/apps/snmp/snmp_raw.c \
 	$(LWIPDIR)/apps/snmp/snmp_scalar.c \
 	$(LWIPDIR)/apps/snmp/snmp_table.c \
 	$(LWIPDIR)/apps/snmp/snmp_threadsync.c \
-	$(LWIPDIR)/apps/snmp/snmp_traps.c
+	$(LWIPDIR)/apps/snmp/snmp_traps.c \
+	$(LWIPDIR)/apps/snmp/snmpv3_mbedtls.c \
+	$(LWIPDIR)/apps/snmp/snmpv3_dummy.c
 
 # HTTPDFILES: HTTP server
 HTTPDFILES=$(LWIPDIR)/apps/httpd/fs.c \

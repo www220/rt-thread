@@ -324,7 +324,7 @@ int cmd_dns(int argc, char **argv)
         ip_addr_t ip_addr;
         for(index=0; index<DNS_MAX_SERVERS; index++)
         {
-            ip_addr = dns_getserver(index);
+            ip_addr = *dns_getserver(index);
             rt_kprintf("dns server #%d: %s\n", index, ipaddr_ntoa(&(ip_addr)));
         }
     }

@@ -65,7 +65,7 @@ typedef struct graphic_device {
 /* Export Graphic Functions                                                   */
 /******************************************************************************/
 
-void *video_hw_init (void);       /* returns GraphicDevice struct or NULL */
+void *video_hw_init (unsigned int fb);/* returns GraphicDevice struct or NULL */
 
 #ifdef VIDEO_HW_BITBLT
 void video_hw_bitblt (

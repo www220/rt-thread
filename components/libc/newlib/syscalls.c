@@ -215,7 +215,7 @@ _write_r(struct _reent *ptr, int fd, const void *buf, size_t nbytes)
 }
 
 int
-_gettimeofday(struct timeval *__tp, void *__tzp)
+gettimeofday(struct timeval *__tp, void *__tzp)
 {
 #ifndef RT_USING_RTC
 	/* return "not supported" */
