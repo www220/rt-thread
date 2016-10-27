@@ -1,0 +1,57 @@
+<!--
+* Copyright (C) 2012, Freescale Semiconductor, Inc. All Rights Reserved.
+* The CFG element contains a list of recognized usb devices.
+*  DEV elements provide a name, class, vid and pid for each device.
+*
+* Each LIST element contains a list of update instructions.
+*  "Install" - Erase media and install firmware.
+*  "Update" - Update firmware only.
+*
+* Each CMD element contains one update instruction of attribute type.
+*  "pull" - Does UtpRead(body, file) transaction.
+*  "push" - Does UtpWrite(body, file) transaction.
+*  "drop" - Does UtpCommand(body) then waits for device to disconnect.
+*  "boot" - Finds configured device, forces it to "body" device and downloads "file".
+*  "find" - Waits for "timeout" seconds for the "body" device to connect.
+*  "show" - Parse and show device info in "file".  
+-->
+
+
+<UCL>
+  <CFG>
+    <STATE name="BootStrap" dev="MX6SL" vid="15A2" pid="0063"/>
+    <STATE name="BootStrap" dev="MX6D" vid="15A2" pid="0061"/>
+    <STATE name="BootStrap" dev="MX6Q" vid="15A2" pid="0054"/>
+    <STATE name="BootStrap" dev="MX6SX" vid="15A2" pid="0071"/>
+    <STATE name="BootStrap" dev="MX6UL" vid="15A2" pid="007D"/>
+    <STATE name="BootStrap" dev="MX7D" vid="15A2" pid="0076"/>
+    <STATE name="Updater"   dev="MSC" vid="066F" pid="37FF"/>
+  </CFG>
+ 
+  
+  <LIST name="NAND Flash" desc="Choose NAND as media">
+	<CMD state="BootStrap" type="boot" body="BootStrap" file ="../../files/u-boot.imx" ifdev="MX6UL">Loading U-boot</CMD>		
+	<CMD state="BootStrap" type="load" file="../../files/zImage-mfgtool" address="0x80800000"
+		loadSection="OTH" setSection="OTH" HasFlashHeader="FALSE" ifdev="MX6SL MX6SX MX7D MX6UL">Loading Kernel.</CMD>
+	<CMD state="BootStrap" type="load" file="../../files/fsl-image-mfgtool-initramfs-imx_mfgtools.cpio.gz.u-boot" address="0x83800000"
+		loadSection="OTH" setSection="OTH" HasFlashHeader="FALSE" ifdev="MX6SL MX6SX MX7D MX6UL">Loading Initramfs.</CMD>	
+	<CMD state="BootStrap" type="load" file="../../files/sinlinx-imx6ul-480x272.dtb" address="0x83000000"
+		loadSection="OTH" setSection="OTH" HasFlashHeader="FALSE" ifdev="MX6UL">Loading device tree.</CMD>
+	
+	<CMD state="BootStrap" type="jump" > Jumping to OS image. </CMD>
+	
+	<!-- burn the uboot to NAND -->
+	<CMD state="Updater" type="push" body="$ flash_erase /dev/mtd%part_uboot% 0 0">Erasing Boot partition</CMD>
+	<CMD state="Updater" type="push" body="$ flash_erase /dev/mtd%part_dtb% 0 0">Erasing dtb partition</CMD>
+	<CMD state="Updater" type="push" body="$ flash_erase /dev/mtd%part_kernel_0% 0 0">Erasing Kernel partition</CMD>
+	<CMD state="Updater" type="push" body="$ flash_erase /dev/mtd%part_kernel_1% 0 0">Erasing Kernel partition</CMD>
+	<CMD state="Updater" type="push" body="$ flash_erase /dev/mtd%part_logo% 0 0">Erasing Logo partition</CMD>
+	<CMD state="Updater" type="push" body="$ flash_erase /dev/mtd%part_rootfs% 0 0">Erasing rootfs partition</CMD>
+    <CMD state="Updater" type="push" body="$ flash_erase /dev/mtd%part_opt% 0 0">Flash opt partition</CMD>
+	<CMD state="Updater" type="push" body="send" file="../../u-boot.imx" ifdev="MX6UL">Sending u-boot.bin</CMD>
+	<CMD state="Updater" type="push" body="$ kobs-ng init -x -v --chip_0_device_path=/dev/mtd%part_uboot% $FILE">Flashing Bootloader</CMD>
+	<CMD state="Updater" type="push" body="$ echo Update Complete!">Done</CMD> 
+	
+  </LIST>
+
+</UCL>

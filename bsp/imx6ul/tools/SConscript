@@ -20,6 +20,10 @@ ping.c
 tcpecho.c
 udpecho.c
 ntp.c
+tftpserver.c
+webclient.c
+ftpd.c
+telnet.c
 """)
 
 if GetDepend(['RT_USING_DFS']):

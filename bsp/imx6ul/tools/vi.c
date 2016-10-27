@@ -234,10 +234,11 @@ typedef int smallint;
 typedef unsigned smalluint;
 
 #ifdef _MSC_VER
+#include <getopt/getopt.h>
 #define ALIGN1
 #define barrier()
 #define STDIN_FILENO 0
-static void *memrchr(const void* ptr, int ch, size_t pos)
+void *memrchr(const void* ptr, int ch, size_t pos)
 {
     char *end = (char *)ptr+pos-1;
     while (end != ptr)
@@ -248,7 +249,7 @@ static void *memrchr(const void* ptr, int ch, size_t pos)
     }
     return (*end == ch)?(end):(NULL);
 }
-static int isblank(int ch)
+int isblank(int ch)
 {
     if (ch == ' ' || ch == '\t')
         return 1;
@@ -3437,13 +3438,12 @@ static int file_write(char *fn, char *first, char *last)
 	 * but instead ftruncate() it _after_ successful write.
 	 * Might reduce amount of data lost on power fail etc.
 	 */
-//  ftruncate nosys + O_TRUNC
-	fd = open(fn, (O_WRONLY | O_CREAT | O_TRUNC), 0666);
+	fd = open(fn, (O_WRONLY | O_CREAT), 0666);
 	if (fd < 0)
 		return -1;
 	cnt = last - first + 1;
 	charcnt = full_write(fd, first, cnt);
-//	ftruncate(fd, charcnt);
+	ftruncate(fd, charcnt);
 	if (charcnt == cnt) {
 		// good write
 		//modified_count = FALSE;

@@ -77,8 +77,6 @@ int i2c_reg_writebuf(rt_uint8_t index, rt_uint8_t addr, rt_uint8_t reg, const rt
 #define PIN_RUN		IMX_GPIO_NR(4,16)
 #define PIN_ERR		IMX_GPIO_NR(4,14)
 #define PIN_WDT		IMX_GPIO_NR(5,0)
-#define PIN_PZ1		IMX_GPIO_NR(5,3)
-#define PIN_PZ2		IMX_GPIO_NR(5,4)
 #define PIN_NET0	IMX_GPIO_NR(5,3)
 #define PIN_NET1	IMX_GPIO_NR(5,4)
 #define I2C_SDL		IMX_GPIO_NR(5,7)

@@ -276,14 +276,13 @@ static rt_err_t sdlfb_control(rt_device_t dev, rt_uint8_t cmd, void *args)
         struct rt_device_rect_info *rect;
         rect = (struct rt_device_rect_info *)args;
         struct mxs_lcdif_regs *regs = (struct mxs_lcdif_regs *)(fb_entry.info.lcdif_base_addr);
-        //已经输出或者超时以后，强制输出
+        //如果缓存的结果没有输出，直接覆盖
         if (_frame_chg)
         {
-            if ((readl(&regs->hw_lcdif_ctrl1)&LCDIF_CTRL1_CUR_FRAME_DONE_IRQ)
-                    || (++_frame_chg > 1000))
+            if (readl(&regs->hw_lcdif_ctrl1)&LCDIF_CTRL1_CUR_FRAME_DONE_IRQ)
                 _frame_chg = 0;
-            if (_frame_chg > 1)
-                rt_kprintf("lcd update rect timeout\n");
+            else
+                rt_memcpy(device->phys[_frame_flg],device->draw,device->entry->display->memSize);
         }
         //如果画的太快都没有显示出去，直接跳过
         if (!_frame_chg)

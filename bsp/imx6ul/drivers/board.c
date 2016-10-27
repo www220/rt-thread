@@ -109,11 +109,6 @@ void rt_hw_board_init(void)
     gpio_direction_output(PIN_WDT, 0);
     gpio_direction_output(PIN_RUN, 0);
     gpio_direction_output(PIN_ERR, 0);
-    gpio_direction_input(PIN_PZ1);
-    gpio_direction_input(PIN_PZ2);
-
-    PZ[0] = gpio_get_value(PIN_PZ1);
-    PZ[1] = gpio_get_value(PIN_PZ2);
 
     s_init();
     arch_cpu_init();
